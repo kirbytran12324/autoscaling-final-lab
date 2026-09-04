@@ -9,8 +9,9 @@
     "node": ">=24 <25"
   },
   "scripts": {
-    "test": "node --test"
-  },
+  "start": "node src/server.js",
+  "test": "node --test"
+},
   "license": "UNLICENSED",
   "dependencies": {
     "pokemon-showdown": "0.11.11"
