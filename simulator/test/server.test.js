@@ -69,6 +69,8 @@ test('POST /v1/battles returns a battle result', async () => {
   assert.equal(result.outcome, 'win');
   assert.equal(result.winnerSide, 'p1');
   assert.equal(result.winnerSpecies, 'Snorlax');
+  assert.deepEqual(result.seed, [12345, 23456, 34567, 45678]);
+  assert.equal(result.simulatorVersion, 'pokemon-showdown@0.11.11');
   assert.match(result.protocolHash, /^[a-f0-9]{64}$/);
   assert.equal(typeof result.servedBy, 'string');
   assert.equal(typeof result.durationMs, 'number');

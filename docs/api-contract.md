@@ -30,6 +30,8 @@ Runs one deterministic Pokémon battle.
   "winnerSpecies": "Snorlax",
   "turns": 6,
   "termination": "natural",
+  "seed": [12345, 23456, 34567, 45678],
+  "simulatorVersion": "pokemon-showdown@0.11.11",
   "protocolHash": "64-character SHA-256 value",
   "servedBy": "simulator-pod-name",
   "durationMs": 12.34

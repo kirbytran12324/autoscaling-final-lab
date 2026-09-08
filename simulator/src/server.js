@@ -4,6 +4,8 @@ const http = require('node:http');
 const os = require('node:os');
 const {performance} = require('node:perf_hooks');
 
+const {version: showdownVersion} =
+  require('pokemon-showdown/package.json');
 const {simulateBattle} = require('./battle');
 const {
   getBaseSpecies,
@@ -170,6 +172,8 @@ async function handleBattle(request, response) {
           : null,
     turns: result.turns,
     termination: result.termination,
+    seed: [...input.seed],
+    simulatorVersion: `pokemon-showdown@${showdownVersion}`,
     protocolHash: result.protocolHash,
     servedBy: process.env.HOSTNAME || os.hostname(),
     durationMs: Number(

@@ -1,290 +1,374 @@
 # Metronome Tournament Autoscaling Lab — Technical Design
 
-Status: proposed version-one design, 2026-09-03. This is a design and risk-reduction document, not the completed lab.
+Status: active implementation design, updated 2026-09-08.
+Final resource sizing, HPA values, VPA comparison and acceptance results remain pending.
+
+## Environment
+
+The lab runs on a Docker Desktop kind cluster with Kubernetes `v1.36.1`. The cluster has four nodes: three schedulable workers and one control-plane node protected by a `NoSchedule` taint. The default local-path StorageClass uses `WaitForFirstConsumer` volume binding.
+
+Metrics Server is installed and working. Test traffic stays inside the cluster, so the accepted test path has no current Traefik dependency.
 
 ## Decision summary
 
-The project is feasible in four days if the Kubernetes autoscaling evidence remains the primary deliverable and the full 1,025-species tournament is treated as a final workload run, not as a prerequisite for proving the application.
+The system consists of:
 
-Use one stateless HTTP simulator Deployment and one singleton tournament-runner Kubernetes Job. The runner calls the simulator's ClusterIP Service directly and keeps one append-only JSONL result file plus a small checkpoint file on a PVC. Run Locust from WSL through the existing Traefik ingress so load-generator CPU does not contaminate cluster measurements. Do not add a database, message queue, interactive application frontend, or separate Pokémon Showdown server. Generate one small read-only HTML results report from the evidence files.
+- one stateless simulator Deployment;
+- one singleton tournament-runner Job;
+- one fixed-replica Locust Deployment in the `load-testing` namespace;
+- one ClusterIP Service used by both the runner and Locust;
+- one PVC for runner results and checkpoints; and
+- a report command that generates a self-contained offline HTML report.
 
-Pin `pokemon-showdown` to exact version `0.11.11` and commit `package-lock.json`. Add contract tests because the upstream source explicitly warns that the stream format is not finalized.
+Only the simulator Deployment is an HPA target. The runner is a single coordinator, and Locust keeps a fixed replica count. The core lab system does not require a database, message queue, or external Pokémon Showdown server.
 
-## What was verified
+A read-only Pokémon Showdown replay viewer is an optional personal-interest extension after the 32-species sample tournament is complete. It does not change the lab acceptance criteria or autoscaling boundary, and it must not delay the runner, restart/resume, report, resource-sizing, HPA, VPA, or capacity evidence.
 
-The official package exports `BattleStream`, `Dex`, `PRNG`, and `Teams`. The documented simulator interface accepts `>start`, `>player`, and player-choice commands and emits an `end` JSON record. The current `end` record contains the winner, original seed, turns, teams, score, and replayable input log. See the upstream [simulator documentation](https://github.com/smogon/pokemon-showdown/blob/master/sim/SIMULATOR.md), [exports](https://github.com/smogon/pokemon-showdown/blob/master/sim/index.ts), and [Battle end record](https://github.com/smogon/pokemon-showdown/blob/master/sim/battle.ts).
+The simulator pins `pokemon-showdown` to exact version `0.11.11` and commits `package-lock.json`. Contract tests protect the application from unexpected assumptions about the pinned simulator interface and data.
 
-The service should consume the raw `BattleStream`. Do not use `getPlayerStreams` as the result collector: its implementation intentionally ignores the `end` message. It is useful as an example of routing requests, but not as the complete service adapter. See [battle-stream.ts](https://github.com/smogon/pokemon-showdown/blob/master/sim/battle-stream.ts).
+## Verified implementation
 
-The pinned package was installed in a disposable spike and exercised with Snorlax versus Clefable. Two runs using the same teams and seed produced identical simulator protocol after excluding the wall-clock timestamp. The package data returned:
+The following implementation is complete and verified:
 
-- 1,025 unique base species, Bulbasaur through Pecharunt;
-- 581 moves callable by Gen 9 Metronome; and
-- a primary (`0`) ability for every selected base species.
+- `pokemon-showdown@0.11.11` is pinned with a committed lockfile;
+- the battle module uses explicit teams and four-number seeds to produce deterministic results;
+- catalog tests enforce the 1,025-base-species roster and 581 Metronome-callable-move contracts;
+- battles apply a deterministic completed-turn cap rather than treating a wall-clock timeout as a draw;
+- the HTTP service validates requests and returns deterministic battle results;
+- automated catalog, battle, turn-cap, validation, and HTTP endpoint tests pass;
+- the simulator container runs as a non-root user;
+- Kubernetes manifests define the simulator Deployment and ClusterIP Service;
+- Metrics Server is installed and supplies node and Pod resource metrics;
+- Locust runs as an in-cluster workload; and
+- one-replica and three-replica exploratory experiments have been completed.
 
-This move count must be a contract-test expectation for version `0.11.11`, not a hand-maintained move list. The Gen 9 implementation selects moves where `isNonstandard` is absent or `Unobtainable`, and the move has the `metronome` flag. See [Metronome's implementation](https://github.com/smogon/pokemon-showdown/blob/master/data/moves.ts).
+The implemented request and response shapes are documented in the [Simulator API Contract](api-contract.md). The exploratory results and evidence links are recorded in the [single-Pod baseline](baseline-experiment.md) and [three-Pod experiment](three-pod-experiment.md).
 
-The label `group1-match9021` is not a valid Showdown seed and is rejected. Keep a human-readable seed label, but derive and record the four-number Showdown seed separately.
+### Pokémon Showdown integration rationale
 
-The disposable spike is in [`tmp/metronome-api-spike`](../../tmp/metronome-api-spike/). Its generated dependencies were removed; `npm ci` recreates them.
+The simulator uses the raw `BattleStream` interface because it exposes the complete simulator protocol, including the final `end` record needed to collect the winner, turn count, seed, and replay metadata. The application sends `>start`, `>player`, and deterministic player-choice commands, then parses that terminal record. The upstream [simulator documentation](https://github.com/smogon/pokemon-showdown/blob/master/sim/SIMULATOR.md), [simulator exports](https://github.com/smogon/pokemon-showdown/blob/master/sim/index.ts), and [battle end implementation](https://github.com/smogon/pokemon-showdown/blob/master/sim/battle.ts) document this interface and result path.
 
-## Smallest working one-battle prototype
+`getPlayerStreams()` is not used as the result collector because its routing implementation intentionally omits the `end` message from the player streams. It is useful as a request-routing reference, but would hide the authoritative terminal record required by this workflow; see the upstream [battle stream implementation](https://github.com/smogon/pokemon-showdown/blob/master/sim/battle-stream.ts).
 
-The first real prototype needs only one module and one test. It should:
+The application supplies fixed teams and selects Metronome, but does not choose the move called by Metronome or reimplement battle rules. Pokémon Showdown selects the called move and resolves the mechanics using the pinned engine and data. The upstream [Metronome implementation](https://github.com/smogon/pokemon-showdown/blob/master/data/moves.ts) is also the basis for the 581-callable-move contract test.
 
-1. Create `new BattleStream()`.
-2. Write `>start` with `formatid: "gen9customgame"` and an explicit four-number seed.
-3. Write one explicit one-Pokémon team for each player.
-4. Read raw stream messages. On a team-preview request, choose team slot 1; on an active request, choose move slot 1.
-5. Capture and parse the raw `end` JSON message.
-6. Run the same input twice and assert the normalized protocol, winner, turns, and returned seed are equal.
+## Architecture and workload ownership
 
-This proves the risky integration before HTTP, containers, or Kubernetes are introduced. A human-readable response wrapper comes afterward.
+```text
+Tournament runner Job ──────┐
+                            ├──> ClusterIP Service ──> simulator Pods
+Locust Deployment ──────────┘                            ▲
+                                                        │
+Metrics Server ──> HPA ─────────────────────────────────┘
 
-Do not use a wall-clock timeout as a draw rule. CPU contention during load testing would then change tournament results. A wall timeout is an operational failure that the runner retries with the same inputs; only the deterministic turn cap produces a draw.
+Runner Job ──> results/checkpoint PVC ──> report generator
+Resource-capture script ──> experiment evidence ──> report generator
+```
 
-## Version-one tournament rules
+Only simulator Pods autoscale. The HPA uses the simulator Deployment as its `scaleTargetRef`; Locust labels and selectors are separate and are excluded from the HPA target.
+
+The singleton runner generates a deterministic schedule and uses a bounded HTTP worker pool. It appends each accepted simulation result to `results.jsonl` and maintains a compact checkpoint on a ReadWriteOnce PVC. On restart, it reloads the checkpoint and results, ignores completed match IDs, and safely resends only missing work. Because each match ID determines the inputs and seed, a duplicate response is harmless and only one result is accepted.
+
+The runner and Locust resolve the simulator Service through Kubernetes DNS. A Service routes connections across Ready endpoints but does not guarantee strict request-by-request round robin; clients use enough independent connections, and the returned `servedBy` value is used to verify distribution.
+
+The runner remains a singleton because it owns the authoritative checkpoint. Group matches can use its worker pool concurrently. Knockout rounds are barriers: series within one round can run concurrently, but the runner waits for all winners before constructing the next round.
+
+## Tournament rules
 
 ### Roster and grouping
 
-- Use `Dex.mod('gen9').species.all()` from the pinned package.
-- Include only entries with National Dex number 1 through 1025 and `name === baseSpecies`. Assert both roster length and unique number count are 1,025.
+- Read the roster from `Dex.mod('gen9').species.all()` in the pinned package.
+- Include entries with National Dex numbers 1 through 1,025 where `name === baseSpecies`.
+- Assert both roster length and unique National Dex number count are 1,025.
 - Sort by National Dex number before shuffling.
-- Derive a roster seed from `SHA-256(UTF8(tournamentSeed + "\nroster"))`. Interpret the first eight digest bytes as four unsigned 16-bit big-endian integers.
-- Shuffle with the pinned Showdown `PRNG.shuffle` and save the complete ordered roster as evidence.
-- Slice the result, in order, into group sizes 257, 256, 256, and 256.
+- Derive the roster seed from `SHA-256(UTF8(tournamentSeed + "\nroster"))`, interpreting the first eight digest bytes as four unsigned 16-bit big-endian integers.
+- Shuffle using the pinned Showdown `PRNG.shuffle`, and save the complete ordered roster as evidence.
+- Divide the shuffled full roster, in order, into groups of 257, 256, 256, and 256.
 
 ### Battle set
 
-- Format: `gen9customgame`. This permits the synthetic set without pretending every species can legally learn Metronome.
-- One Pokémon per side, level 100.
+- Format: `gen9customgame`, allowing the synthetic set without claiming that every species can legally learn Metronome.
+- One Pokémon per side at level 100.
 - IVs: 31 in all six stats.
 - EVs: 0 in all six stats.
 - Nature: Serious, which is neutral.
 - Item: none.
 - Move list: Metronome only.
 - Ability: the species' primary ability, `species.abilities[0]`.
-- Gender: use a species' fixed M/F/N gender; use M for a species with a variable gender ratio.
+- Gender: use a species' fixed M/F/N gender; use M for a variable gender ratio.
 - Happiness: 255.
-- Never choose Terastallization. A Metronome-called Tera Blast therefore behaves as the engine defines it for a non-Terastallized Pokémon.
-- The simulator, not our code, chooses the called move and resolves battle mechanics.
+- Never select Terastallization.
+- Pokémon Showdown chooses the Metronome-called move and resolves the battle mechanics.
 
 ### Seeds and side assignment
 
-Every simulation has a unique stable `match_id`, for example `group-A-000001` or `r64-series-03-game-2-attempt-1`.
-
-Derive its Showdown seed as follows:
+Every simulation has a unique stable `matchId`, such as `group-A-000001` or `r64-series-03-game-2-attempt-1`. Its Showdown seed is derived as follows:
 
 ```text
-digest = SHA-256(UTF8(tournamentSeed + "\n" + match_id))
-showdown_seed = [u16be(digest[0:2]), u16be(digest[2:4]),
-                 u16be(digest[4:6]), u16be(digest[6:8])]
+digest = SHA-256(UTF8(tournamentSeed + "\n" + matchId))
+seed = [u16be(digest[0:2]), u16be(digest[2:4]),
+        u16be(digest[4:6]), u16be(digest[6:8])]
 ```
 
-Record `tournament_seed`, `match_id`, and `showdown_seed`. Reproducibility also requires the exact package version, rules, teams, and choices; a seed alone is insufficient.
+Record the tournament seed, `matchId`, four-number Showdown seed, exact package version, rule version, teams, and choices. A seed alone is not sufficient for reproducibility.
 
-For each group match, use the next digest bit to decide which participant is p1. In knockout series, alternate p1 between games. This makes any side-order effect deterministic and balanced rather than silently assigning it by Pokédex order.
+For a group match, use the next digest bit to select the p1 participant. In knockout series, alternate p1 between games. This makes side assignment deterministic and balanced.
 
 ### Completion, draws, and errors
 
-- Maximum: 100 completed turns. If the simulator begins turn 101, send `>forcetie` before accepting more choices.
+- After 100 completed turns, force a tie before accepting choices for a further turn.
 - A natural Showdown tie is also a draw.
-- An application timeout, stream exception, invalid response, or HTTP failure is not a draw. Retry the same `match_id` and seed up to three times with exponential backoff, then stop the tournament as failed.
-- Keep the full input log for failed or sampled battles, but do not store every full battle protocol by default. The protocol includes a wall-clock timestamp and can make evidence unnecessarily large.
+- An application timeout, stream exception, invalid response, or HTTP failure is an operational error rather than a draw. Retry the same `matchId` and seed up to three times with exponential backoff, then fail the tournament.
+- Retain the full input log for failed or sampled battles, but not every full protocol by default.
 
-### Group stage
+### Full group stage
 
-For a group of `n`, generate every unordered pair `i < j` exactly once. The match counts are:
+For a group of `n`, generate each unordered pair `i < j` exactly once:
 
-- group A: `257 × 256 / 2 = 32,896`;
-- each other group: `256 × 255 / 2 = 32,640`; and
-- total group stage: **130,816 battles**.
+- group A: `257 × 256 / 2 = 32,896` battles;
+- each other group: `256 × 255 / 2 = 32,640` battles; and
+- total: **130,816 group-stage battles**.
 
-Scoring is win = 3 points, draw = 1 point each, loss = 0. Rank by:
+Scoring is win = 3 points, draw = 1 point for each participant, and loss = 0. Rank participants by:
 
 1. total points;
 2. mini-table points from matches among the tied cohort;
 3. total wins;
-4. Sonneborn–Berger score, represented as an integer: twice each defeated opponent's final points plus each drawn opponent's final points; and
+4. Sonneborn–Berger score, stored as an integer: twice each defeated opponent's final points plus each drawn opponent's final points; and
 5. ascending deterministic tie key `SHA-256(tournamentSeed + "\nrank\n" + group + "\n" + speciesId)`.
 
-The final key is an explicit reproducible lottery, not a claim of sporting merit. Save every intermediate tie-break value in the standings output. Advance ranks 1–16 from each group.
+Save every intermediate tie-break value in the standings output. The top 16 participants from each group advance.
 
-### Knockout stage
+### Full knockout stage
 
-- Round of 64 pairs A with B and C with D. Rank `r` faces rank `17-r` from the paired group. Lay out the fixed bracket so adjacent series alternate which group supplies the higher seed. No same-group rematches can occur in round one.
-- Do not reseed after a round; winners advance through the recorded bracket.
-- A series is first to two decisive battle wins. Drawn simulations do not count as a win and use the next attempt seed.
-- Cap a series at seven total simulations. If neither participant has two wins, advance the one with more decisive wins; if still tied, use an explicitly recorded deterministic hash lottery.
+- The round of 64 pairs A with B and C with D. Rank `r` faces rank `17-r` from the paired group, and adjacent series alternate which group supplies the higher seed.
+- Do not reseed after a round; winners advance through the fixed recorded bracket.
+- A series is first to two decisive wins. Draws do not count as wins and consume the next simulation seed.
+- Cap a series at seven total simulations. If neither participant has two wins, advance the participant with more decisive wins; if still tied, use and record a deterministic hash lottery.
 
-There are 63 knockout series and 126–441 simulations under these rules. The overall tournament therefore contains 130,942–131,257 simulations.
+The full knockout has 63 series and 126–441 simulations. The complete tournament therefore contains 130,942–131,257 simulations.
+
+### Accepted 32-species sample mode
+
+The runner first supports a deterministic 32-species sample selected from the full roster. It creates four groups of eight, advances the top four participants from each group, and uses a fixed 16-entry knockout bracket.
+
+The sample contains 112 group-stage battles and 15 knockout series. At two to seven simulations per series, it requires approximately 142–217 simulations overall. It uses the same seed derivation, side assignment, scoring, tie-breakers, battle rules, retry rules, and result format as the full tournament.
+
+This mode validates the complete runner, checkpoint, standings, bracket, and reporting pipeline. It does not replace the required 1,025-species tournament.
 
 ## Application and API boundary
 
-The service owns the fixed rules. Clients select two valid base species and supply identity/seed data; they cannot submit arbitrary teams, moves, abilities, or formats.
+The service owns the fixed battle rules. Clients provide two valid base species, a `matchId`, and a four-number seed; they cannot submit arbitrary teams, moves, abilities, or formats.
 
-Suggested version-one endpoints:
+Implemented endpoints are:
 
-- `POST /v1/battles`: validate, simulate one battle, return its result.
-- `GET /healthz`: process is alive.
-- `GET /readyz`: pinned Dex is loaded and roster/move-count contract checks have passed.
+- `POST /v1/battles` — validate and simulate one battle;
+- `GET /health/live` — confirm that the HTTP process is alive; and
+- `GET /health/ready` — confirm that the pinned Dex is loaded and the species and move-count contracts pass.
 
-Minimum response fields are `match_id`, both species, nullable winner, `result` (`win` or `draw`), turns, seed label, four-number Showdown seed, simulator version, and Pod name from `HOSTNAME`. Remaining HP percentage is intentionally deferred: it is not present in the end record and would require careful parsing of split private/public protocol messages. It is not needed for version-one standings or autoscaling evidence.
+The API uses camelCase field names. The intended final battle response contains:
 
-## Results interpretation interface
+- `matchId`;
+- `pokemon1` and `pokemon2`;
+- `outcome`;
+- `winnerSide`;
+- `winnerSpecies`;
+- `turns`;
+- `termination`;
+- `seed`;
+- `simulatorVersion`;
+- `protocolHash`;
+- `servedBy`; and
+- `durationMs`.
 
-A minimal interface is justified because 130,000-plus JSONL records are reproducible but difficult to interpret or present. It should be a generated evidence artifact, not a second stateful application.
+## Results, experiment evidence, and report interface
 
-The runner writes canonical machine-readable files to the PVC:
+The runner owns tournament execution state and writes these canonical machine-readable artifacts to the PVC:
 
-- `run-metadata.json`: seed, rule version, dependency/image versions, timestamps, and completion state;
-- `results.jsonl`: one immutable record per simulation;
+- `run-metadata.json`: seed, rule version, dependency and image versions, timestamps, and completion state;
+- `results.jsonl`: one immutable record per accepted simulation;
 - `standings.json`: group scores and every tie-break value;
-- `bracket.json`: fixed bracket positions, series games, and winners; and
-- `autoscaling-timeline.csv`: timestamped replicas, CPU, request rate, failures, and latency gathered during the dedicated load test.
+- `bracket.json`: bracket positions, series simulations, and winners.
 
-A `report` command reads those files and produces a self-contained `report.html` with embedded data, CSS, and JavaScript. It must work offline after being copied into the repository; do not depend on a CDN. Regenerating it from the same inputs should produce the same substantive content, excluding an explicitly labelled generation timestamp.
+The separate [resource-capture script](../scripts/capture-resource-usage.sh), not the runner, owns experiment observations. The current script writes `resources.csv` and `replicas.csv`; the acceptance-evidence workflow combines those observations with the exported Locust results into `autoscaling-timeline.csv`. This timeline and its source Kubernetes observations are collected only during dedicated Locust/HPA runs. A normal tournament run does not implicitly run a load experiment.
 
-The first interface needs only:
+The report generator combines the tournament artifacts with separately captured experiment evidence and produces a self-contained `report.html` with embedded data, CSS, and JavaScript. It works offline after being copied into the repository and has no CDN dependency. Regeneration from identical inputs produces substantively identical content apart from an explicitly labelled generation timestamp.
 
-1. a run-summary header with seed, versions, progress, match counts, draws, retries, and failures;
-2. four sortable group tables with a visible top-16 cutoff and tie-break columns;
-3. the 64-entry knockout bracket and per-series game results;
-4. a searchable battle table showing match ID, participants, winner/draw, turns, seed, and serving Pod; and
-5. an autoscaling chart aligning replicas and CPU utilization with request rate, p95 latency, and failures.
+The report provides a run summary, sortable group tables with advancement cutoffs, the knockout bracket and series details, a searchable simulation table, and an autoscaling chart aligned with request rate, latency, and failures. It is read-only and never becomes the source of truth.
 
-The report is read-only: it must not start battles, alter standings, or become the source of truth. Its purpose is interpretation, screenshots, and browser print-to-PDF for the audit. During early phases, generate it from the 16- or 32-species sample; the same generator later handles the full run.
+### Deferred Pokémon Showdown replay viewer
 
-## Work distribution without a database or queue
+After the 32-species sample tournament, restart/resume validation, and offline report are complete, perform a bounded viability spike for a separate read-only replay viewer. A user should be able to search for a matchup, select a recorded simulation, and watch it turn by turn using the actual Pokémon Showdown battle UI rather than only reading a move log or final result.
 
-```text
-Tournament runner Job ---------------------> ClusterIP Service
-        |                                          |
-        v                                          v
-results/checkpoint PVC                  stateless simulator Pods
-                                                   ^
-WSL Locust -> Traefik Ingress -> ClusterIP Service |
-Metrics Server -> HPA ------------------------------|
-VPA recommender -> VPA status (read-only recommendation)
-```
+The viewer does not require a database or a second simulation engine. For a selected `matchId`, the system reloads the canonical participants, seed, rule version, and simulator version from the tournament artifacts, re-simulates the battle with the same fixed teams and player choices, verifies the winner, turn count, termination, and `protocolHash` against the stored result, and passes the regenerated battle protocol to a pinned Pokémon Showdown client replay player.
 
-The singleton runner Job generates a deterministic schedule and uses a bounded HTTP worker pool. After each success, it appends one result line to `results.jsonl` on a small ReadWriteOnce PVC. A checkpoint contains the tournament seed, rules version, dependency version, completed match IDs, and current bracket state. If the Job's Pod restarts, it reloads results, ignores completed IDs, and safely resends missing work. Duplicate responses are harmless because a `match_id` has deterministic inputs and only one result is accepted. Copy the completed artifacts from the PVC into the repository's evidence directory.
+Full replay protocols are not stored for every simulation by default. They are regenerated on demand, while sampled or explicitly requested replay logs may be retained as evidence. `results.jsonl` remains the authoritative tournament record, and a replay mismatch is treated as a reproducibility failure rather than replacing the stored result.
 
-The runner resolves the Service by Kubernetes DNS and never needs external exposure. Use the existing Traefik ingress only for WSL-based Locust and manual smoke tests. A Kubernetes Service routes connections, not a guaranteed round-robin sequence of HTTP requests; keep-alive can make distribution uneven. Use enough independent client connections and confirm distribution from the returned Pod names. Do not claim that every request is round-robin.
+The required `report.html` remains self-contained and usable offline without the viewer. The replay viewer is a separate optional interface and may use a locally served simulator plus explicitly pinned client assets. Its viability spike must identify the client commit, required sprite and animation assets, browser delivery path, and licensing obligations; the Pokémon Showdown client is AGPLv3 even though the simulator package is MIT-licensed. The first spike needs to prove only that one recorded battle renders with working replay controls and agrees with the stored result. If that integration is impractical, the viewer remains deferred and does not block any required lab deliverable.
 
-Do not autoscale the runner. It is one coordinator with one authoritative checkpoint; multiple runner replicas would require leader election or partition ownership and would recreate the queue/database problem we are deliberately avoiding. Give the Job measured requests and limits, but let the HPA target only the stateless simulator Deployment. Locust also stays outside the cluster so its own CPU and memory do not consume the capacity being measured.
+## Container and Pod security
 
-Group matches are fully independent and can use the worker pool. Knockout bracket rounds are barriers: series within a round run concurrently, then the runner waits for every winner before creating the next round.
+The simulator image and Pod implement the following controls:
 
-## Why this is a meaningful HPA workload
+- process UID and GID are both 1000;
+- `runAsNonRoot: true`;
+- `RuntimeDefault` seccomp profile;
+- privilege escalation disabled;
+- all Linux capabilities dropped;
+- read-only root filesystem;
+- explicit CPU and memory requests and limits; and
+- startup, readiness, and liveness probes.
 
-Battle simulation is CPU-bound, stateless, independently repeatable work. A Node.js process executes JavaScript on one main event loop, so one saturated Pod cannot turn HTTP concurrency into unlimited CPU parallelism. Additional Pods allow the cluster to use additional cores. This is a legitimate horizontal-scaling case.
+Before every acceptance run, validate that every lab-owned regular and init container declares CPU and memory requests and limits. Resource values currently used for experiments are provisional until the right-sizing phase is complete.
 
-CPU `averageUtilization` is a percentage of each container's CPU **request**, not its limit. Kubernetes uses approximately:
+## Probe behaviour and acceptance risk
+
+Exploratory tests show that battle processing can saturate the Node.js process and delay HTTP probe responses. Under saturation, the current HTTP liveness probe can restart a busy but still living simulator Pod. Readiness correctly removes an unresponsive endpoint, but liveness-triggered restarts can amplify the failure by reducing serving capacity and repeating startup work.
+
+The final liveness behaviour must be revised and validated before HPA acceptance testing. The design deliberately does not prescribe the final probe configuration until that experiment is complete.
+
+## In-cluster Locust design
+
+Locust runs as one fixed-replica Deployment in the `load-testing` namespace and sends requests directly to the simulator through Kubernetes Service DNS. It declares explicit CPU and memory requests and limits and is not autoscaled.
+
+Every acceptance experiment captures Locust resource usage alongside simulator and cluster metrics. The exploratory evidence shows that Locust remained well below its limits while the simulator saturated, supporting CPU saturation in the simulator as the leading constraint in those runs.
+
+Locust's requests count toward cluster scheduling capacity. For the capacity-limited experiment, it must either be scaled down or be explicitly included in the free-capacity calculation.
+
+Locust profiles cover idle, sustainable steady load, a spike held for multiple metrics collection intervals, and recovery. Capture synchronized timestamps, desired/current/ready simulator replicas, per-Pod CPU and memory, Locust resources, request rate, failures, and p50/p95 latency. Very short spikes are not valid evidence because Metrics Server and the HPA reconcile periodically.
+
+## Exploratory scaling evidence
+
+> Scaling from one to three fixed simulator replicas nearly tripled useful processing capacity and substantially reduced latency and failure rate. All three replicas still reached their CPU limits and restarted, so these results demonstrate horizontal scalability but are not final right-sizing or HPA acceptance evidence.
+
+Under the same 50-user, three-minute profile, Locust total RPS increased from 13.7 to 37.7. Accounting for failed requests, successful throughput increased from approximately 12.3 to 36.9 requests per second—nearly threefold. Failure rate fell from 10.0% to 2.1%, median latency fell from 1.5 seconds to 790 milliseconds, and p95 latency fell from 19 seconds to 2.2 seconds. See the [baseline experiment](baseline-experiment.md) and [three-Pod experiment](three-pod-experiment.md) for the measurements and source artifacts.
+
+The fixed-replica runs establish that horizontal scaling can add useful processing capacity. Because CPU saturation, readiness loss, and restarts remained, they do not establish a healthy operating point or validate an HPA configuration.
+
+## HPA and resource-sizing design
+
+Battle simulation is CPU-bound, stateless, and independently reproducible. A Node.js process executes JavaScript on one main event loop, so additional simulator Pods allow the cluster to use additional cores. Experiments showed simulator CPU saturation while memory remained below the 512 Mi limit, making CPU the leading HPA metric. The current 128 Mi memory request remains provisional.
+
+CPU `averageUtilization` is measured as a percentage of the container's CPU request rather than its limit. Kubernetes calculates the raw recommendation approximately as:
 
 ```text
 desiredReplicas = ceil(currentReplicas × currentUtilization / targetUtilization)
 ```
 
-For example, with four replicas averaging 90% against a 60% target, the raw recommendation is `ceil(4 × 90 / 60) = 6`. Missing CPU requests make utilization undefined. See the official [HPA algorithm](https://kubernetes.io/docs/concepts/workloads/autoscaling/horizontal-pod-autoscale/) and [resource request/limit behavior](https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/).
+CPU requests are therefore required for utilization-based scaling, and choosing them is part of the control design rather than a cosmetic resource setting. See the Kubernetes documentation for the [HPA algorithm](https://kubernetes.io/docs/concepts/workloads/autoscaling/horizontal-pod-autoscale/) and [container resources](https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/).
 
-Do not choose final requests and limits in this design. First run one Pod at a declared sustainable load for at least ten minutes and sample CPU and memory every 15 seconds. A defensible initial method is:
+Final CPU and memory requests, limits, CPU target, minimum replica count, and maximum replica count have not been selected. Values used in exploratory manifests, including a 100m CPU request, 500m CPU limit, or any experimental HPA bounds and targets, are provisional.
 
-- CPU request: observed p95 CPU at the chosen sustainable per-Pod load divided by the 0.60 HPA target, rounded to a documented practical unit.
-- CPU limit: above observed peak with documented burst headroom, but no more than the useful single-process ceiling.
-- Memory request: observed p95 working set plus measured headroom.
-- Memory limit: above observed maximum plus a larger safety margin, then verify no OOM kills.
+The final choices follow these measurements and constraints:
 
-Use `autoscaling/v2`, a provisional `minReplicas: 1`, `maxReplicas: 12`, CPU target 60%, and an explicit 300-second scale-down stabilization window. Revisit the maximum after reading node allocatable capacity. The five-minute window makes scale-in slower by design and prevents thrashing; evidence collection must continue long enough to capture it. Kubernetes documents the default five-minute downscale stabilization behavior in the [HPA behavior section](https://kubernetes.io/docs/concepts/workloads/autoscaling/horizontal-pod-autoscale/).
+- establish sustainable per-Pod load before selecting CPU requests;
+- define healthy operation using latency, failure rate, readiness, and restart behaviour, not CPU alone;
+- choose a CPU target below the utilization point at which service degradation begins;
+- set minimum replicas from the selected availability objective;
+- set maximum replicas from cluster allocatable capacity and measured healthy per-Pod throughput; and
+- continue the recovery observation beyond the configured scale-down stabilization window to demonstrate delayed scale-in and a stable return to minimum capacity.
 
-Locust should have four named profiles: idle, sustainable steady load, spike load held for several metrics collection intervals, and recovery. Record timestamps, current/desired/ready replicas, per-Pod CPU/memory, request rate, failures, and p50/p95 latency at a fixed interval. A very short spike is invalid evidence because Metrics Server and the HPA reconcile periodically.
+Measure one Pod under idle, steady, and increasing load for a representative duration. Use observed CPU, memory, throttling, latency, failures, readiness, and restarts to choose a sustainable operating point and appropriate headroom. Then compare a fixed one-Pod baseline with an HPA run using the same image, requests and limits, deterministic request corpus, client concurrency, and duration.
 
-## What proves that scaling helped
+Acceptance evidence must show more than a replica-count change: requests must reach new Ready Pods, useful throughput or latency must improve or remain healthy, failures and restarts must remain acceptable, and replicas must scale down after load ends. Aggregate the response `servedBy` values by time bucket and correlate them with EndpointSlices, Deployment and HPA events, Pod placement, and per-Pod CPU.
 
-Do not create one Kubernetes Job per battle and do not start several tournaments merely to manufacture load. One full tournament already contains more than 130,000 independent HTTP battle requests. The singleton runner keeps a configurable number of those requests in flight; the ClusterIP Service sends connections to Ready simulator endpoints, and the HPA changes the number of those endpoints by scaling the simulator Deployment.
+## Metrics Server
 
-Keep functional correctness and autoscaling proof as two related but separate experiments:
+Metrics Server `v0.8.0` is installed from its vendored upstream `components.yaml` using Kustomize. The local overlay applies `--kubelet-insecure-tls` because the Docker Desktop kubelet serving certificate failed validation. The [installation documentation](../k8s/addons/metrics-server/README.md) records the local-only rationale, but the repository does not yet contain the original error output. The exact certificate-validation error must be captured in the evidence package before the final audit; until then, the design does not claim that raw TLS failure evidence is retained.
 
-1. **Single-Pod baseline:** disable HPA or hold the Deployment at one replica. Replay a fixed deterministic battle corpus at a concurrency that drives the Pod above the intended 60% CPU target. Capture throughput, p95 latency, failures, CPU, memory, and throttling for at least five minutes.
-2. **HPA comparison:** use the same image, resources, battle corpus, client concurrency, and duration, but enable HPA. Capture when desired/current/ready replicas change and compare throughput and latency with the baseline. The useful result is not merely “more Pods existed”; it is that work was spread across them and service behavior improved or remained acceptable.
-3. **Recovery:** stop the load and continue collecting for longer than the 300-second scale-down stabilization window. Show CPU falling first and replica count returning to the minimum later.
-4. **Real-workload run:** run the full tournament once with HPA enabled. It should reproduce the same scale-out and recovery pattern, but it is supporting evidence rather than the only controlled test.
+Disabling kubelet certificate validation is acceptable only in this local, single-user lab. A production or shared cluster must use trusted kubelet serving certificates. Metrics Server `0.8.x` supports Kubernetes `1.31+`, including this Kubernetes `v1.36.1` cluster; see the upstream [compatibility matrix](https://github.com/kubernetes-sigs/metrics-server#compatibility-matrix).
 
-Choose runner/Locust concurrency from measurement: increase it until one Pod is CPU-saturated and latency begins to queue, then keep that value constant for the one-Pod and HPA comparisons. Concurrency must be high enough to keep additional replicas busy; otherwise new Pods cannot improve throughput.
+## VPA comparison
 
-Each battle response includes the serving Pod name. Aggregate completed battles by Pod and by time bucket. Correlate that with:
+VPA remains a pending recommendation-only comparison. Configure it with `updateMode: "Off"`, collect representative idle and loaded history, and compare its `lowerBound`, `target`, and `upperBound` with the manually selected requests.
 
-- the Service's EndpointSlices, showing only Ready simulator endpoints;
-- Deployment/HPA events, showing when new Pods were created;
-- `kubectl get pods -o wide`, showing which nodes received the Pods; and
-- per-Pod CPU from Metrics Server.
+VPA must not mutate the CPU requests while a CPU-utilization HPA controls the same workload. Changing the request changes the HPA utilization denominator and creates interacting feedback loops. Recommendation-only mode allows an evidence-based comparison without changing running Pods. See the upstream [VPA API](https://github.com/kubernetes/autoscaler/blob/master/vertical-pod-autoscaler/docs/api.md) and [known limitations](https://github.com/kubernetes/autoscaler/blob/master/vertical-pod-autoscaler/docs/known-limitations.md).
 
-New Pod names appearing in results after scale-out prove that requests reached the new replicas. A soft topology spread constraint (`whenUnsatisfiable: ScheduleAnyway`) can encourage simulator Pods across both schedulable workers without making normal scheduling brittle. The third Ready node is the tainted control plane and remains unavailable to ordinary application Pods. Kubernetes schedules Pods onto nodes; it does not assign individual battle Jobs to simulator Pods. Service networking routes the runner's HTTP connections to the Ready simulator Pods.
+## Scheduling and capacity demonstration
 
-For Kubernetes 1.36, pin the currently compatible Metrics Server application `0.9.0` / Helm chart `3.14.0`; the upstream compatibility table says 0.9.x supports Kubernetes 1.34+. First test normal TLS settings. Add `--kubelet-insecure-tls` only if Docker Desktop's kubelet certificate actually fails validation, and capture that error and rationale. See the [Metrics Server compatibility and installation notes](https://github.com/kubernetes-sigs/metrics-server#readme).
+Simulator Pods may be spread across the three schedulable workers; the tainted control-plane node is unavailable to ordinary application Pods. A soft topology-spread constraint may encourage distribution without making normal scheduling brittle. Kubernetes schedules Pods to nodes; the ClusterIP Service then routes client connections to Ready simulator endpoints.
 
-Pin VPA `1.7.1` / chart `0.11.0` and set `updateMode: "Off"`. Compare `lowerBound`, `target`, and `upperBound` after it has collected representative idle and loaded samples. Off mode still writes recommendations but never changes Pods. Upstream explicitly warns against VPA and HPA controlling the same CPU metric: changing CPU requests changes the HPA utilization denominator, so two feedback loops can fight. See the [VPA API](https://github.com/kubernetes/autoscaler/blob/master/vertical-pod-autoscaler/docs/api.md) and [known limitations](https://github.com/kubernetes/autoscaler/blob/master/vertical-pod-autoscaler/docs/known-limitations.md).
+The capacity demonstration must produce scheduler-level Pending Pods with events that include `FailedScheduling` and `Insufficient cpu`. It must not use a ResourceQuota that turns the result into an admission-time `FailedCreate` failure.
 
-The lab uses the first of these conflict-avoidance strategies and explains the alternatives:
+Create an isolated capacity-demo overlay targeting the three schedulable workers. Let `L` be the largest eligible worker's allocatable CPU and choose a demo request `q > L / 2`, which prevents any eligible node from fitting two demo Pods. Confirm that `q` is no greater than the smallest eligible worker's free requested CPU so one demo Pod can fit on each worker. Then request four replicas: one more than the three-worker capacity under that constraint.
 
-- **Recommendation only (chosen):** keep VPA in `Off` mode while the CPU-utilization HPA is active, then review its recommendation without allowing it to mutate requests.
-- **Separate metrics:** let VPA manage CPU requests only when HPA scales on a metric whose denominator VPA does not change, such as an external queue-depth metric.
-- **Separate phases or workloads:** disable the HPA while applying a VPA recommendation, or run VPA mutation on a different workload from the HPA-controlled simulator.
+If those bounds do not overlap because the nodes are heterogeneous or already busy, select a homogeneous worker subset with node affinity and repeat the calculation for that subset. Record allocatable resources, existing requests—including Locust unless it has been scaled down—the calculation, Pod conditions, and scheduler events.
 
-Before each acceptance run, validate every lab-owned regular and init container in the `autoscaling-lab` namespace. Each must declare both CPU and memory requests and limits. Save the machine-readable Pod-spec check with the evidence; simulator sidecars, runner containers, and any later helper containers are included rather than checking only the main simulator container.
+Requests drive scheduling and an unsatisfied request leaves a Pod Pending; limits are runtime enforcement. See [Kubernetes resource management](https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/). Docker Desktop has fixed local nodes and no cloud-provider node-group API that a cluster autoscaler could use to add a VM; contrast this with [Kubernetes node autoscaling](https://kubernetes.io/docs/concepts/cluster-administration/node-autoscaling/).
 
-## Capacity-limited demonstration
+## Cost and performance requirement
 
-Do not use a `ResourceQuota` if the required evidence is Pending Pods. A quota commonly prevents the ReplicaSet from creating Pods and produces `FailedCreate`, which demonstrates admission failure rather than scheduler capacity failure.
+The Docker Desktop cluster has no defensible cloud node charge, so local measurements and cloud estimates remain clearly separated. At project completion, report:
 
-Create an isolated `capacity-demo` overlay of the simulator Deployment and target only the schedulable worker nodes. Let `L` be the largest worker's allocatable CPU and choose a demo request `q > L / 2`; this is what guarantees that no eligible node can fit two demo Pods. Also verify `q` is no greater than the smallest worker's currently free requested capacity so that one demo Pod can fit on every worker. Then request `schedulableWorkerCount + 1` replicas. If those two bounds do not overlap on a heterogeneous or busy cluster, use a homogeneous worker subset with node affinity and calculate against that subset. Record allocatable CPU, pre-existing requests, the calculation, and the selected value rather than assuming a node size. Diagnose the remaining Pod with conditions and scheduler events showing `FailedScheduling` / `Insufficient cpu`, then remove the overlay after capturing evidence.
+- a right-sized monthly cloud estimate;
+- a monthly estimate for the same workload at 2× over-provisioning;
+- the additional monthly cost of that over-provisioning; and
+- the observed latency, failure-rate, readiness, and restart/availability risk caused by under-provisioning.
 
-Requests guide scheduling and an unsatisfied request leaves a Pod Pending; limits are runtime enforcement. See [Kubernetes resource management](https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/). In a cloud cluster, Cluster Autoscaler could add a VM to a preconfigured node group for the Pending Pod. Docker Desktop has fixed local nodes and no cloud-provider VM/node-group API for the autoscaler to call. See [Kubernetes node autoscaling](https://kubernetes.io/docs/concepts/cluster-administration/node-autoscaling/).
+For each estimate, identify the provider, region, instance type, billing unit, utilization assumptions, required node count, fixed service charges, and the date of the cited official price. Use a consistent monthly-hours assumption and show the arithmetic.
 
-## Cost/performance calculation
+Cost per 1,000 battles remains supplementary:
 
-The local Docker Desktop run has no defensible per-node cloud charge, so report measured performance locally and a clearly labelled cloud projection separately. For each controlled run record completed battles, elapsed hours, average node count, and any fixed service charges. On the day of the estimate, cite the selected provider, region, instance type, billing unit, and dated official price. Calculate:
+```text
+estimatedRunCost =
+  averageNodeCount × instanceHourlyPrice × elapsedHours
+  + proratedFixedServiceCosts
 
-`estimated_cost = (average_node_count * instance_hourly_price * elapsed_hours) + prorated_fixed_service_costs`
+costPer1000Battles = estimatedRunCost / completedBattles × 1,000
+```
 
-`cost_per_1,000_battles = estimated_cost / completed_battles * 1,000`
+Compare cost with throughput, p95 latency, failure rate, and availability. Additional simulator replicas consume cluster capacity but add cloud cost only when they cause additional billed infrastructure or service usage.
 
-Compare that value alongside throughput, p95 latency, and failure rate. Do not claim that additional Pods cost more unless they actually require additional billed nodes; Kubernetes replicas consume capacity, while cloud billing normally follows the backing infrastructure and managed-service pricing.
+## Required deliverables
 
-## Four-day feasibility risks
+The final audit package is complete only when it contains all of the following:
 
-| Risk | Effect | Mitigation / decision gate |
-|---|---|---|
-| Stream API changes | Subtle result or request-routing breakage | Exact dependency pin, lockfile, one-battle and deterministic replay contract tests |
-| 130,816 group battles | Full run and evidence volume distract from Kubernetes | Support a small roster mode first; keep JSONL canonical and generate a summarized HTML report; full run is not an HPA acceptance gate |
-| Battles are short | Load generator may not sustain CPU saturation | Benchmark first, then raise Locust users/connections; do not add artificial sleeps |
-| Keep-alive skews Service routing | One Pod is hot while others appear idle | Multiple client connections; return Pod name and check the distribution |
-| A wall timeout changes results under load | Same seed can appear non-reproducible | Treat timeout as retryable operational failure; draws use turn count only |
-| Startup CPU and Dex loading distort samples | Misleading sizing/HPA decisions | Readiness only after data checks; exclude warm-up interval from measurements |
-| VPA has insufficient history | Weak recommendation comparison | Install before the sustained-load run and record sample duration |
-| Docker Desktop metrics TLS fails | No `kubectl top`, HPA shows unknown | Diagnose first; apply insecure kubelet TLS only with captured evidence |
-| Package brings server-side dependencies and audit findings | Larger image/security-review noise | Expose only our small service, omit optional/dev dependencies, run and document a scan, do not run the Showdown server |
-| Cluster facts differ from the brief | Manifests and capacity demo are wrong | Capture versions, node count, allocatable CPU/memory, Metrics API, default StorageClass, and Traefik release before implementation |
+- [ ] an HPA manifest plus observed scale-out and scale-in evidence;
+- [ ] a VPA Off-mode manifest plus captured recommendation evidence;
+- [ ] the in-cluster Locust workload plus exported acceptance-test results;
+- [ ] a capacity demonstration with a scheduler-level Pending Pod and `Insufficient cpu` diagnosis;
+- [ ] the final offline report interface combining tournament results and separately captured experiment evidence; and
+- [ ] a README explaining resource sizing, HPA/VPA interaction, capacity diagnosis, approximate monthly cost, and complete reproduction instructions.
 
-A local 1,000-battle pure-simulator sample across the base roster completed at about 137 battles/second on the current Windows Node.js process, with about 5 turns per battle. That suggests roughly 16 minutes of ideal single-process compute for the group stage, but it is not a service or Kubernetes capacity claim; HTTP, logging, CPU limits, WSL, and matchup distribution will change it.
+## Current risks and validation gates
 
-## Phased implementation plan
+| Risk | Effect | Validation or control |
+| --- | --- | --- |
+| Pinned stream assumptions drift | Incorrect result parsing or request routing | Exact dependency and lockfile; deterministic replay and contract tests |
+| Pinned engine has vulnerable or deprecated transitive packages | Known dependency findings remain in the runtime dependency tree | Keep the engine version pinned for reproducibility, save the current 11-finding audit output, limit container exposure and privileges, and evaluate upgrades separately; do not apply `npm audit fix --force` because forced changes could alter behaviour and reproducibility |
+| Full group stage contains 130,816 battles | Runtime and evidence volume can obscure infrastructure work | Validate the same pipeline with the accepted 32-species mode, then run all 1,025 species |
+| CPU-bound processing delays probes | Busy but living Pods restart and reduce serving capacity | Revise and test liveness behaviour before HPA acceptance |
+| Keep-alive skews Service distribution | One Pod may be hot while others are underused | Use independent connections and analyze `servedBy` distribution |
+| A wall timeout changes outcomes under load | Identical deterministic input could appear inconsistent | Treat timeouts as retryable operational failures; only turn count determines a capped draw |
+| Startup work distorts samples | Sizing and HPA choices include non-steady behaviour | Gate traffic on readiness and separate warm-up from measurement |
+| VPA has insufficient history | Recommendation is not representative | Collect both idle and sustained-load history and report the sampling period |
+| Locust consumes schedulable capacity | Capacity experiment attributes the wrong constraint | Scale Locust down or include its requests in the calculation |
+| Replay viewer integration expands scope or mishandles upstream assets | Optional UI work delays required lab evidence or creates licensing and compatibility risk | Start only after the sample-tournament phase gate; prove one replay in a bounded spike; pin the client revision and document AGPLv3 and asset requirements before integration |
 
-Every phase has a runnable exit condition. Stop and fix a failed gate before adding the next layer.
+## Phase status
 
-1. **Environment inventory.** Capture Kubernetes/Helm/Docker versions, Ready and schedulable node counts, allocatable and already-requested resources, node taints, Traefik release/values, Metrics API status, and storage/network facts. Exit: a dated environment evidence file explains the actual cluster.
-2. **Pinned simulator contract.** Build the one-battle module and tests, including invalid species, deterministic replay, 1,025-species roster, 581-move invariant, natural tie/win parsing, and the turn cap. Exit: local test command passes twice from a clean `npm ci`.
-3. **Local HTTP service.** Add `POST /v1/battles`, health/readiness, validation, operational timeout/retryable error distinction, and Pod/version metadata. Exit: local smoke test plus a bounded parallel test returns deterministic results without state leakage.
-4. **Container and single-Pod Kubernetes path.** Build a non-root image, deploy one replica with provisional resources, ClusterIP Service, probes, and Traefik route. Exit: WSL reaches the endpoint and the response identifies the serving Pod.
-5. **In-cluster runner and report, small tournament first.** Create a singleton Job and small PVC; implement deterministic schedule, JSONL resume, standings, tie-break fields, fixed bracket, and the self-contained HTML report. Run 16 or 32 species end to end through Service DNS. Exit: deleting the runner Pod causes the Job to restart and resume from the PVC without changing prior results, and the copied report opens offline with correct totals.
-6. **Measure and right-size.** With HPA disabled and one Pod, collect idle, steady, and saturation data; choose and document requests/limits from the observations. Exit: rerun at the chosen sustainable load with acceptable latency, no OOM, and no unexplained throttling.
-7. **Metrics Server, HPA, and Locust evidence.** Install pinned Metrics Server if absent, apply HPA, run idle/steady/spike/recovery, and capture a synchronized scaling timeline. Exit: evidence shows scale-out and later scale-in, with the HPA calculation explained from one observed sample.
-8. **VPA recommendation comparison.** Install pinned VPA in Off mode before a representative sustained run. Exit: saved VPA status is compared numerically with manual requests and the HPA/VPA CPU conflict is explained.
-9. **Capacity and scheduler diagnosis.** Apply the isolated capacity overlay, capture Pending Pod events, calculate why no node fits, explain cloud node autoscaling, then remove the overlay. Exit: evidence shows scheduler failure, not quota admission failure.
-10. **Final run and audit package.** Run all 1,025 species as the required functional capstone, then assemble the README, cost/performance note, manifests, exact install commands, versions, measurements, logs, and cleanup steps. The full tournament is required for project completion but is not the HPA acceptance gate; the fixed-corpus comparison remains the controlled autoscaling proof. Exit: every assignment and checklist item links to a specific artifact.
+The current implementation state is:
 
-Suggested four-day split: day 1 phases 1–3; day 2 phases 4–6; day 3 phases 7–8; day 4 phases 9–10 and rehearsal.
+- phases 1–4 complete;
+- Metrics Server completed early;
+- exploratory fixed-replica testing completed early;
+- phase 5 active;
+- the optional replay-viewer spike deferred until after the phase 5 sample-tournament gate; and
+- phases 6–10 pending.
 
-## Confirmed deployment boundary
+The remaining phase gates are:
 
-Kubernetes runs the simulator Deployment, its HPA, and one tournament-runner Job with a small results PVC. Only the stateless simulator Pods autoscale. Locust runs from WSL as an independent external observer and load source.
+1. **Environment inventory — complete.** The accepted cluster facts are reflected in this design.
+2. **Pinned simulator contract — complete.** Deterministic battle and catalog contracts are tested.
+3. **Local HTTP service — complete.** Battle, liveness, readiness, and validation paths are implemented.
+4. **Container and single-Pod Kubernetes path — complete.** The secured simulator Deployment and ClusterIP Service run in Kubernetes.
+5. **Runner, PVC, sample tournament, and report — active.** Complete the 32-species tournament end to end, validate restart/resume, and open the generated report offline.
+6. **Measure and right-size — pending.** Establish the sustainable one-Pod operating point and select resource values.
+7. **HPA acceptance evidence — pending; Metrics Server and exploratory comparison completed early.** Select the HPA values, then capture steady load, scale-out, service health, and recovery through scale-down.
+8. **VPA recommendation comparison — pending.** Collect and compare Off-mode recommendations.
+9. **Capacity and scheduler diagnosis — pending.** Produce a scheduler-level `Insufficient cpu` Pending Pod using calculated requests.
+10. **Final run and audit package — pending.** Run all 1,025 species and assemble the final manifests, evidence, cost comparison, report, and reproducibility instructions.
+
+After the phase 5 exit condition is satisfied, the optional replay-viewer viability spike may run as a separate enhancement. It is not an assignment deliverable or a prerequisite for phases 6–10.
+
+At project completion, replace this progress section and the opening status with a clean description of the implemented final design and its accepted results.

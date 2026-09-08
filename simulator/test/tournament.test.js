@@ -1,0 +1,331 @@
+'use strict';
+
+const {createHash} = require('node:crypto');
+const {test} = require('node:test');
+const assert = require('node:assert/strict');
+
+const {listBaseSpecies} = require('../src/catalog');
+const {
+  FULL_GROUP_SIZES,
+  SAMPLE_GROUP_SIZES,
+  buildFullRoster,
+  buildSampleRoster,
+  deriveShowdownSeed,
+  generateGroupStageSchedule,
+  shuffleRoster,
+  splitRosterIntoGroups,
+} = require('../src/tournament');
+
+function sampleSpeciesNames() {
+  return listBaseSpecies()
+    .slice(0, 32)
+    .reverse()
+    .map(species => species.name);
+}
+
+function buildGroups(groupSizes) {
+  const roster = listBaseSpecies().slice(0, 1025);
+  const requiredSize = groupSizes.reduce((total, size) => total + size, 0);
+  return splitRosterIntoGroups(roster.slice(0, requiredSize), groupSizes);
+}
+
+function pairingKey(match) {
+  return [match.pokemon1, match.pokemon2].sort().join('|');
+}
+
+test('deriveShowdownSeed produces a four-number array', () => {
+  const tournamentSeed = 'tournament-001';
+  const identifier = 'match-001';
+  const seed = deriveShowdownSeed(tournamentSeed, identifier);
+  assert.ok(Array.isArray(seed));
+  assert.equal(seed.length, 4);
+});
+
+test('deriveShowdownSeed produces consistent results for the same inputs', () => {
+  const tournamentSeed = 'tournament-001';
+  const identifier = 'match-001';
+  const seed1 = deriveShowdownSeed(tournamentSeed, identifier);
+  const seed2 = deriveShowdownSeed(tournamentSeed, identifier);
+  assert.deepEqual(seed1, seed2);
+});
+
+test('deriveShowdownSeed produces different results for different identifiers', () => {
+  const tournamentSeed = 'tournament-001';
+  const identifier1 = 'match-001';
+  const identifier2 = 'match-002';
+  const seed1 = deriveShowdownSeed(tournamentSeed, identifier1);
+  const seed2 = deriveShowdownSeed(tournamentSeed, identifier2);
+  assert.notDeepEqual(seed1, seed2);
+});
+
+test('deriveShowdownSeed produces seeds for fixed vector', () => {
+  assert.deepEqual(
+    deriveShowdownSeed('sample-2026', 'group-A-000001'),
+    [17977, 57843, 3005, 3627]
+  );
+});
+
+test('buildSampleRoster resolves and sorts 32 configured species', () => {
+  const configuredRoster = sampleSpeciesNames();
+  const originalConfiguration = [...configuredRoster];
+  const roster = buildSampleRoster(configuredRoster);
+
+  assert.equal(roster.length, 32);
+  assert.deepEqual(configuredRoster, originalConfiguration);
+  assert.deepEqual(
+    roster.map(species => species.num),
+    [...roster]
+      .map(species => species.num)
+      .sort((left, right) => left - right)
+  );
+  assert.ok(roster.every(species =>
+    species.name === species.baseSpecies
+  ));
+});
+
+test('buildSampleRoster rejects the wrong number of species', () => {
+  assert.throws(
+    () => buildSampleRoster(sampleSpeciesNames().slice(0, 31)),
+    /exactly 32 species/
+  );
+});
+
+test('buildSampleRoster rejects canonical duplicates', () => {
+  const configuredRoster = sampleSpeciesNames();
+  configuredRoster[31] = configuredRoster[0];
+
+  assert.throws(
+    () => buildSampleRoster(configuredRoster),
+    /duplicate species/
+  );
+});
+
+test('buildSampleRoster reuses catalog validation', () => {
+  const configuredRoster = sampleSpeciesNames();
+  configuredRoster[31] = 'MissingNo';
+
+  assert.throws(
+    () => buildSampleRoster(configuredRoster),
+    /tournament roster/
+  );
+});
+
+test('buildFullRoster returns the complete sorted catalog', () => {
+  const roster = buildFullRoster();
+  const speciesIds = new Set(roster.map(species => species.id));
+  const nationalDexNumbers = new Set(
+    roster.map(species => species.num)
+  );
+
+  assert.equal(roster.length, 1025);
+  assert.equal(speciesIds.size, 1025);
+  assert.equal(nationalDexNumbers.size, 1025);
+  assert.deepEqual(
+    roster.map(species => species.num),
+    Array.from({length: 1025}, (_, index) => index + 1)
+  );
+});
+
+test('shuffleRoster is deterministic for the same roster and seed', () => {
+  const roster = Array.from({length: 32}, (_, index) => index + 1);
+  const first = shuffleRoster(roster, 'tournament-001');
+  const second = shuffleRoster(roster, 'tournament-001');
+
+  assert.deepEqual(first.shuffledRoster, second.shuffledRoster);
+});
+
+test('shuffleRoster changes order for a different tournament seed', () => {
+  const roster = Array.from({length: 32}, (_, index) => index + 1);
+  const first = shuffleRoster(roster, 'tournament-001');
+  const second = shuffleRoster(roster, 'tournament-002');
+
+  assert.notDeepEqual(first.shuffledRoster, second.shuffledRoster);
+});
+
+test('shuffleRoster does not mutate the prepared roster', () => {
+  const roster = Array.from({length: 32}, (_, index) => index + 1);
+  const originalRoster = [...roster];
+
+  shuffleRoster(roster, 'tournament-001');
+
+  assert.deepEqual(roster, originalRoster);
+});
+
+test('shuffleRoster returns the derived roster seed', () => {
+  const roster = Array.from({length: 32}, (_, index) => index + 1);
+  const result = shuffleRoster(roster, 'tournament-001');
+
+  assert.deepEqual(
+    result.rosterSeed,
+    deriveShowdownSeed('tournament-001', 'roster')
+  );
+  assert.equal(result.rosterSeed.length, 4);
+});
+
+test('splitRosterIntoGroups creates four groups of eight', () => {
+  const roster = Array.from({length: 32}, (_, index) => index + 1);
+  const groups = splitRosterIntoGroups(roster, SAMPLE_GROUP_SIZES);
+  const flattened = Object.values(groups).flat();
+
+  assert.deepEqual(Object.keys(groups), ['A', 'B', 'C', 'D']);
+  assert.deepEqual(
+    Object.values(groups).map(group => group.length),
+    [8, 8, 8, 8]
+  );
+  assert.equal(new Set(flattened).size, 32);
+  assert.deepEqual(flattened, roster);
+});
+
+test('splitRosterIntoGroups uses the full tournament group sizes', () => {
+  const roster = Array.from({length: 1025}, (_, index) => index + 1);
+  const groups = splitRosterIntoGroups(roster, FULL_GROUP_SIZES);
+
+  assert.deepEqual(
+    Object.values(groups).map(group => group.length),
+    [257, 256, 256, 256]
+  );
+  assert.deepEqual(Object.values(groups).flat(), roster);
+});
+
+test('splitRosterIntoGroups does not mutate the shuffled roster', () => {
+  const roster = Array.from({length: 32}, (_, index) => index + 1);
+  const originalRoster = [...roster];
+
+  splitRosterIntoGroups(roster, SAMPLE_GROUP_SIZES);
+
+  assert.deepEqual(roster, originalRoster);
+});
+
+test('splitRosterIntoGroups rejects an invalid group count', () => {
+  const roster = Array.from({length: 32}, (_, index) => index + 1);
+
+  assert.throws(
+    () => splitRosterIntoGroups(roster, [8, 8, 16]),
+    /Exactly four group sizes/
+  );
+  assert.throws(
+    () => splitRosterIntoGroups(roster, [8, 8, 8, 4, 4]),
+    /Exactly four group sizes/
+  );
+});
+
+test('splitRosterIntoGroups rejects non-positive or non-integer sizes', () => {
+  const roster = Array.from({length: 32}, (_, index) => index + 1);
+
+  assert.throws(
+    () => splitRosterIntoGroups(roster, [8, 8, 16, 0]),
+    /positive integer/
+  );
+  assert.throws(
+    () => splitRosterIntoGroups(roster, [8, 8, 15.5, 0.5]),
+    /positive integer/
+  );
+});
+
+test('splitRosterIntoGroups rejects sizes with an incorrect total', () => {
+  const roster = Array.from({length: 32}, (_, index) => index + 1);
+
+  assert.throws(
+    () => splitRosterIntoGroups(roster, [7, 8, 8, 8]),
+    /sum to the roster length/
+  );
+});
+
+test('generateGroupStageSchedule creates every sample pair exactly once', () => {
+  const groups = buildGroups(SAMPLE_GROUP_SIZES);
+  const schedule = generateGroupStageSchedule(groups, 'tournament-001');
+
+  assert.equal(schedule.length, 112);
+
+  for (const groupName of ['A', 'B', 'C', 'D']) {
+    const matches = schedule.filter(match => match.group === groupName);
+    const pairings = new Set(matches.map(pairingKey));
+
+    assert.equal(matches.length, 28);
+    assert.equal(pairings.size, 28);
+    assert.ok(matches.every(match =>
+      match.pokemon1 !== match.pokemon2
+    ));
+
+    for (let leftIndex = 0; leftIndex < 8; leftIndex++) {
+      for (let rightIndex = leftIndex + 1; rightIndex < 8; rightIndex++) {
+        assert.ok(pairings.has([
+          groups[groupName][leftIndex].name,
+          groups[groupName][rightIndex].name,
+        ].sort().join('|')));
+      }
+    }
+  }
+});
+
+test('generateGroupStageSchedule creates unique stable match IDs', () => {
+  const groups = buildGroups(SAMPLE_GROUP_SIZES);
+  const schedule = generateGroupStageSchedule(groups, 'tournament-001');
+  const repeated = generateGroupStageSchedule(groups, 'tournament-001');
+  const matchIds = schedule.map(match => match.matchId);
+
+  assert.equal(new Set(matchIds).size, 112);
+  assert.equal(matchIds[0], 'group-A-000001');
+  assert.equal(matchIds[27], 'group-A-000028');
+  assert.equal(matchIds[28], 'group-B-000001');
+  assert.equal(matchIds[111], 'group-D-000028');
+  assert.deepEqual(repeated, schedule);
+});
+
+test('generateGroupStageSchedule uses the seed and byte-eight side bit', () => {
+  const groups = buildGroups(SAMPLE_GROUP_SIZES);
+  const tournamentSeed = 'tournament-001';
+  const [match] = generateGroupStageSchedule(groups, tournamentSeed);
+  const digest = createHash('sha256')
+    .update(`${tournamentSeed}\n${match.matchId}`, 'utf8')
+    .digest();
+  const swapSides = Boolean(digest[8] & 0x80);
+  const expectedParticipants = swapSides
+    ? [groups.A[1].name, groups.A[0].name]
+    : [groups.A[0].name, groups.A[1].name];
+
+  assert.deepEqual(
+    match.seed,
+    deriveShowdownSeed(tournamentSeed, match.matchId)
+  );
+  assert.deepEqual(
+    [match.pokemon1, match.pokemon2],
+    expectedParticipants
+  );
+});
+
+test('a different seed preserves group pairings but changes randomness', () => {
+  const groups = buildGroups(SAMPLE_GROUP_SIZES);
+  const first = generateGroupStageSchedule(groups, 'tournament-001');
+  const second = generateGroupStageSchedule(groups, 'tournament-002');
+
+  assert.deepEqual(
+    first.map(match => match.matchId),
+    second.map(match => match.matchId)
+  );
+  assert.deepEqual(
+    first.map(match => `${match.group}:${pairingKey(match)}`),
+    second.map(match => `${match.group}:${pairingKey(match)}`)
+  );
+  assert.ok(first.every((match, index) =>
+    !match.seed.every((value, seedIndex) =>
+      value === second[index].seed[seedIndex]
+    )
+  ));
+  assert.ok(first.some((match, index) =>
+    match.pokemon1 !== second[index].pokemon1
+  ));
+});
+
+test('generateGroupStageSchedule creates all full tournament matches', () => {
+  const groups = buildGroups(FULL_GROUP_SIZES);
+  const schedule = generateGroupStageSchedule(groups, 'tournament-001');
+
+  assert.equal(schedule.length, 130816);
+  assert.deepEqual(
+    ['A', 'B', 'C', 'D'].map(groupName =>
+      schedule.filter(match => match.group === groupName).length
+    ),
+    [32896, 32640, 32640, 32640]
+  );
+});
