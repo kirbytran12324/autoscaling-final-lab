@@ -32,9 +32,10 @@ The single replica was CPU-constrained under this workload. Simulator CPU repeat
 
 This result is the comparison point for later autoscaling experiments. An effective autoscaling configuration should keep more requests successful, reduce tail latency, and avoid restarts while sustaining at least the baseline offered load.
 
+The [three-replica experiment](three-pod-experiment.md) repeats this load profile and includes a side-by-side comparison with the baseline.
+
 ## Supporting evidence
 
 - [Locust HTML report](../evidence/experiments/single-pod-50-users/Locust_report.html) — request count, failures, throughput, and latency percentiles.
 - [Replica observations](../evidence/experiments/single-pod-50-users/replicas.csv) — desired, current, ready, and available replica counts over time.
 - [Resource observations](../evidence/experiments/single-pod-50-users/resources.csv) — CPU and memory samples for the simulator and load generator.
-
