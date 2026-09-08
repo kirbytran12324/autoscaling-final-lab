@@ -87,6 +87,10 @@ class BattleUser(HttpUser):
             catch_response=True,
             timeout=BATTLE_REQUEST_TIMEOUT_SECONDS,
         ) as response:
+            if response.error is not None:
+                response.failure(response.error)
+                return
+            
             if response.status_code != 200:
                 response.failure(f"expected HTTP 200, got {response.status_code}")
                 return
