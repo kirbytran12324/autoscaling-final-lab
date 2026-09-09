@@ -6,7 +6,9 @@ const assert = require('node:assert/strict');
 
 const {listBaseSpecies} = require('../src/catalog');
 const {
+  FULL_ADVANCERS_PER_GROUP,
   FULL_GROUP_SIZES,
+  SAMPLE_ADVANCERS_PER_GROUP,
   SAMPLE_GROUP_SIZES,
   buildFullRoster,
   buildSampleRoster,
@@ -14,6 +16,7 @@ const {
   calculateGroupStandings,
   deriveShowdownSeed,
   generateGroupStageSchedule,
+  selectAdvancers,
   shuffleRoster,
   splitRosterIntoGroups,
 } = require('../src/tournament');
@@ -101,6 +104,19 @@ function roundRobinResults(groupRoster, outcomes) {
 
   assert.equal(outcomes.length, results.length);
   return results;
+}
+
+function calculatedStanding(size) {
+  const roster = listBaseSpecies().slice(0, size);
+  const matchCount = size * (size - 1) / 2;
+  const results = roundRobinResults(
+    roster,
+    Array.from({length: matchCount}, () => 'p1')
+  );
+
+  return calculateGroupStandings(
+    'A', roster, results, 'tournament-001'
+  );
 }
 
 test('deriveShowdownSeed produces a four-number array', () => {
@@ -778,4 +794,126 @@ test('calculateGroupStandings preserves inputs and base records', () => {
       Number.isInteger(record.sonnebornBerger) &&
       /^[0-9a-f]{64}$/.test(record.tieKey);
   }));
+});
+
+test('selectAdvancers selects the first four entries in ranked order', () => {
+  const groupStanding = calculatedStanding(8);
+  const result = selectAdvancers(
+    groupStanding,
+    SAMPLE_ADVANCERS_PER_GROUP
+  );
+
+  assert.deepEqual(result, {
+    group: 'A',
+    advancingCount: 4,
+    advancers: groupStanding.standings.slice(0, 4).map(entry => ({
+      group: entry.group,
+      rank: entry.rank,
+      speciesId: entry.speciesId,
+      species: entry.species,
+    })),
+  });
+});
+
+test('selectAdvancers supports sixteen full-tournament advancers', () => {
+  const groupStanding = calculatedStanding(17);
+  const result = selectAdvancers(
+    groupStanding,
+    FULL_ADVANCERS_PER_GROUP
+  );
+
+  assert.equal(result.advancingCount, 16);
+  assert.equal(result.advancers.length, 16);
+  assert.deepEqual(
+    result.advancers.map(entry => entry.speciesId),
+    groupStanding.standings.slice(0, 16).map(entry => entry.speciesId)
+  );
+  assert.deepEqual(
+    result.advancers.map(entry => entry.rank),
+    Array.from({length: 16}, (_, index) => index + 1)
+  );
+});
+
+test('selectAdvancers rejects provisional standings', () => {
+  const groupStanding = calculatedStanding(8);
+  groupStanding.status = 'provisional';
+
+  assert.throws(
+    () => selectAdvancers(groupStanding, SAMPLE_ADVANCERS_PER_GROUP),
+    /non-final group/
+  );
+});
+
+test('selectAdvancers rejects inconsistent completion metadata', () => {
+  const groupStanding = calculatedStanding(8);
+  groupStanding.completedMatches--;
+
+  assert.throws(
+    () => selectAdvancers(groupStanding, SAMPLE_ADVANCERS_PER_GROUP),
+    /incomplete group/
+  );
+});
+
+test('selectAdvancers rejects invalid advancing counts', () => {
+  const groupStanding = calculatedStanding(8);
+
+  for (const advancingCount of [0, -1, 1.5]) {
+    assert.throws(
+      () => selectAdvancers(groupStanding, advancingCount),
+      /positive integer/
+    );
+  }
+
+  assert.throws(
+    () => selectAdvancers(groupStanding, 9),
+    /cannot exceed/
+  );
+});
+
+test('selectAdvancers rejects malformed selected standings entries', () => {
+  const mutations = [
+    entry => { entry.group = 'B'; },
+    entry => { entry.rank = 0; },
+    entry => { entry.rank = 2; },
+    entry => { entry.speciesId = ''; },
+    entry => { entry.species = null; },
+  ];
+
+  for (const mutate of mutations) {
+    const groupStanding = calculatedStanding(8);
+    mutate(groupStanding.standings[0]);
+
+    assert.throws(
+      () => selectAdvancers(groupStanding, SAMPLE_ADVANCERS_PER_GROUP),
+      /inconsistent group|invalid rank|invalid species fields/
+    );
+  }
+});
+
+test('selectAdvancers does not mutate the supplied standings', () => {
+  const groupStanding = calculatedStanding(8);
+  const snapshot = structuredClone(groupStanding);
+  const standingsReference = groupStanding.standings;
+
+  selectAdvancers(groupStanding, SAMPLE_ADVANCERS_PER_GROUP);
+
+  assert.strictEqual(groupStanding.standings, standingsReference);
+  assert.deepEqual(groupStanding, snapshot);
+});
+
+test('selectAdvancers returns advancers without shared references', () => {
+  const groupStanding = calculatedStanding(8);
+  const result = selectAdvancers(
+    groupStanding,
+    SAMPLE_ADVANCERS_PER_GROUP
+  );
+  const originalFirst = structuredClone(groupStanding.standings[0]);
+
+  assert.notStrictEqual(result.advancers, groupStanding.standings);
+  assert.notStrictEqual(result.advancers[0], groupStanding.standings[0]);
+
+  result.advancers[0].species = 'Changed';
+  result.advancers[0].rank = 99;
+
+  assert.deepEqual(groupStanding.standings[0], originalFirst);
 });

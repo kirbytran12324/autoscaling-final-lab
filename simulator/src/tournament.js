@@ -8,6 +8,8 @@ const {
 
 const SAMPLE_GROUP_SIZES = Object.freeze([8, 8, 8, 8]);
 const FULL_GROUP_SIZES = Object.freeze([257, 256, 256, 256]);
+const SAMPLE_ADVANCERS_PER_GROUP = 4;
+const FULL_ADVANCERS_PER_GROUP = 16;
 const GROUP_NAMES = Object.freeze(['A', 'B', 'C', 'D']);
 
 function deriveTournamentDigest(tournamentSeed, identifier) {
@@ -410,9 +412,92 @@ function calculateGroupStandings(
   };
 }
 
+function selectAdvancers(groupStanding, advancingCount) {
+  if (!groupStanding || typeof groupStanding !== 'object' ||
+      Array.isArray(groupStanding)) {
+    throw new TypeError('Group standing must be an object');
+  }
+
+  if (!GROUP_NAMES.includes(groupStanding.group)) {
+    throw new RangeError('Group standing must identify group A, B, C, or D');
+  }
+
+  if (!Array.isArray(groupStanding.standings)) {
+    throw new TypeError('Group standing standings must be an array');
+  }
+
+  if (groupStanding.status !== 'final') {
+    throw new RangeError(
+      `Cannot select advancers from a non-final group: ${groupStanding.group}`
+    );
+  }
+
+  if (!Number.isInteger(groupStanding.completedMatches) ||
+      groupStanding.completedMatches < 0 ||
+      !Number.isInteger(groupStanding.expectedMatches) ||
+      groupStanding.expectedMatches < 0 ||
+      groupStanding.completedMatches !== groupStanding.expectedMatches) {
+    throw new RangeError(
+      `Cannot select advancers from an incomplete group: ${groupStanding.group}`
+    );
+  }
+
+  if (!Number.isInteger(advancingCount) || advancingCount <= 0) {
+    throw new RangeError('Advancing count must be a positive integer');
+  }
+
+  if (advancingCount > groupStanding.standings.length) {
+    throw new RangeError(
+      'Advancing count cannot exceed the number of standings entries'
+    );
+  }
+
+  const advancers = groupStanding.standings
+    .slice(0, advancingCount)
+    .map((entry, index) => {
+      if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
+        throw new TypeError('Every selected standing must be an object');
+      }
+
+      if (entry.group !== groupStanding.group) {
+        throw new RangeError(
+          `Selected standing at rank ${index + 1} has an inconsistent group`
+        );
+      }
+
+      if (!Number.isInteger(entry.rank) || entry.rank !== index + 1) {
+        throw new RangeError(
+          `Selected standing at position ${index + 1} has an invalid rank`
+        );
+      }
+
+      if (typeof entry.speciesId !== 'string' || entry.speciesId === '' ||
+          typeof entry.species !== 'string' || entry.species === '') {
+        throw new TypeError(
+          `Selected standing at rank ${entry.rank} has invalid species fields`
+        );
+      }
+
+      return {
+        group: entry.group,
+        rank: entry.rank,
+        speciesId: entry.speciesId,
+        species: entry.species,
+      };
+    });
+
+  return {
+    group: groupStanding.group,
+    advancingCount,
+    advancers,
+  };
+}
+
 module.exports = {
   SAMPLE_GROUP_SIZES,
   FULL_GROUP_SIZES,
+  SAMPLE_ADVANCERS_PER_GROUP,
+  FULL_ADVANCERS_PER_GROUP,
   deriveShowdownSeed,
   buildSampleRoster,
   buildFullRoster,
@@ -420,5 +505,6 @@ module.exports = {
   splitRosterIntoGroups,
   generateGroupStageSchedule,
   calculateGroupRecords,
-  calculateGroupStandings
+  calculateGroupStandings,
+  selectAdvancers,
 };
