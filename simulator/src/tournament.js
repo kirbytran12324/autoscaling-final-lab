@@ -493,6 +493,156 @@ function selectAdvancers(groupStanding, advancingCount) {
   };
 }
 
+function buildInitialKnockoutRound(groupAdvancers) {
+  if (!Array.isArray(groupAdvancers)) {
+    throw new TypeError('Group advancers must be an array');
+  }
+
+  if (groupAdvancers.length !== GROUP_NAMES.length) {
+    throw new RangeError('Group advancers must contain exactly four groups');
+  }
+
+  const selectionsByGroup = new Map();
+
+  for (const selection of groupAdvancers) {
+    if (!selection || typeof selection !== 'object' ||
+        Array.isArray(selection)) {
+      throw new TypeError('Every group advancer selection must be an object');
+    }
+
+    if (!GROUP_NAMES.includes(selection.group)) {
+      throw new RangeError(`Unknown advancing group: ${selection.group}`);
+    }
+
+    if (selectionsByGroup.has(selection.group)) {
+      throw new RangeError(`Duplicate advancing group: ${selection.group}`);
+    }
+
+    selectionsByGroup.set(selection.group, selection);
+  }
+
+  const advancementCounts = new Set(
+    groupAdvancers.map(selection => selection.advancingCount)
+  );
+  if (advancementCounts.size !== 1) {
+    throw new RangeError('All groups must have the same advancing count');
+  }
+
+  const [advancingCount] = advancementCounts;
+  if (advancingCount !== SAMPLE_ADVANCERS_PER_GROUP &&
+      advancingCount !== FULL_ADVANCERS_PER_GROUP) {
+    throw new RangeError(
+      'Advancing count must be 4 for sample mode or 16 for full mode'
+    );
+  }
+
+  const copiedAdvancersByGroup = new Map();
+  const speciesIds = new Set();
+  const speciesNames = new Set();
+
+  for (const groupName of GROUP_NAMES) {
+    const selection = selectionsByGroup.get(groupName);
+
+    if (!selection) {
+      throw new RangeError(`Missing advancing group: ${groupName}`);
+    }
+
+    if (!Array.isArray(selection.advancers)) {
+      throw new TypeError(`Group ${groupName} advancers must be an array`);
+    }
+
+    if (selection.advancers.length !== advancingCount) {
+      throw new RangeError(
+        `Group ${groupName} must contain exactly ${advancingCount} advancers`
+      );
+    }
+
+    const copiedAdvancers = selection.advancers.map((entrant, index) => {
+      const expectedRank = index + 1;
+
+      if (!entrant || typeof entrant !== 'object' ||
+          Array.isArray(entrant)) {
+        throw new TypeError(
+          `Group ${groupName} entrant at rank ${expectedRank} must be an object`
+        );
+      }
+
+      if (entrant.group !== groupName) {
+        throw new RangeError(
+          `Group ${groupName} entrant at rank ${expectedRank} has an ` +
+          'inconsistent group'
+        );
+      }
+
+      if (!Number.isInteger(entrant.rank) ||
+          entrant.rank !== expectedRank) {
+        throw new RangeError(
+          `Group ${groupName} entrant at position ${expectedRank} has an ` +
+          'invalid rank'
+        );
+      }
+
+      if (typeof entrant.speciesId !== 'string' ||
+          entrant.speciesId === '' ||
+          typeof entrant.species !== 'string' || entrant.species === '') {
+        throw new TypeError(
+          `Group ${groupName} entrant at rank ${expectedRank} has invalid ` +
+          'species fields'
+        );
+      }
+
+      if (speciesIds.has(entrant.speciesId) ||
+          speciesNames.has(entrant.species)) {
+        throw new RangeError(
+          `Duplicate knockout species: ${entrant.species}`
+        );
+      }
+      speciesIds.add(entrant.speciesId);
+      speciesNames.add(entrant.species);
+
+      return {
+        group: entrant.group,
+        rank: entrant.rank,
+        speciesId: entrant.speciesId,
+        species: entrant.species,
+      };
+    });
+
+    copiedAdvancersByGroup.set(groupName, copiedAdvancers);
+  }
+
+  const round = advancingCount === SAMPLE_ADVANCERS_PER_GROUP
+    ? 'r16'
+    : 'r64';
+  const series = [];
+  const groupPairs = [['A', 'B'], ['C', 'D']];
+
+  for (const [firstGroup, secondGroup] of groupPairs) {
+    const firstAdvancers = copiedAdvancersByGroup.get(firstGroup);
+    const secondAdvancers = copiedAdvancersByGroup.get(secondGroup);
+
+    for (let highRank = 1; highRank <= advancingCount / 2; highRank++) {
+      const lowRank = advancingCount + 1 - highRank;
+      const pairings = [
+        [firstAdvancers[highRank - 1], secondAdvancers[lowRank - 1]],
+        [secondAdvancers[highRank - 1], firstAdvancers[lowRank - 1]],
+      ];
+
+      for (const [entrant1, entrant2] of pairings) {
+        const position = series.length + 1;
+        series.push({
+          seriesId: `${round}-series-${String(position).padStart(2, '0')}`,
+          position,
+          entrant1,
+          entrant2,
+        });
+      }
+    }
+  }
+
+  return {round, series};
+}
+
 module.exports = {
   SAMPLE_GROUP_SIZES,
   FULL_GROUP_SIZES,
@@ -507,4 +657,5 @@ module.exports = {
   calculateGroupRecords,
   calculateGroupStandings,
   selectAdvancers,
+  buildInitialKnockoutRound,
 };
