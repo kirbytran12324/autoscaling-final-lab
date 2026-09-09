@@ -161,6 +161,17 @@ complete final standing may be used to select advancing participants.
 - A series is first to two decisive wins. Draws do not count as wins and consume the next simulation seed.
 - Cap a series at seven total simulations. If neither participant has two wins, advance the participant with more decisive wins; if still tied, use and record a deterministic hash lottery.
 
+The game-cap lottery digest is derived without mutable random state:
+
+```text
+lotteryHash =
+  SHA-256(UTF8(tournamentSeed + "\n" + seriesId + "-lottery"))
+```
+
+Record the complete lowercase 64-character hexadecimal digest. The most
+significant bit of its first byte selects the winner: bit 0 selects
+`entrant1`, and bit 1 selects `entrant2`.
+
 The full knockout has 63 series and 126–441 simulations. The complete tournament therefore contains 130,942–131,257 simulations.
 
 ### Accepted 32-species sample mode

@@ -690,6 +690,161 @@ function generateKnockoutSeriesGame(series, gameNumber, tournamentSeed) {
   };
 }
 
+function evaluateKnockoutSeries(series, acceptedGames, tournamentSeed) {
+  if (!Array.isArray(acceptedGames)) {
+    throw new TypeError('Accepted knockout games must be an array');
+  }
+
+  if (acceptedGames.length > 7) {
+    throw new RangeError('A knockout series cannot contain more than 7 games');
+  }
+
+  generateKnockoutSeriesGame(series, 1, tournamentSeed);
+
+  let entrant1Wins = 0;
+  let entrant2Wins = 0;
+  let draws = 0;
+
+  for (const [index, game] of acceptedGames.entries()) {
+    const expectedGameNumber = index + 1;
+
+    if (entrant1Wins >= 2 || entrant2Wins >= 2) {
+      throw new RangeError(
+        `Game ${expectedGameNumber} appears after the series was complete`
+      );
+    }
+
+    if (!game || typeof game !== 'object' || Array.isArray(game)) {
+      throw new TypeError(
+        `Accepted game ${expectedGameNumber} must be an object`
+      );
+    }
+
+    const expected = generateKnockoutSeriesGame(
+      series,
+      expectedGameNumber,
+      tournamentSeed
+    );
+
+    for (const field of [
+      'seriesId',
+      'gameNumber',
+      'matchId',
+      'pokemon1',
+      'pokemon2',
+    ]) {
+      if (game[field] !== expected[field]) {
+        throw new RangeError(
+          `Accepted game ${expectedGameNumber} has an inconsistent ${field}`
+        );
+      }
+    }
+
+    if (!Array.isArray(game.seed) || game.seed.length !== 4 ||
+        !game.seed.every((value, seedIndex) =>
+          value === expected.seed[seedIndex]
+        )) {
+      throw new RangeError(
+        `Accepted game ${expectedGameNumber} has an inconsistent seed`
+      );
+    }
+
+    if (game.outcome === 'tie') {
+      if (game.winnerSide !== null || game.winnerSpecies !== null) {
+        throw new RangeError(
+          `Tie ${game.matchId} must not have a winner`
+        );
+      }
+
+      draws++;
+      continue;
+    }
+
+    if (game.outcome !== 'win') {
+      throw new RangeError(
+        `Accepted game ${game.matchId} has an unsupported outcome`
+      );
+    }
+
+    if (game.winnerSide !== 'p1' && game.winnerSide !== 'p2') {
+      throw new RangeError(
+        `Accepted game ${game.matchId} has an invalid winner side`
+      );
+    }
+
+    const expectedWinnerSpecies = game.winnerSide === 'p1'
+      ? expected.pokemon1
+      : expected.pokemon2;
+    if (game.winnerSpecies !== expectedWinnerSpecies) {
+      throw new RangeError(
+        `Accepted game ${game.matchId} has an inconsistent winner`
+      );
+    }
+
+    const entrant1Won = game.winnerSide === (
+      expectedGameNumber % 2 === 1 ? 'p1' : 'p2'
+    );
+    if (entrant1Won) {
+      entrant1Wins++;
+    } else {
+      entrant2Wins++;
+    }
+  }
+
+  const gamesPlayed = acceptedGames.length;
+  let status = 'in-progress';
+  let nextGameNumber = gamesPlayed + 1;
+  let winnerSlot = null;
+  let resolution = null;
+  let lotteryHash = null;
+
+  if (entrant1Wins >= 2 || entrant2Wins >= 2) {
+    status = 'complete';
+    nextGameNumber = null;
+    winnerSlot = entrant1Wins >= 2 ? 'entrant1' : 'entrant2';
+    resolution = 'two-wins';
+  } else if (gamesPlayed === 7) {
+    status = 'complete';
+    nextGameNumber = null;
+
+    if (entrant1Wins !== entrant2Wins) {
+      winnerSlot = entrant1Wins > entrant2Wins ? 'entrant1' : 'entrant2';
+      resolution = 'game-cap-wins';
+    } else {
+      const lotteryDigest = deriveTournamentDigest(
+        tournamentSeed,
+        `${series.seriesId}-lottery`
+      );
+      lotteryHash = lotteryDigest.toString('hex');
+      winnerSlot = lotteryDigest[0] & 0x80 ? 'entrant2' : 'entrant1';
+      resolution = 'hash-lottery';
+    }
+  }
+
+  const winner = winnerSlot === null
+    ? null
+    : {
+      slot: winnerSlot,
+      group: series[winnerSlot].group,
+      rank: series[winnerSlot].rank,
+      speciesId: series[winnerSlot].speciesId,
+      species: series[winnerSlot].species,
+    };
+
+  return {
+    seriesId: series.seriesId,
+    status,
+    gamesPlayed,
+    entrant1Wins,
+    entrant2Wins,
+    draws,
+    nextGameNumber,
+    winner,
+    resolution,
+    lotteryHash,
+  };
+}
+
 module.exports = {
   SAMPLE_GROUP_SIZES,
   FULL_GROUP_SIZES,
@@ -706,4 +861,5 @@ module.exports = {
   selectAdvancers,
   buildInitialKnockoutRound,
   generateKnockoutSeriesGame,
+  evaluateKnockoutSeries,
 };

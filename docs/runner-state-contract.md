@@ -50,6 +50,12 @@ game, so continued series play uses the next game ID and its derived seed.
 HTTP attempts. Each accepted game records its game number, match ID,
 participants, seed, outcome and winner, turns, termination, and protocol hash.
 
+If seven accepted games leave the entrants tied on decisive wins, derive and
+record the complete lowercase hexadecimal `lotteryHash` as
+`SHA-256(UTF8(tournamentSeed + "\n" + seriesId + "-lottery"))`. The most
+significant bit of the first digest byte selects `entrant1` for bit 0 and
+`entrant2` for bit 1.
+
 ## Deterministic replay fields
 
 For identical battle inputs and the same rule and simulator versions, these fields must reproduce exactly:
