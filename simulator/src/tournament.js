@@ -161,6 +161,153 @@ function generateGroupStageSchedule(groups, tournamentSeed) {
   return schedule;
 }
 
+function calculateGroupRecords(groupName, groupRoster, results) {
+  if (!GROUP_NAMES.includes(groupName)) {
+    throw new RangeError('Group name must be A, B, C, or D');
+  }
+
+  if (!Array.isArray(groupRoster)) {
+    throw new TypeError('Group roster must be an array');
+  }
+
+  if (!Array.isArray(results)) {
+    throw new TypeError('Group results must be an array');
+  }
+
+  const participantIndexes = new Map();
+  const records = groupRoster.map((pokemon, index) => {
+    if (!pokemon || typeof pokemon.id !== 'string' ||
+        typeof pokemon.name !== 'string') {
+      throw new TypeError('Group roster must contain species objects');
+    }
+
+    if (participantIndexes.has(pokemon.name)) {
+      throw new RangeError(
+        `Group roster contains duplicate species: ${pokemon.name}`
+      );
+    }
+
+    participantIndexes.set(pokemon.name, index);
+
+    return {
+      group: groupName,
+      speciesId: pokemon.id,
+      species: pokemon.name,
+      played: 0,
+      wins: 0,
+      draws: 0,
+      losses: 0,
+      points: 0,
+    };
+  });
+  const matchIds = new Set();
+  const pairings = new Set();
+
+  for (const result of results) {
+    if (!result || typeof result !== 'object') {
+      throw new TypeError('Every group result must be an object');
+    }
+
+    if (result.group !== groupName) {
+      throw new RangeError(
+        `Result ${result.matchId} does not belong to group ${groupName}`
+      );
+    }
+
+    if (typeof result.matchId !== 'string' || result.matchId === '') {
+      throw new TypeError('Every group result must have a match ID');
+    }
+
+    if (matchIds.has(result.matchId)) {
+      throw new RangeError(`Duplicate match ID: ${result.matchId}`);
+    }
+    matchIds.add(result.matchId);
+
+    const pokemon1Index = participantIndexes.get(result.pokemon1);
+    const pokemon2Index = participantIndexes.get(result.pokemon2);
+
+    if (pokemon1Index === undefined || pokemon2Index === undefined) {
+      throw new RangeError(
+        `Result ${result.matchId} contains an unknown group participant`
+      );
+    }
+
+    if (pokemon1Index === pokemon2Index) {
+      throw new RangeError(
+        `Result ${result.matchId} must contain distinct participants`
+      );
+    }
+
+    const pairing = pokemon1Index < pokemon2Index
+      ? `${pokemon1Index}:${pokemon2Index}`
+      : `${pokemon2Index}:${pokemon1Index}`;
+
+    if (pairings.has(pairing)) {
+      throw new RangeError(
+        `Duplicate group pairing: ${result.pokemon1} and ${result.pokemon2}`
+      );
+    }
+    pairings.add(pairing);
+
+    const pokemon1Record = records[pokemon1Index];
+    const pokemon2Record = records[pokemon2Index];
+    pokemon1Record.played++;
+    pokemon2Record.played++;
+
+    if (result.outcome === 'win') {
+      if (result.winnerSide !== 'p1' && result.winnerSide !== 'p2') {
+        throw new RangeError(
+          `Result ${result.matchId} has an invalid winner side`
+        );
+      }
+
+      const expectedWinner = result.winnerSide === 'p1'
+        ? result.pokemon1
+        : result.pokemon2;
+      if (result.winnerSpecies !== expectedWinner) {
+        throw new RangeError(
+          `Result ${result.matchId} has an inconsistent winner`
+        );
+      }
+
+      const winnerRecord = result.winnerSide === 'p1'
+        ? pokemon1Record
+        : pokemon2Record;
+      const loserRecord = result.winnerSide === 'p1'
+        ? pokemon2Record
+        : pokemon1Record;
+      winnerRecord.wins++;
+      winnerRecord.points += 3;
+      loserRecord.losses++;
+    } else if (result.outcome === 'tie') {
+      if (result.winnerSide != null || result.winnerSpecies != null) {
+        throw new RangeError(
+          `Tie ${result.matchId} must not have a winner`
+        );
+      }
+
+      pokemon1Record.draws++;
+      pokemon1Record.points++;
+      pokemon2Record.draws++;
+      pokemon2Record.points++;
+    } else {
+      throw new RangeError(
+        `Result ${result.matchId} has an unsupported outcome`
+      );
+    }
+  }
+
+  const expectedPairings = groupRoster.length * (groupRoster.length - 1) / 2;
+  if (pairings.size !== expectedPairings) {
+    throw new RangeError(
+      `Group ${groupName} results are incomplete: expected ` +
+      `${expectedPairings} pairings, received ${pairings.size}`
+    );
+  }
+
+  return records;
+}
+
 module.exports = {
   SAMPLE_GROUP_SIZES,
   FULL_GROUP_SIZES,
@@ -170,4 +317,5 @@ module.exports = {
   shuffleRoster,
   splitRosterIntoGroups,
   generateGroupStageSchedule,
+  calculateGroupRecords,
 };

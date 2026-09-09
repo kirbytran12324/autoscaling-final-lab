@@ -150,7 +150,7 @@ The full knockout has 63 series and 126–441 simulations. The complete tourname
 
 ### Accepted 32-species sample mode
 
-The runner first supports a deterministic 32-species sample selected from the full roster. It creates four groups of eight, advances the top four participants from each group, and uses a fixed 16-entry knockout bracket.
+The runner first supports a fixed, curated roster of 32 species defined in configuration and is not selected from the shuffled full roster. It advances the top four participants from each group and uses a fixed 16-entry knockout bracket.
 
 The sample contains 112 group-stage battles and 15 knockout series. At two to seven simulations per series, it requires approximately 142–217 simulations overall. It uses the same seed derivation, side assignment, scoring, tie-breakers, battle rules, retry rules, and result format as the full tournament.
 

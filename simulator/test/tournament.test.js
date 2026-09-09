@@ -10,6 +10,7 @@ const {
   SAMPLE_GROUP_SIZES,
   buildFullRoster,
   buildSampleRoster,
+  calculateGroupRecords,
   deriveShowdownSeed,
   generateGroupStageSchedule,
   shuffleRoster,
@@ -31,6 +32,40 @@ function buildGroups(groupSizes) {
 
 function pairingKey(match) {
   return [match.pokemon1, match.pokemon2].sort().join('|');
+}
+
+function threeSpeciesGroupResults(groupRoster) {
+  const [first, second, third] = groupRoster.map(species => species.name);
+
+  return [
+    {
+      matchId: 'group-A-000001',
+      group: 'A',
+      pokemon1: first,
+      pokemon2: second,
+      outcome: 'win',
+      winnerSide: 'p1',
+      winnerSpecies: first,
+    },
+    {
+      matchId: 'group-A-000002',
+      group: 'A',
+      pokemon1: first,
+      pokemon2: third,
+      outcome: 'tie',
+      winnerSide: null,
+      winnerSpecies: null,
+    },
+    {
+      matchId: 'group-A-000003',
+      group: 'A',
+      pokemon1: second,
+      pokemon2: third,
+      outcome: 'win',
+      winnerSide: 'p2',
+      winnerSpecies: third,
+    },
+  ];
 }
 
 test('deriveShowdownSeed produces a four-number array', () => {
@@ -327,5 +362,134 @@ test('generateGroupStageSchedule creates all full tournament matches', () => {
       schedule.filter(match => match.group === groupName).length
     ),
     [32896, 32640, 32640, 32640]
+  );
+});
+
+test('calculateGroupRecords calculates three-species totals', () => {
+  const roster = listBaseSpecies().slice(0, 3);
+  const records = calculateGroupRecords(
+    'A', roster, threeSpeciesGroupResults(roster)
+  );
+
+  assert.deepEqual(records, [
+    {
+      group: 'A',
+      speciesId: roster[0].id,
+      species: roster[0].name,
+      played: 2,
+      wins: 1,
+      draws: 1,
+      losses: 0,
+      points: 4,
+    },
+    {
+      group: 'A',
+      speciesId: roster[1].id,
+      species: roster[1].name,
+      played: 2,
+      wins: 0,
+      draws: 0,
+      losses: 2,
+      points: 0,
+    },
+    {
+      group: 'A',
+      speciesId: roster[2].id,
+      species: roster[2].name,
+      played: 2,
+      wins: 1,
+      draws: 1,
+      losses: 0,
+      points: 4,
+    },
+  ]);
+});
+
+test('calculateGroupRecords retains roster order', () => {
+  const catalogSpecies = listBaseSpecies().slice(0, 3);
+  const roster = [catalogSpecies[2], catalogSpecies[0], catalogSpecies[1]];
+  const records = calculateGroupRecords(
+    'A', roster, threeSpeciesGroupResults(roster)
+  );
+
+  assert.deepEqual(
+    records.map(record => record.speciesId),
+    roster.map(species => species.id)
+  );
+});
+
+test('calculateGroupRecords does not mutate its inputs', () => {
+  const roster = listBaseSpecies().slice(0, 3);
+  const results = threeSpeciesGroupResults(roster);
+  const rosterSnapshot = roster.map(species => ({
+    id: species.id,
+    name: species.name,
+  }));
+  const resultsSnapshot = structuredClone(results);
+
+  calculateGroupRecords('A', roster, results);
+
+  assert.deepEqual(
+    roster.map(species => ({id: species.id, name: species.name})),
+    rosterSnapshot
+  );
+  assert.deepEqual(results, resultsSnapshot);
+});
+
+test('calculateGroupRecords rejects incomplete results', () => {
+  const roster = listBaseSpecies().slice(0, 3);
+  const results = threeSpeciesGroupResults(roster).slice(0, 2);
+
+  assert.throws(
+    () => calculateGroupRecords('A', roster, results),
+    /results are incomplete/
+  );
+});
+
+test('calculateGroupRecords rejects duplicate pairings and match IDs', () => {
+  const roster = listBaseSpecies().slice(0, 3);
+  const duplicatePairing = threeSpeciesGroupResults(roster);
+  duplicatePairing[2] = {
+    ...duplicatePairing[2],
+    pokemon1: duplicatePairing[0].pokemon2,
+    pokemon2: duplicatePairing[0].pokemon1,
+  };
+  const duplicateMatchId = threeSpeciesGroupResults(roster);
+  duplicateMatchId[2] = {
+    ...duplicateMatchId[2],
+    matchId: duplicateMatchId[0].matchId,
+  };
+
+  assert.throws(
+    () => calculateGroupRecords('A', roster, duplicatePairing),
+    /Duplicate group pairing/
+  );
+  assert.throws(
+    () => calculateGroupRecords('A', roster, duplicateMatchId),
+    /Duplicate match ID/
+  );
+});
+
+test('calculateGroupRecords rejects unknown participants and bad winners', () => {
+  const roster = listBaseSpecies().slice(0, 3);
+  const unknownParticipant = threeSpeciesGroupResults(roster);
+  unknownParticipant[0] = {
+    ...unknownParticipant[0],
+    pokemon1: 'MissingNo',
+    winnerSpecies: 'MissingNo',
+  };
+  const inconsistentWinner = threeSpeciesGroupResults(roster);
+  inconsistentWinner[0] = {
+    ...inconsistentWinner[0],
+    winnerSpecies: inconsistentWinner[0].pokemon2,
+  };
+
+  assert.throws(
+    () => calculateGroupRecords('A', roster, unknownParticipant),
+    /unknown group participant/
+  );
+  assert.throws(
+    () => calculateGroupRecords('A', roster, inconsistentWinner),
+    /inconsistent winner/
   );
 });
