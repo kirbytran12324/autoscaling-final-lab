@@ -157,7 +157,15 @@ complete final standing may be used to select advancing participants.
 ### Full knockout stage
 
 - The round of 64 pairs A with B and C with D. Rank `r` faces rank `17-r` from the paired group, and adjacent series alternate which group supplies the higher seed.
-- Do not reseed after a round; winners advance through the fixed recorded bracket.
+- The fixed round progression is `r64` → `r32` → `r16` → `r8` → `r4`
+  → `r2`; `r2` is the final series.
+- After each round, adjacent series winners advance together through the fixed
+  recorded bracket: the odd-positioned prior series supplies `entrant1`, and
+  the even-positioned prior series supplies `entrant2`.
+- Regenerate consecutive positions and round-prefixed series IDs for the next
+  round. Do not reshuffle or reseed the winners.
+- Each advanced entrant retains its original group-stage identity and records
+  the immediately preceding series ID as `sourceSeriesId`.
 - A series is first to two decisive wins. Draws do not count as wins and consume the next simulation seed.
 - Cap a series at seven total simulations. If neither participant has two wins, advance the participant with more decisive wins; if still tied, use and record a deterministic hash lottery.
 

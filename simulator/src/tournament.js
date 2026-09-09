@@ -11,6 +11,20 @@ const FULL_GROUP_SIZES = Object.freeze([257, 256, 256, 256]);
 const SAMPLE_ADVANCERS_PER_GROUP = 4;
 const FULL_ADVANCERS_PER_GROUP = 16;
 const GROUP_NAMES = Object.freeze(['A', 'B', 'C', 'D']);
+const NEXT_KNOCKOUT_ROUND = Object.freeze({
+  r64: 'r32',
+  r32: 'r16',
+  r16: 'r8',
+  r8: 'r4',
+  r4: 'r2',
+});
+const KNOCKOUT_SERIES_COUNTS = Object.freeze({
+  r64: 32,
+  r32: 16,
+  r16: 8,
+  r8: 4,
+  r4: 2,
+});
 
 function deriveTournamentDigest(tournamentSeed, identifier) {
   return createHash('sha256')
@@ -643,6 +657,212 @@ function buildInitialKnockoutRound(groupAdvancers) {
   return {round, series};
 }
 
+function validateKnockoutEntrant(entrant, entrantName, seriesId) {
+  if (!entrant || typeof entrant !== 'object' || Array.isArray(entrant)) {
+    throw new TypeError(
+      `${entrantName} in ${seriesId} must be an object`
+    );
+  }
+
+  if (typeof entrant.group !== 'string' || entrant.group.trim() === '' ||
+      typeof entrant.speciesId !== 'string' ||
+      entrant.speciesId.trim() === '' ||
+      typeof entrant.species !== 'string' ||
+      entrant.species.trim() === '') {
+    throw new TypeError(
+      `${entrantName} in ${seriesId} has invalid identity fields`
+    );
+  }
+
+  if (!Number.isInteger(entrant.rank) || entrant.rank <= 0) {
+    throw new RangeError(
+      `${entrantName} in ${seriesId} must have a positive integer rank`
+    );
+  }
+}
+
+function buildNextKnockoutRound(previousRound, seriesEvaluations) {
+  if (!previousRound || typeof previousRound !== 'object' ||
+      Array.isArray(previousRound)) {
+    throw new TypeError('Previous knockout round must be an object');
+  }
+
+  if (!Object.hasOwn(NEXT_KNOCKOUT_ROUND, previousRound.round)) {
+    throw new RangeError(
+      'Previous knockout round must be r64, r32, r16, r8, or r4'
+    );
+  }
+  const nextRound = NEXT_KNOCKOUT_ROUND[previousRound.round];
+
+  if (!Array.isArray(previousRound.series)) {
+    throw new TypeError('Previous knockout round series must be an array');
+  }
+
+  const expectedSeriesCount = KNOCKOUT_SERIES_COUNTS[previousRound.round];
+  if (previousRound.series.length !== expectedSeriesCount) {
+    throw new RangeError(
+      `Round ${previousRound.round} must contain exactly ` +
+      `${expectedSeriesCount} series`
+    );
+  }
+
+  const previousSeriesById = new Map();
+
+  for (const [index, series] of previousRound.series.entries()) {
+    const expectedPosition = index + 1;
+
+    if (!series || typeof series !== 'object' || Array.isArray(series)) {
+      throw new TypeError(
+        `Previous series at position ${expectedPosition} must be an object`
+      );
+    }
+
+    if (!Number.isInteger(series.position) ||
+        series.position !== expectedPosition) {
+      throw new RangeError(
+        `Previous series at position ${expectedPosition} has an invalid ` +
+        'position'
+      );
+    }
+
+    const expectedSeriesId = `${previousRound.round}-series-${String(
+      expectedPosition
+    ).padStart(2, '0')}`;
+    if (series.seriesId !== expectedSeriesId) {
+      throw new RangeError(
+        `Previous series at position ${expectedPosition} has an invalid ` +
+        'series ID'
+      );
+    }
+
+    validateKnockoutEntrant(series.entrant1, 'entrant1', series.seriesId);
+    validateKnockoutEntrant(series.entrant2, 'entrant2', series.seriesId);
+    previousSeriesById.set(series.seriesId, series);
+  }
+
+  if (!Array.isArray(seriesEvaluations)) {
+    throw new TypeError('Series evaluations must be an array');
+  }
+
+  if (seriesEvaluations.length !== expectedSeriesCount) {
+    throw new RangeError(
+      `Round ${previousRound.round} must have exactly ` +
+      `${expectedSeriesCount} series evaluations`
+    );
+  }
+
+  const winnerEntrantsBySeriesId = new Map();
+  const validResolutions = new Set([
+    'two-wins',
+    'game-cap-wins',
+    'hash-lottery',
+  ]);
+
+  for (const evaluation of seriesEvaluations) {
+    if (!evaluation || typeof evaluation !== 'object' ||
+        Array.isArray(evaluation)) {
+      throw new TypeError('Every series evaluation must be an object');
+    }
+
+    if (typeof evaluation.seriesId !== 'string' ||
+        evaluation.seriesId.trim() === '') {
+      throw new TypeError('Every series evaluation must have a series ID');
+    }
+
+    if (winnerEntrantsBySeriesId.has(evaluation.seriesId)) {
+      throw new RangeError(
+        `Duplicate series evaluation: ${evaluation.seriesId}`
+      );
+    }
+
+    const previousSeries = previousSeriesById.get(evaluation.seriesId);
+    if (!previousSeries) {
+      throw new RangeError(
+        `Unknown series evaluation: ${evaluation.seriesId}`
+      );
+    }
+
+    if (evaluation.status !== 'complete' ||
+        evaluation.nextGameNumber !== null) {
+      throw new RangeError(
+        `Series evaluation ${evaluation.seriesId} is not complete`
+      );
+    }
+
+    if (!validResolutions.has(evaluation.resolution)) {
+      throw new RangeError(
+        `Series evaluation ${evaluation.seriesId} has an invalid resolution`
+      );
+    }
+
+    const winner = evaluation.winner;
+    if (!winner || typeof winner !== 'object' || Array.isArray(winner)) {
+      throw new TypeError(
+        `Series evaluation ${evaluation.seriesId} must have a winner`
+      );
+    }
+
+    if (winner.slot !== 'entrant1' && winner.slot !== 'entrant2') {
+      throw new RangeError(
+        `Series evaluation ${evaluation.seriesId} has an invalid winner slot`
+      );
+    }
+
+    validateKnockoutEntrant(
+      winner,
+      'Winner',
+      evaluation.seriesId
+    );
+
+    const previousEntrant = previousSeries[winner.slot];
+    if (winner.group !== previousEntrant.group ||
+        winner.rank !== previousEntrant.rank ||
+        winner.speciesId !== previousEntrant.speciesId ||
+        winner.species !== previousEntrant.species) {
+      throw new RangeError(
+        `Series evaluation ${evaluation.seriesId} has an inconsistent winner`
+      );
+    }
+
+    winnerEntrantsBySeriesId.set(evaluation.seriesId, previousEntrant);
+  }
+
+  const series = [];
+
+  for (let index = 0; index < previousRound.series.length; index += 2) {
+    const firstPreviousSeries = previousRound.series[index];
+    const secondPreviousSeries = previousRound.series[index + 1];
+    const firstWinner = winnerEntrantsBySeriesId.get(
+      firstPreviousSeries.seriesId
+    );
+    const secondWinner = winnerEntrantsBySeriesId.get(
+      secondPreviousSeries.seriesId
+    );
+    const position = index / 2 + 1;
+
+    series.push({
+      seriesId: `${nextRound}-series-${String(position).padStart(2, '0')}`,
+      position,
+      entrant1: {
+        group: firstWinner.group,
+        rank: firstWinner.rank,
+        speciesId: firstWinner.speciesId,
+        species: firstWinner.species,
+        sourceSeriesId: firstPreviousSeries.seriesId,
+      },
+      entrant2: {
+        group: secondWinner.group,
+        rank: secondWinner.rank,
+        speciesId: secondWinner.speciesId,
+        species: secondWinner.species,
+        sourceSeriesId: secondPreviousSeries.seriesId,
+      },
+    });
+  }
+
+  return {round: nextRound, series};
+}
+
 function generateKnockoutSeriesGame(series, gameNumber, tournamentSeed) {
   if (!series || typeof series !== 'object' || Array.isArray(series)) {
     throw new TypeError('Knockout series must be an object');
@@ -860,6 +1080,7 @@ module.exports = {
   calculateGroupStandings,
   selectAdvancers,
   buildInitialKnockoutRound,
+  buildNextKnockoutRound,
   generateKnockoutSeriesGame,
   evaluateKnockoutSeries,
 };

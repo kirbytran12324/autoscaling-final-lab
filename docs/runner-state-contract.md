@@ -49,6 +49,9 @@ game, so continued series play uses the next game ID and its derived seed.
 `bracket.json` retains accepted games, including draws, but excludes failed
 HTTP attempts. Each accepted game records its game number, match ID,
 participants, seed, outcome and winner, turns, termination, and protocol hash.
+At each completed-round barrier, its next-round entrants retain their original
+group and rank and record the immediately preceding series they won in
+`sourceSeriesId`.
 
 If seven accepted games leave the entrants tied on decisive wins, derive and
 record the complete lowercase hexadecimal `lotteryHash` as
