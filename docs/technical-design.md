@@ -139,6 +139,15 @@ Scoring is win = 3 points, draw = 1 point for each participant, and loss = 0. Ra
 
 Save every intermediate tie-break value in the standings output. The top 16 participants from each group advance.
 
+During group play, standings are provisional calculations derived from the
+currently accepted results. The runner may atomically replace
+`standings.json` with bounded periodic provisional snapshots so progress is
+observable without making the snapshot authoritative. The exact cadence
+belongs to the later runner implementation; it must not introduce round
+barriers or otherwise delay independent group matches. A group standing is
+final only after every unordered pair has one accepted result, and only that
+complete final standing may be used to select advancing participants.
+
 ### Full knockout stage
 
 - The round of 64 pairs A with B and C with D. Rank `r` faces rank `17-r` from the paired group, and adjacent series alternate which group supplies the higher seed.
@@ -187,12 +196,20 @@ The runner owns tournament execution state and writes these canonical machine-re
 
 - `run-metadata.json`: seed, rule version, dependency and image versions, timestamps, and completion state;
 - `results.jsonl`: one immutable record per accepted simulation;
-- `standings.json`: group scores and every tie-break value;
+- `standings.json`: atomically replaced provisional or final group scores and
+  every tie-break value;
 - `bracket.json`: bracket positions, series simulations, and winners.
 
 The separate [resource-capture script](../scripts/capture-resource-usage.sh), not the runner, owns experiment observations. The current script writes `resources.csv` and `replicas.csv`; the acceptance-evidence workflow combines those observations with the exported Locust results into `autoscaling-timeline.csv`. This timeline and its source Kubernetes observations are collected only during dedicated Locust/HPA runs. A normal tournament run does not implicitly run a load experiment.
 
 The report generator combines the tournament artifacts with separately captured experiment evidence and produces a self-contained `report.html` with embedded data, CSS, and JavaScript. It works offline after being copied into the repository and has no CDN dependency. Regeneration from identical inputs produces substantively identical content apart from an explicitly labelled generation timestamp.
+
+`results.jsonl` remains authoritative for accepted simulations. After a
+restart, the runner recomputes standings from those results rather than
+treating a prior `standings.json` snapshot as source state. Provisional points,
+mini-table values, and Sonneborn–Berger values reflect only the accepted
+results available when the snapshot was calculated and can change as later
+results are accepted.
 
 The report provides a run summary, sortable group tables with advancement cutoffs, the knockout bracket and series details, a searchable simulation table, and an autoscaling chart aligned with request rate, latency, and failures. It is read-only and never becomes the source of truth.
 

@@ -161,7 +161,22 @@ function generateGroupStageSchedule(groups, tournamentSeed) {
   return schedule;
 }
 
-function calculateGroupRecords(groupName, groupRoster, results) {
+function validateGroupOptions(options) {
+  if (!options || typeof options !== 'object' || Array.isArray(options)) {
+    throw new TypeError('Group calculation options must be an object');
+  }
+
+  if (options.requireComplete !== undefined &&
+      typeof options.requireComplete !== 'boolean') {
+    throw new TypeError('requireComplete must be a boolean');
+  }
+
+  return options.requireComplete === undefined
+    ? true
+    : options.requireComplete;
+}
+
+function calculateGroupRecords(groupName, groupRoster, results, options = {}) {
   if (!GROUP_NAMES.includes(groupName)) {
     throw new RangeError('Group name must be A, B, C, or D');
   }
@@ -173,6 +188,8 @@ function calculateGroupRecords(groupName, groupRoster, results) {
   if (!Array.isArray(results)) {
     throw new TypeError('Group results must be an array');
   }
+
+  const requireComplete = validateGroupOptions(options);
 
   const participantIndexes = new Map();
   const records = groupRoster.map((pokemon, index) => {
@@ -298,7 +315,7 @@ function calculateGroupRecords(groupName, groupRoster, results) {
   }
 
   const expectedPairings = groupRoster.length * (groupRoster.length - 1) / 2;
-  if (pairings.size !== expectedPairings) {
+  if (requireComplete && pairings.size !== expectedPairings) {
     throw new RangeError(
       `Group ${groupName} results are incomplete: expected ` +
       `${expectedPairings} pairings, received ${pairings.size}`
@@ -306,6 +323,91 @@ function calculateGroupRecords(groupName, groupRoster, results) {
   }
 
   return records;
+}
+
+function calculateGroupStandings(
+  groupName,
+  groupRoster,
+  results,
+  tournamentSeed,
+  options = {}
+) {
+  const records = calculateGroupRecords(
+    groupName,
+    groupRoster,
+    results,
+    options
+  );
+  const expectedMatches = groupRoster.length * (groupRoster.length - 1) / 2;
+  const standings = records.map(record => ({
+    ...record,
+    miniTablePoints: 0,
+    sonnebornBerger: 0,
+    tieKey: deriveTournamentDigest(
+      tournamentSeed,
+      `rank\n${groupName}\n${record.speciesId}`
+    ).toString('hex'),
+  }));
+  const standingsBySpecies = new Map(
+    standings.map(record => [record.species, record])
+  );
+
+  for (const result of results) {
+    const pokemon1Record = standingsBySpecies.get(result.pokemon1);
+    const pokemon2Record = standingsBySpecies.get(result.pokemon2);
+
+    if (pokemon1Record.points === pokemon2Record.points) {
+      if (result.outcome === 'tie') {
+        pokemon1Record.miniTablePoints++;
+        pokemon2Record.miniTablePoints++;
+      } else {
+        const winnerRecord = result.winnerSide === 'p1'
+          ? pokemon1Record
+          : pokemon2Record;
+        winnerRecord.miniTablePoints += 3;
+      }
+    }
+
+    if (result.outcome === 'tie') {
+      pokemon1Record.sonnebornBerger += pokemon2Record.points;
+      pokemon2Record.sonnebornBerger += pokemon1Record.points;
+    } else {
+      const winnerRecord = result.winnerSide === 'p1'
+        ? pokemon1Record
+        : pokemon2Record;
+      const loserRecord = result.winnerSide === 'p1'
+        ? pokemon2Record
+        : pokemon1Record;
+      winnerRecord.sonnebornBerger += 2 * loserRecord.points;
+    }
+  }
+
+  standings.sort((left, right) => {
+    const scoreComparison = right.points - left.points ||
+      right.miniTablePoints - left.miniTablePoints ||
+      right.wins - left.wins ||
+      right.sonnebornBerger - left.sonnebornBerger;
+
+    if (scoreComparison !== 0) {
+      return scoreComparison;
+    }
+
+    if (left.tieKey < right.tieKey) return -1;
+    if (left.tieKey > right.tieKey) return 1;
+    return 0;
+  });
+
+  standings.forEach((record, index) => {
+    record.rank = index + 1;
+  });
+
+  return {
+    group: groupName,
+    status: results.length === expectedMatches ? 'final' : 'provisional',
+    completedMatches: results.length,
+    expectedMatches,
+    standings,
+  };
 }
 
 module.exports = {
@@ -318,4 +420,5 @@ module.exports = {
   splitRosterIntoGroups,
   generateGroupStageSchedule,
   calculateGroupRecords,
+  calculateGroupStandings
 };

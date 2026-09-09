@@ -11,6 +11,7 @@ const {
   buildFullRoster,
   buildSampleRoster,
   calculateGroupRecords,
+  calculateGroupStandings,
   deriveShowdownSeed,
   generateGroupStageSchedule,
   shuffleRoster,
@@ -66,6 +67,40 @@ function threeSpeciesGroupResults(groupRoster) {
       winnerSpecies: third,
     },
   ];
+}
+
+function roundRobinResults(groupRoster, outcomes) {
+  const results = [];
+  let matchNumber = 1;
+
+  for (let leftIndex = 0; leftIndex < groupRoster.length; leftIndex++) {
+    for (
+      let rightIndex = leftIndex + 1;
+      rightIndex < groupRoster.length;
+      rightIndex++
+    ) {
+      const outcome = outcomes[matchNumber - 1];
+      const pokemon1 = groupRoster[leftIndex].name;
+      const pokemon2 = groupRoster[rightIndex].name;
+      const isTie = outcome === 'tie';
+
+      results.push({
+        matchId: `group-A-${String(matchNumber).padStart(6, '0')}`,
+        group: 'A',
+        pokemon1,
+        pokemon2,
+        outcome: isTie ? 'tie' : 'win',
+        winnerSide: isTie ? null : outcome,
+        winnerSpecies: isTie
+          ? null
+          : outcome === 'p1' ? pokemon1 : pokemon2,
+      });
+      matchNumber++;
+    }
+  }
+
+  assert.equal(outcomes.length, results.length);
+  return results;
 }
 
 test('deriveShowdownSeed produces a four-number array', () => {
@@ -446,6 +481,66 @@ test('calculateGroupRecords rejects incomplete results', () => {
   );
 });
 
+test('calculateGroupRecords accepts partial results only when requested', () => {
+  const roster = listBaseSpecies().slice(0, 3);
+  const results = threeSpeciesGroupResults(roster).slice(0, 2);
+
+  assert.throws(
+    () => calculateGroupRecords('A', roster, results),
+    /results are incomplete/
+  );
+  assert.deepEqual(
+    calculateGroupRecords('A', roster, results, {requireComplete: false}),
+    [
+      {
+        group: 'A',
+        speciesId: roster[0].id,
+        species: roster[0].name,
+        played: 2,
+        wins: 1,
+        draws: 1,
+        losses: 0,
+        points: 4,
+      },
+      {
+        group: 'A',
+        speciesId: roster[1].id,
+        species: roster[1].name,
+        played: 1,
+        wins: 0,
+        draws: 0,
+        losses: 1,
+        points: 0,
+      },
+      {
+        group: 'A',
+        speciesId: roster[2].id,
+        species: roster[2].name,
+        played: 1,
+        wins: 0,
+        draws: 1,
+        losses: 0,
+        points: 1,
+      },
+    ]
+  );
+});
+
+test('calculateGroupRecords validates completeness options', () => {
+  const roster = listBaseSpecies().slice(0, 2);
+
+  assert.throws(
+    () => calculateGroupRecords('A', roster, [], null),
+    /options must be an object/
+  );
+  assert.throws(
+    () => calculateGroupRecords(
+      'A', roster, [], {requireComplete: 'false'}
+    ),
+    /requireComplete must be a boolean/
+  );
+});
+
 test('calculateGroupRecords rejects duplicate pairings and match IDs', () => {
   const roster = listBaseSpecies().slice(0, 3);
   const duplicatePairing = threeSpeciesGroupResults(roster);
@@ -492,4 +587,195 @@ test('calculateGroupRecords rejects unknown participants and bad winners', () =>
     () => calculateGroupRecords('A', roster, inconsistentWinner),
     /inconsistent winner/
   );
+});
+
+test('calculateGroupStandings reports provisional completion metadata', () => {
+  const roster = listBaseSpecies().slice(0, 3);
+  const results = threeSpeciesGroupResults(roster).slice(0, 2);
+  const result = calculateGroupStandings(
+    'A', roster, results, 'tournament-001', {requireComplete: false}
+  );
+
+  assert.equal(result.group, 'A');
+  assert.equal(result.status, 'provisional');
+  assert.equal(result.completedMatches, 2);
+  assert.equal(result.expectedMatches, 3);
+});
+
+test('calculateGroupStandings retains strict completeness by default', () => {
+  const roster = listBaseSpecies().slice(0, 3);
+  const results = threeSpeciesGroupResults(roster).slice(0, 2);
+
+  assert.throws(
+    () => calculateGroupStandings(
+      'A', roster, results, 'tournament-001'
+    ),
+    /results are incomplete/
+  );
+});
+
+test('calculateGroupStandings reports final completion metadata', () => {
+  const roster = listBaseSpecies().slice(0, 3);
+  const results = threeSpeciesGroupResults(roster);
+  const result = calculateGroupStandings(
+    'A', roster, results, 'tournament-001'
+  );
+
+  assert.equal(result.group, 'A');
+  assert.equal(result.status, 'final');
+  assert.equal(result.completedMatches, 3);
+  assert.equal(result.expectedMatches, 3);
+});
+
+test('calculateGroupStandings orders by total points first', () => {
+  const roster = listBaseSpecies().slice(0, 3);
+  const result = calculateGroupStandings(
+    'A', roster, threeSpeciesGroupResults(roster), 'tournament-001'
+  );
+
+  assert.deepEqual(
+    result.standings.map(record => record.points),
+    [4, 4, 0]
+  );
+});
+
+test('calculateGroupStandings uses a fixed equal-points mini-table', () => {
+  const roster = listBaseSpecies().slice(0, 4);
+  const results = roundRobinResults(
+    roster,
+    ['p1', 'p2', 'p2', 'p1', 'p2', 'p1']
+  );
+  const standings = calculateGroupStandings(
+    'A', roster, results, 'tournament-001'
+  ).standings;
+  const first = standings.find(record => record.speciesId === roster[0].id);
+  const second = standings.find(record => record.speciesId === roster[1].id);
+
+  assert.equal(first.points, 3);
+  assert.equal(second.points, 3);
+  assert.equal(first.miniTablePoints, 3);
+  assert.equal(second.miniTablePoints, 0);
+  assert.ok(first.rank < second.rank);
+});
+
+test('calculateGroupStandings orders by wins after equal mini-tables', () => {
+  const roster = listBaseSpecies().slice(0, 5);
+  const results = roundRobinResults(roster, [
+    'tie', 'p1', 'p2', 'p2',
+    'tie', 'tie', 'tie',
+    'p2', 'p2',
+    'tie',
+  ]);
+  const standings = calculateGroupStandings(
+    'A', roster, results, 'tournament-001'
+  ).standings;
+  const first = standings.find(record => record.speciesId === roster[0].id);
+  const second = standings.find(record => record.speciesId === roster[1].id);
+
+  assert.equal(first.points, 4);
+  assert.equal(second.points, 4);
+  assert.equal(first.miniTablePoints, 1);
+  assert.equal(second.miniTablePoints, 1);
+  assert.equal(first.wins, 1);
+  assert.equal(second.wins, 0);
+  assert.ok(first.rank < second.rank);
+});
+
+test('calculateGroupStandings orders by Sonneborn-Berger next', () => {
+  const roster = listBaseSpecies().slice(0, 6);
+  const results = roundRobinResults(roster, [
+    'tie', 'p1', 'p2', 'p2', 'p2',
+    'p2', 'p1', 'p2', 'p2',
+    'p2', 'p2', 'p2',
+    'p2', 'p2',
+    'tie',
+  ]);
+  const standings = calculateGroupStandings(
+    'A', roster, results, 'tournament-001'
+  ).standings;
+  const first = standings.find(record => record.speciesId === roster[0].id);
+  const second = standings.find(record => record.speciesId === roster[1].id);
+
+  assert.equal(first.points, 4);
+  assert.equal(second.points, 4);
+  assert.equal(first.miniTablePoints, 1);
+  assert.equal(second.miniTablePoints, 1);
+  assert.equal(first.wins, 1);
+  assert.equal(second.wins, 1);
+  assert.equal(first.sonnebornBerger, 10);
+  assert.equal(second.sonnebornBerger, 16);
+  assert.ok(second.rank < first.rank);
+});
+
+test('calculateGroupStandings uses the deterministic tie key last', () => {
+  const roster = listBaseSpecies().slice(0, 2);
+  const results = roundRobinResults(roster, ['tie']);
+  const tournamentSeed = 'tournament-001';
+  const standings = calculateGroupStandings(
+    'A', roster, results, tournamentSeed
+  ).standings;
+  const expected = roster.map(species => ({
+    speciesId: species.id,
+    tieKey: createHash('sha256')
+      .update(`${tournamentSeed}\nrank\nA\n${species.id}`, 'utf8')
+      .digest('hex'),
+  })).sort((left, right) => left.tieKey.localeCompare(right.tieKey));
+
+  assert.deepEqual(
+    standings.map(record => ({
+      speciesId: record.speciesId,
+      tieKey: record.tieKey,
+    })),
+    expected
+  );
+  assert.deepEqual(standings.map(record => record.rank), [1, 2]);
+  assert.ok(standings.every(record =>
+    record.points === 1 &&
+    record.miniTablePoints === 1 &&
+    record.wins === 0 &&
+    record.sonnebornBerger === 1
+  ));
+});
+
+test('calculateGroupStandings preserves inputs and base records', () => {
+  const roster = listBaseSpecies().slice(0, 3);
+  const results = threeSpeciesGroupResults(roster);
+  const rosterSnapshot = roster.map(species => ({
+    id: species.id,
+    name: species.name,
+  }));
+  const resultsSnapshot = structuredClone(results);
+  const baseRecords = calculateGroupRecords('A', roster, results);
+  const baseRecordsSnapshot = structuredClone(baseRecords);
+  const standings = calculateGroupStandings(
+    'A', roster, results, 'tournament-001'
+  ).standings;
+
+  assert.deepEqual(
+    roster.map(species => ({id: species.id, name: species.name})),
+    rosterSnapshot
+  );
+  assert.deepEqual(results, resultsSnapshot);
+  assert.deepEqual(baseRecords, baseRecordsSnapshot);
+  assert.ok(standings.every(record => {
+    assert.deepEqual(Object.keys(record).sort(), [
+      'draws',
+      'group',
+      'losses',
+      'miniTablePoints',
+      'played',
+      'points',
+      'rank',
+      'sonnebornBerger',
+      'species',
+      'speciesId',
+      'tieKey',
+      'wins',
+    ]);
+
+    return Number.isInteger(record.rank) &&
+      Number.isInteger(record.miniTablePoints) &&
+      Number.isInteger(record.sonnebornBerger) &&
+      /^[0-9a-f]{64}$/.test(record.tieKey);
+  }));
 });

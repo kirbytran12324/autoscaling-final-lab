@@ -11,10 +11,21 @@ This contract defines which runner artifacts are authoritative, when a battle is
 | `run-metadata.json` | Identifies the run, tournament seed, rule and dependency versions, mode, timestamps, and completion state | Atomic replacement |
 | `results.jsonl` | Append-only authoritative record of accepted simulations | Append one newline-terminated record, then flush it before advancing the checkpoint |
 | `checkpoint.json` | Records the current stage, round, and schedule position so normal resume is efficient | Atomic replacement |
-| `standings.json` | Derived group standings and every tie-break value | Atomic replacement after a complete standings calculation |
+| `standings.json` | Derived provisional or final group standings and every tie-break value | Atomic replacement at a bounded periodic cadence during group play and after the complete final calculation |
 | `bracket.json` | Derived knockout positions, series simulations, and winners | Atomic replacement at knockout-round barriers |
 
 `results.jsonl` is the source of truth for whether a `matchId` is complete. The checkpoint is a progress aid and must never override an accepted result.
+
+Provisional standings are derived from the currently accepted records in
+`results.jsonl`. Their points, mini-table values, and Sonneborn–Berger values
+represent that result set and may change as more matches are accepted. A
+provisional snapshot is never an advancement input: only a complete final
+group standing, with every unordered pair present exactly once, may select
+advancing participants.
+
+The runner may atomically replace `standings.json` with bounded periodic
+provisional snapshots during group play. The exact snapshot cadence belongs to
+the later runner implementation and must not introduce round barriers.
 
 ## Accepting a simulation result
 
@@ -62,11 +73,12 @@ On startup or restart, the runner:
 3. rejects conflicting duplicate IDs or malformed persisted evidence;
 4. loads the checkpoint as a progress hint;
 5. reconciles it with the authoritative results; and
-6. skips completed matches and resends only missing work.
+6. recomputes provisional or final standings from `results.jsonl`; and
+7. skips completed matches and resends only missing work.
 
 A crash before the result append causes the missing deterministic request to be sent again. A crash after the append but before the checkpoint update leaves the checkpoint behind, but the accepted `matchId` in `results.jsonl` prevents a duplicate result. A malformed or truncated persisted record is never silently discarded; automatic resume stops and preserves the PVC for diagnosis.
 
-The other JSON state files use the same temporary-file, flush, and atomic-rename pattern. Temporary files must be created on the same PVC as their destination so the rename stays within one filesystem.
+The other JSON state files use the same temporary-file, flush, and atomic-rename pattern. Temporary files must be created on the same PVC as their destination so the rename stays within one filesystem. A prior `standings.json` snapshot is derived evidence and never overrides standings recomputed from authoritative `results.jsonl` records after restart.
 
 ## Deferred replay viewer
 
