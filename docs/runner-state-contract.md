@@ -52,6 +52,9 @@ participants, seed, outcome and winner, turns, termination, and protocol hash.
 At each completed-round barrier, its next-round entrants retain their original
 group and rank and record the immediately preceding series they won in
 `sourceSeriesId`.
+The champion stored in `bracket.json` is derived from the authoritative
+accepted `r2-series-01` game records and is not a separate mutable source of
+truth.
 
 If seven accepted games leave the entrants tied on decisive wins, derive and
 record the complete lowercase hexadecimal `lotteryHash` as

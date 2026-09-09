@@ -180,6 +180,11 @@ Record the complete lowercase 64-character hexadecimal digest. The most
 significant bit of its first byte selects the winner: bit 0 selects
 `entrant1`, and bit 1 selects `entrant2`.
 
+The completed winner of `r2-series-01` is the tournament champion. Champion
+selection is derived from the accepted final games, and its summary retains
+the original group and rank, immediate source-series provenance, final
+resolution and counts, plus `lotteryHash` when a lottery was required.
+
 The full knockout has 63 series and 126–441 simulations. The complete tournament therefore contains 130,942–131,257 simulations.
 
 ### Accepted 32-species sample mode

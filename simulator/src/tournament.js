@@ -1065,6 +1065,103 @@ function evaluateKnockoutSeries(series, acceptedGames, tournamentSeed) {
   };
 }
 
+function selectTournamentChampion(
+  finalRound,
+  acceptedGames,
+  tournamentSeed
+) {
+  if (!finalRound || typeof finalRound !== 'object' ||
+      Array.isArray(finalRound)) {
+    throw new TypeError('Final round must be an object');
+  }
+
+  if (finalRound.round !== 'r2') {
+    throw new RangeError('Final round must be r2');
+  }
+
+  if (!Array.isArray(finalRound.series)) {
+    throw new TypeError('Final round series must be an array');
+  }
+
+  if (finalRound.series.length !== 1) {
+    throw new RangeError('Final round must contain exactly one series');
+  }
+
+  const [finalSeries] = finalRound.series;
+  if (!finalSeries || typeof finalSeries !== 'object' ||
+      Array.isArray(finalSeries)) {
+    throw new TypeError('Final series must be an object');
+  }
+
+  if (finalSeries.seriesId !== 'r2-series-01') {
+    throw new RangeError('Final series must have ID r2-series-01');
+  }
+
+  if (finalSeries.position !== 1) {
+    throw new RangeError('Final series must occupy position 1');
+  }
+
+  const expectedSourceSeriesIds = {
+    entrant1: 'r4-series-01',
+    entrant2: 'r4-series-02',
+  };
+
+  for (const entrantName of ['entrant1', 'entrant2']) {
+    const entrant = finalSeries[entrantName];
+    validateKnockoutEntrant(entrant, entrantName, finalSeries.seriesId);
+
+    if (typeof entrant.sourceSeriesId !== 'string' ||
+        entrant.sourceSeriesId.trim() === '') {
+      throw new TypeError(
+        `${entrantName} in ${finalSeries.seriesId} must have a source series ID`
+      );
+    }
+
+    if (entrant.sourceSeriesId !== expectedSourceSeriesIds[entrantName]) {
+      throw new RangeError(
+        `${entrantName} in ${finalSeries.seriesId} must come from ` +
+        expectedSourceSeriesIds[entrantName]
+      );
+    }
+  }
+
+  if (finalSeries.entrant1.speciesId === finalSeries.entrant2.speciesId ||
+      finalSeries.entrant1.species === finalSeries.entrant2.species) {
+    throw new RangeError('Final series entrants must be distinct species');
+  }
+
+  const evaluation = evaluateKnockoutSeries(
+    finalSeries,
+    acceptedGames,
+    tournamentSeed
+  );
+
+  if (evaluation.status !== 'complete') {
+    throw new RangeError('Final series is incomplete');
+  }
+
+  const winnerSlot = evaluation.winner.slot;
+  const winner = finalSeries[winnerSlot];
+
+  return {
+    finalSeriesId: finalSeries.seriesId,
+    winnerSlot,
+    champion: {
+      group: winner.group,
+      rank: winner.rank,
+      speciesId: winner.speciesId,
+      species: winner.species,
+      sourceSeriesId: winner.sourceSeriesId,
+    },
+    resolution: evaluation.resolution,
+    gamesPlayed: evaluation.gamesPlayed,
+    entrant1Wins: evaluation.entrant1Wins,
+    entrant2Wins: evaluation.entrant2Wins,
+    draws: evaluation.draws,
+    lotteryHash: evaluation.lotteryHash,
+  };
+}
+
 module.exports = {
   SAMPLE_GROUP_SIZES,
   FULL_GROUP_SIZES,
@@ -1083,4 +1180,5 @@ module.exports = {
   buildNextKnockoutRound,
   generateKnockoutSeriesGame,
   evaluateKnockoutSeries,
+  selectTournamentChampion,
 };
