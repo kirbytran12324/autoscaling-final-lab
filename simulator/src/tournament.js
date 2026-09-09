@@ -643,6 +643,53 @@ function buildInitialKnockoutRound(groupAdvancers) {
   return {round, series};
 }
 
+function generateKnockoutSeriesGame(series, gameNumber, tournamentSeed) {
+  if (!series || typeof series !== 'object' || Array.isArray(series)) {
+    throw new TypeError('Knockout series must be an object');
+  }
+
+  if (typeof series.seriesId !== 'string' || series.seriesId === '') {
+    throw new TypeError('Knockout series must have a series ID');
+  }
+
+  for (const entrantName of ['entrant1', 'entrant2']) {
+    const entrant = series[entrantName];
+
+    if (!entrant || typeof entrant !== 'object' || Array.isArray(entrant)) {
+      throw new TypeError(`${entrantName} must be an object`);
+    }
+
+    if (typeof entrant.species !== 'string' || entrant.species === '') {
+      throw new TypeError(`${entrantName} must have a species`);
+    }
+  }
+
+  if (!Number.isInteger(gameNumber) || gameNumber < 1 || gameNumber > 7) {
+    throw new RangeError('Game number must be an integer from 1 through 7');
+  }
+
+  if (typeof tournamentSeed !== 'string' || tournamentSeed === '') {
+    throw new TypeError('Tournament seed must be a non-empty string');
+  }
+
+  const matchId = `${series.seriesId}-game-${String(gameNumber)
+    .padStart(2, '0')}`;
+  const entrant1Starts = gameNumber % 2 === 1;
+
+  return {
+    seriesId: series.seriesId,
+    gameNumber,
+    matchId,
+    pokemon1: entrant1Starts
+      ? series.entrant1.species
+      : series.entrant2.species,
+    pokemon2: entrant1Starts
+      ? series.entrant2.species
+      : series.entrant1.species,
+    seed: deriveShowdownSeed(tournamentSeed, matchId),
+  };
+}
+
 module.exports = {
   SAMPLE_GROUP_SIZES,
   FULL_GROUP_SIZES,
@@ -658,4 +705,5 @@ module.exports = {
   calculateGroupStandings,
   selectAdvancers,
   buildInitialKnockoutRound,
+  generateKnockoutSeriesGame,
 };

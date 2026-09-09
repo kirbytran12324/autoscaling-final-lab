@@ -102,7 +102,7 @@ The runner remains a singleton because it owns the authoritative checkpoint. Gro
 
 ### Seeds and side assignment
 
-Every simulation has a unique stable `matchId`, such as `group-A-000001` or `r64-series-03-game-2-attempt-1`. Its Showdown seed is derived as follows:
+Every simulation has a unique stable `matchId`, such as `group-A-000001` or `r64-series-03-game-02`. Its Showdown seed is derived as follows:
 
 ```text
 digest = SHA-256(UTF8(tournamentSeed + "\n" + matchId))
@@ -113,6 +113,12 @@ seed = [u16be(digest[0:2]), u16be(digest[2:4]),
 Record the tournament seed, `matchId`, four-number Showdown seed, exact package version, rule version, teams, and choices. A seed alone is not sufficient for reproducibility.
 
 For a group match, use the next digest bit to select the p1 participant. In knockout series, alternate p1 between games. This makes side assignment deterministic and balanced.
+
+Every accepted knockout simulation is called a game. Its stable `matchId`
+uses a two-digit game suffix, such as `r64-series-03-game-02`. Operational
+retries reuse that game ID, participants, and seed; retry numbers belong only
+in runner logs or metadata and never become part of `matchId`. A draw consumes
+the current game and the next game uses its next game ID and derived seed.
 
 ### Completion, draws, and errors
 
@@ -198,7 +204,10 @@ The runner owns tournament execution state and writes these canonical machine-re
 - `results.jsonl`: one immutable record per accepted simulation;
 - `standings.json`: atomically replaced provisional or final group scores and
   every tie-break value;
-- `bracket.json`: bracket positions, series simulations, and winners.
+- `bracket.json`: bracket positions, accepted series games, and winners. It
+  includes accepted draws but excludes failed HTTP attempts. Each accepted
+  game retains its game number, match ID, participants, seed, outcome and
+  winner, turns, termination, and protocol hash.
 
 The separate [resource-capture script](../scripts/capture-resource-usage.sh), not the runner, owns experiment observations. The current script writes `resources.csv` and `replicas.csv`; the acceptance-evidence workflow combines those observations with the exported Locust results into `autoscaling-timeline.csv`. This timeline and its source Kubernetes observations are collected only during dedicated Locust/HPA runs. A normal tournament run does not implicitly run a load experiment.
 

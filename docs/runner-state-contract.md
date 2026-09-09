@@ -41,6 +41,15 @@ Before appending a response, the runner validates that:
 
 An invalid response, HTTP failure, application timeout, or stream failure is an operational error. The runner does not append it. It retries the same `matchId`, participants, and seed up to three times with exponential backoff, then marks the tournament failed.
 
+Every accepted knockout simulation is called a game. Its stable `matchId`
+uses a two-digit suffix such as `r64-series-03-game-02`. Operational retries
+reuse the same game ID, participants, and seed; retry numbers appear only in
+runner logs or metadata and never in `matchId`. A draw consumes the current
+game, so continued series play uses the next game ID and its derived seed.
+`bracket.json` retains accepted games, including draws, but excludes failed
+HTTP attempts. Each accepted game records its game number, match ID,
+participants, seed, outcome and winner, turns, termination, and protocol hash.
+
 ## Deterministic replay fields
 
 For identical battle inputs and the same rule and simulator versions, these fields must reproduce exactly:
