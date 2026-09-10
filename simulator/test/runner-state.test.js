@@ -15,8 +15,28 @@ const test = require('node:test');
 const {
   appendJsonLine,
   atomicWriteJson,
+  buildCompletedMatchIndex,
   readJsonLines,
 } = require('../src/runner-state');
+
+function completedResult(overrides = {}) {
+  return {
+    matchId: 'group-A-000001',
+    pokemon1: 'Snorlax',
+    pokemon2: 'Clefable',
+    seed: [12345, 23456, 34567, 45678],
+    simulatorVersion: 'pokemon-showdown@0.11.11',
+    outcome: 'win',
+    winnerSide: 'p1',
+    winnerSpecies: 'Snorlax',
+    turns: 42,
+    termination: 'neutral',
+    protocolHash: 'a'.repeat(64),
+    servedBy: 'simulator-1',
+    durationMs: 120,
+    ...overrides,
+  };
+}
 
 async function createTestDirectory(t) {
   const directory = await mkdtemp(join(tmpdir(), 'runner-state-'));
@@ -139,4 +159,147 @@ test('readJsonLines rejects an unterminated final record as truncated', async t 
     readJsonLines(filePath),
     /line 2 lacks a terminating newline/i
   );
+});
+
+test('buildCompletedMatchIndex indexes unique records in a Map', () => {
+  const first = completedResult();
+  const second = completedResult({matchId: 'group-A-000002'});
+
+  const index = buildCompletedMatchIndex([first, second]);
+
+  assert.ok(index instanceof Map);
+  assert.equal(index.size, 2);
+  assert.strictEqual(index.get(first.matchId), first);
+  assert.strictEqual(index.get(second.matchId), second);
+});
+
+test('buildCompletedMatchIndex accepts identical deterministic duplicates', () => {
+  const first = completedResult();
+  const duplicate = {
+    ...first,
+    seed: [...first.seed],
+  };
+
+  const index = buildCompletedMatchIndex([first, duplicate]);
+
+  assert.equal(index.size, 1);
+  assert.strictEqual(index.get(first.matchId), first);
+});
+
+test('buildCompletedMatchIndex ignores operational duplicate differences', () => {
+  const first = completedResult();
+  const duplicate = completedResult({
+    seed: [...first.seed],
+    servedBy: 'simulator-9',
+    durationMs: 875,
+  });
+
+  const index = buildCompletedMatchIndex([first, duplicate]);
+
+  assert.equal(index.size, 1);
+  assert.strictEqual(index.get(first.matchId), first);
+});
+
+test('buildCompletedMatchIndex rejects a changed participant', () => {
+  const first = completedResult();
+  const conflicting = completedResult({pokemon2: 'Mew'});
+
+  assert.throws(
+    () => buildCompletedMatchIndex([first, conflicting]),
+    /reproducibility conflict/i
+  );
+});
+
+test('buildCompletedMatchIndex rejects a changed seed', () => {
+  const first = completedResult();
+  const conflicting = completedResult({seed: [1, 2, 3, 4]});
+
+  assert.throws(
+    () => buildCompletedMatchIndex([first, conflicting]),
+    /reproducibility conflict/i
+  );
+});
+
+test('buildCompletedMatchIndex rejects changed outcomes and winners', () => {
+  const first = completedResult();
+
+  for (const conflicting of [
+    completedResult({outcome: 'tie'}),
+    completedResult({winnerSpecies: 'Clefable'}),
+  ]) {
+    assert.throws(
+      () => buildCompletedMatchIndex([first, conflicting]),
+      /reproducibility conflict/i
+    );
+  }
+});
+
+test('buildCompletedMatchIndex rejects another deterministic difference', () => {
+  const first = completedResult();
+  const conflicting = completedResult({protocolHash: 'b'.repeat(64)});
+
+  assert.throws(
+    () => buildCompletedMatchIndex([first, conflicting]),
+    /reproducibility conflict/i
+  );
+});
+
+test('duplicate conflict errors include the matchId', () => {
+  const first = completedResult({matchId: 'r64-series-03-game-02'});
+  const conflicting = completedResult({
+    matchId: first.matchId,
+    turns: first.turns + 1,
+  });
+
+  assert.throws(
+    () => buildCompletedMatchIndex([first, conflicting]),
+    new RegExp(first.matchId)
+  );
+});
+
+test('buildCompletedMatchIndex rejects missing deterministic fields', () => {
+  const record = completedResult();
+  delete record.protocolHash;
+
+  assert.throws(
+    () => buildCompletedMatchIndex([record]),
+    /missing.*protocolHash/i
+  );
+});
+
+test('buildCompletedMatchIndex rejects blank and non-string matchIds', () => {
+  for (const matchId of ['', '   ', 123]) {
+    assert.throws(
+      () => buildCompletedMatchIndex([completedResult({matchId})]),
+      /non-empty string matchId/i
+    );
+  }
+});
+
+test('buildCompletedMatchIndex rejects malformed top-level inputs', () => {
+  for (const records of [null, {}, 'records']) {
+    assert.throws(
+      () => buildCompletedMatchIndex(records),
+      /must be an array/i
+    );
+  }
+
+  for (const record of [null, [], 'record']) {
+    assert.throws(
+      () => buildCompletedMatchIndex([record]),
+      /must be a non-array object/i
+    );
+  }
+});
+
+test('buildCompletedMatchIndex preserves input records', () => {
+  const records = [
+    completedResult(),
+    completedResult({matchId: 'group-A-000002'}),
+  ];
+  const snapshot = structuredClone(records);
+
+  buildCompletedMatchIndex(records);
+
+  assert.deepEqual(records, snapshot);
 });

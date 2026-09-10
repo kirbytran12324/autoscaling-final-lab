@@ -8,6 +8,73 @@ const {
   unlink,
 } = require('node:fs/promises');
 const {basename, dirname, join} = require('node:path');
+const {isDeepStrictEqual} = require('node:util');
+
+const DETERMINISTIC_RESULT_FIELDS = Object.freeze([
+  'matchId',
+  'pokemon1',
+  'pokemon2',
+  'seed',
+  'simulatorVersion',
+  'outcome',
+  'winnerSide',
+  'winnerSpecies',
+  'turns',
+  'termination',
+  'protocolHash',
+]);
+
+function haveSameDeterministicResult(left, right) {
+  return DETERMINISTIC_RESULT_FIELDS.every(field =>
+    isDeepStrictEqual(left[field], right[field])
+  );
+}
+
+function buildCompletedMatchIndex(records) {
+  if (!Array.isArray(records)) {
+    throw new TypeError('Completed match records must be an array');
+  }
+
+  const completedMatches = new Map();
+
+  for (const [index, record] of records.entries()) {
+    if (record === null || typeof record !== 'object' ||
+        Array.isArray(record)) {
+      throw new TypeError(
+        `Completed match record at index ${index} must be a non-array object`
+      );
+    }
+
+    for (const field of DETERMINISTIC_RESULT_FIELDS) {
+      if (!Object.hasOwn(record, field)) {
+        throw new TypeError(
+          `Completed match record at index ${index} is missing ` +
+            `deterministic field "${field}"`
+        );
+      }
+    }
+
+    if (typeof record.matchId !== 'string' || record.matchId.trim() === '') {
+      throw new TypeError(
+        `Completed match record at index ${index} must have a non-empty ` +
+          'string matchId'
+      );
+    }
+
+    const previousRecord = completedMatches.get(record.matchId);
+
+    if (previousRecord === undefined) {
+      completedMatches.set(record.matchId, record);
+    } else if (!haveSameDeterministicResult(previousRecord, record)) {
+      throw new Error(
+        `Reproducibility conflict for matchId "${record.matchId}": ` +
+          'deterministic result fields differ'
+      );
+    }
+  }
+
+  return completedMatches;
+}
 
 function serializeJsonLine(value) {
   const serialized = JSON.stringify(value);
@@ -131,5 +198,6 @@ async function readJsonLines(filePath) {
 module.exports = {
   appendJsonLine,
   atomicWriteJson,
+  buildCompletedMatchIndex,
   readJsonLines,
 };
