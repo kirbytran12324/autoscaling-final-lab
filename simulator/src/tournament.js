@@ -24,6 +24,7 @@ const KNOCKOUT_SERIES_COUNTS = Object.freeze({
   r16: 8,
   r8: 4,
   r4: 2,
+  r2: 1,
 });
 
 function deriveTournamentDigest(tournamentSeed, identifier) {
@@ -1167,6 +1168,8 @@ module.exports = {
   FULL_GROUP_SIZES,
   SAMPLE_ADVANCERS_PER_GROUP,
   FULL_ADVANCERS_PER_GROUP,
+  NEXT_KNOCKOUT_ROUND,
+  KNOCKOUT_SERIES_COUNTS,
   deriveShowdownSeed,
   buildSampleRoster,
   buildFullRoster,

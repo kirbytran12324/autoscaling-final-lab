@@ -437,7 +437,7 @@ test('planning is deterministic, schedule ordered, and input preserving', async 
   assert.deepEqual(roster, rosterSnapshot);
 });
 
-test('knockout recovery is rejected explicitly', async t => {
+test('checkpoint stage does not override incomplete group evidence', async t => {
   const identity = runIdentity();
   const initial = await newPlan(t, identity);
   await writeJson(join(initial.runDirectory, 'checkpoint.json'), checkpoint({
@@ -445,13 +445,14 @@ test('knockout recovery is rejected explicitly', async t => {
     round: 'r64',
   }));
 
-  await assert.rejects(
-    planTournamentRun({
-      stateRoot: join(initial.runDirectory, '..', '..'),
-      identity,
-    }),
-    /unsupported knockout recovery.*only plans the group stage/i
-  );
+  const reconciled = await planTournamentRun({
+    stateRoot: join(initial.runDirectory, '..', '..'),
+    identity,
+  });
+
+  assert.equal(reconciled.stage, 'groups');
+  assert.equal(reconciled.round, undefined);
+  assert.equal(reconciled.acceptedResultCount, 0);
 
   await writeJson(
     join(initial.runDirectory, 'checkpoint.json'),
@@ -468,7 +469,7 @@ test('knockout recovery is rejected explicitly', async t => {
       stateRoot: join(initial.runDirectory, '..', '..'),
       identity,
     }),
-    /unsupported knockout recovery.*r64-series-01-game-01/i
+    /knockout recovery requires the complete group stage.*r64-series-01-game-01/i
   );
 });
 

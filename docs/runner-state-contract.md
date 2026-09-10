@@ -96,6 +96,12 @@ progress from the number of JSONL records. The lifecycle loader exposes these
 as `acceptedRecords` and the optional `checkpointHint`; raw JSONL records are
 not part of its downstream return value.
 
+During knockout play, `schedulePosition` is the number of accepted games in
+the currently reconstructed `round`. It resets to zero when a completed-round
+barrier constructs the next round. `acceptedResultCount` remains the total
+number of authoritative accepted simulations across the group and knockout
+stages. Both values are progress hints and never override `results.jsonl`.
+
 Provisional standings are derived from the currently accepted records in
 `results.jsonl`. Their points, mini-table values, and Sonneborn–Berger values
 represent that result set and may change as more matches are accepted. A
