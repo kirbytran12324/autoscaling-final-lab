@@ -14,8 +14,13 @@ const test = require('node:test');
 
 const {
   buildKnockoutRecoveryPlan,
+  executeKnockoutPlan,
   planTournamentRun,
 } = require('../src/runner');
+const {
+  atomicWriteJson: atomicWriteStateJson,
+  readJsonLines,
+} = require('../src/runner-state');
 const {
   buildNextKnockoutRound,
   evaluateKnockoutSeries,
@@ -123,6 +128,25 @@ async function readEvidence(runDirectory) {
   return evidence;
 }
 
+function deferred() {
+  let resolve;
+  let reject;
+  const promise = new Promise((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return {promise, reject, resolve};
+}
+
+async function waitFor(predicate) {
+  for (let attempt = 0; attempt < 100; attempt++) {
+    if (predicate()) return;
+    await new Promise(resolve => setImmediate(resolve));
+  }
+
+  throw new Error('Timed out waiting for test condition');
+}
+
 async function transitionedTournament(t, identity = runIdentity()) {
   const stateRoot = await createStateRoot(t);
   const groupPlan = await planTournamentRun({
@@ -179,6 +203,61 @@ function completedSeriesRecords(series, identity, winner = 'entrant1') {
     identity,
     winner
   ));
+}
+
+function responseForRequest(request, series, identity, result = 'entrant1') {
+  if (result === 'tie') {
+    return acceptedRecord(request, identity);
+  }
+
+  const winnerSpecies = series[result].species;
+  return acceptedRecord(request, identity, {
+    outcome: 'win',
+    winnerSide: request.pokemon1 === winnerSpecies ? 'p1' : 'p2',
+    winnerSpecies,
+  });
+}
+
+async function planWithOnlyLastSeriesIncomplete(t, overrides = {}) {
+  const fixture = await transitionedTournament(t, runIdentity(overrides));
+  const round = fixture.plan.rounds[0];
+  const records = round.series.slice(0, -1).flatMap(series =>
+    completedSeriesRecords(series, fixture.identity)
+  );
+  const plan = await replan(fixture, records);
+
+  return {fixture, plan, series: round.series.at(-1), records};
+}
+
+async function planAtFinalRound(t, overrides = {}) {
+  const fixture = await transitionedTournament(t, runIdentity(overrides));
+  const records = [];
+  let round = fixture.plan.rounds[0];
+
+  while (round.round !== 'r2') {
+    const evaluations = round.series.map(series => {
+      const games = completedSeriesRecords(series, fixture.identity);
+      records.push(...games);
+      return evaluateKnockoutSeries(
+        series,
+        games.map((record, index) => ({
+          ...record,
+          seriesId: series.seriesId,
+          gameNumber: index + 1,
+        })),
+        fixture.identity.tournamentSeed
+      );
+    });
+    round = buildNextKnockoutRound(round, evaluations);
+  }
+
+  const plan = await replan(fixture, records, checkpoint({
+    round: 'r2',
+    schedulePosition: 0,
+    acceptedResultCount: fixture.groupRecords.length + records.length,
+  }));
+
+  return {fixture, plan, records, series: round.series[0]};
 }
 
 test('a newly transitioned sample bracket plans eight game-one requests', async t => {
@@ -482,7 +561,7 @@ test('invalid knockout chronology and authority are rejected', async t => {
   });
 });
 
-test('a completed r2 derives the deterministic champion', async t => {
+test('a result-complete r2 derives the champion and awaits persistence', async t => {
   const fixture = await transitionedTournament(t);
   const records = [];
   let round = fixture.plan.rounds[0];
@@ -516,9 +595,10 @@ test('a completed r2 derives the deterministic champion', async t => {
 
   const plan = await replan(fixture, records);
 
-  assert.equal(plan.stage, 'complete');
-  assert.equal(plan.activeRound, null);
-  assert.equal(plan.tournamentComplete, true);
+  assert.equal(plan.stage, 'knockout');
+  assert.equal(plan.activeRound, 'r2');
+  assert.equal(plan.tournamentComplete, false);
+  assert.equal(plan.resultComplete, true);
   assert.deepEqual(plan.rounds.map(entry => entry.round), [
     'r16', 'r8', 'r4', 'r2',
   ]);
@@ -566,4 +646,612 @@ test('knockout planning preserves supplied state and derived artifacts', async t
   assert.equal(plan.activeRound, 'r16');
   assert.deepEqual(runState, stateSnapshot);
   assert.deepEqual(fixture.identity, identitySnapshot);
+});
+
+test('knockout execution runs series concurrently but games serially', async t => {
+  const fixture = await transitionedTournament(t, runIdentity({
+    runId: 'knockout-execution-concurrency',
+    runnerConcurrency: 3,
+  }));
+  const plan = fixture.plan;
+  const seriesById = new Map(plan.rounds[0].series.map(series => [
+    series.seriesId,
+    series,
+  ]));
+  const activeBySeries = new Map();
+  const maximumBySeries = new Map();
+  const calls = [];
+  let activeRequests = 0;
+  let maximumActiveRequests = 0;
+  let activePersistence = 0;
+  let maximumActivePersistence = 0;
+
+  async function persist() {
+    activePersistence++;
+    maximumActivePersistence = Math.max(
+      maximumActivePersistence,
+      activePersistence
+    );
+    await new Promise(resolve => setImmediate(resolve));
+    activePersistence--;
+  }
+
+  const summary = await executeKnockoutPlan(plan, {
+    async runBattle(request) {
+      calls.push(request);
+      activeRequests++;
+      maximumActiveRequests = Math.max(maximumActiveRequests, activeRequests);
+      const seriesActive = (activeBySeries.get(request.seriesId) || 0) + 1;
+      activeBySeries.set(request.seriesId, seriesActive);
+      maximumBySeries.set(
+        request.seriesId,
+        Math.max(maximumBySeries.get(request.seriesId) || 0, seriesActive)
+      );
+      await new Promise(resolve => setImmediate(resolve));
+      activeBySeries.set(request.seriesId, seriesActive - 1);
+      activeRequests--;
+      return responseForRequest(
+        request,
+        seriesById.get(request.seriesId),
+        fixture.identity
+      );
+    },
+    appendJsonLine: persist,
+    atomicWriteJson: persist,
+    now: () => INITIAL_TIME,
+  });
+
+  assert.equal(maximumActiveRequests, 3);
+  assert.equal(maximumActivePersistence, 1);
+  assert.ok([...maximumBySeries.values()].every(maximum => maximum === 1));
+  assert.equal(calls.length, 16);
+  assert.equal(new Set(calls.map(request => request.matchId)).size, 16);
+  assert.ok(calls.every(request => request.matchId.startsWith('r16-')));
+  assert.deepEqual(summary, {
+    stage: 'knockout',
+    round: 'r8',
+    tournamentComplete: false,
+    requestedMatchCount: 16,
+    acceptedMatchCount: 16,
+    acceptedResultCount: 128,
+    schedulePosition: 0,
+  });
+});
+
+test('draws advance sequentially and two wins stop the series', async t => {
+  const {fixture, plan, series} = await planWithOnlyLastSeriesIncomplete(t, {
+    runId: 'knockout-draw-sequence',
+  });
+  const calls = [];
+  const outcomes = ['tie', 'entrant1', 'entrant1'];
+
+  await executeKnockoutPlan(plan, {
+    async runBattle(request) {
+      calls.push(request);
+      return responseForRequest(
+        request,
+        series,
+        fixture.identity,
+        outcomes[calls.length - 1]
+      );
+    },
+    async appendJsonLine() {},
+    async atomicWriteJson() {},
+    now: () => INITIAL_TIME,
+  });
+
+  assert.deepEqual(calls.map(request => request.gameNumber), [1, 2, 3]);
+  assert.deepEqual(calls.map(request => request.matchId), [
+    `${series.seriesId}-game-01`,
+    `${series.seriesId}-game-02`,
+    `${series.seriesId}-game-03`,
+  ]);
+});
+
+test('a knockout series stops immediately after its second win', async t => {
+  const {fixture, plan, series} = await planWithOnlyLastSeriesIncomplete(t, {
+    runId: 'knockout-two-win-stop',
+  });
+  const calls = [];
+
+  await executeKnockoutPlan(plan, {
+    async runBattle(request) {
+      calls.push(request);
+      return responseForRequest(request, series, fixture.identity);
+    },
+    async appendJsonLine() {},
+    async atomicWriteJson() {},
+    now: () => INITIAL_TIME,
+  });
+
+  assert.deepEqual(calls.map(request => request.gameNumber), [1, 2]);
+});
+
+test('seven draws stop at the cap and persist the hash lottery', async t => {
+  const {fixture, plan, series} = await planWithOnlyLastSeriesIncomplete(t, {
+    runId: 'knockout-hash-lottery-execution',
+  });
+  const calls = [];
+  const writes = [];
+
+  await executeKnockoutPlan(plan, {
+    async runBattle(request) {
+      calls.push(request);
+      return responseForRequest(
+        request,
+        series,
+        fixture.identity,
+        'tie'
+      );
+    },
+    async appendJsonLine() {},
+    async atomicWriteJson(path, value) {
+      writes.push({path, value: structuredClone(value)});
+    },
+    now: () => INITIAL_TIME,
+  });
+
+  const bracket = writes.find(write => write.path.endsWith('bracket.json'))
+    .value;
+  const completedSeries = bracket.rounds[0].series.at(-1);
+  assert.deepEqual(calls.map(request => request.gameNumber), [1, 2, 3, 4, 5, 6, 7]);
+  assert.equal(completedSeries.games.length, 7);
+  assert.equal(completedSeries.evaluation.resolution, 'hash-lottery');
+  assert.match(completedSeries.evaluation.lotteryHash, /^[0-9a-f]{64}$/);
+});
+
+test('knockout acceptance appends before checkpoints with absolute counts', async t => {
+  const prepared = await planWithOnlyLastSeriesIncomplete(t, {
+    runId: 'knockout-acceptance-order',
+  });
+  const firstWin = acceptedKnockoutRecord(
+    prepared.series,
+    1,
+    prepared.fixture.identity,
+    'entrant1'
+  );
+  const plan = await replan(
+    prepared.fixture,
+    [...prepared.records, firstWin]
+  );
+  const events = [];
+
+  const summary = await executeKnockoutPlan(plan, {
+    async runBattle(request) {
+      return responseForRequest(
+        request,
+        prepared.series,
+        prepared.fixture.identity
+      );
+    },
+    async appendJsonLine(path, value) {
+      events.push({kind: 'append', path, value: structuredClone(value)});
+    },
+    async atomicWriteJson(path, value) {
+      events.push({kind: path.split('/').at(-1), value: structuredClone(value)});
+    },
+    now: () => INITIAL_TIME,
+  });
+
+  assert.equal(events[0].kind, 'append');
+  assert.equal(events[1].kind, 'checkpoint.json');
+  assert.equal(events[1].value.round, 'r16');
+  assert.equal(events[1].value.schedulePosition, 16);
+  assert.equal(events[1].value.acceptedResultCount, 128);
+  assert.equal(events.at(-2).kind, 'bracket.json');
+  assert.equal(events.at(-1).kind, 'checkpoint.json');
+  assert.equal(events.at(-1).value.round, 'r8');
+  assert.equal(events.at(-1).value.schedulePosition, 0);
+  assert.equal(events.at(-1).value.acceptedResultCount, 128);
+  assert.equal(summary.acceptedResultCount, 128);
+});
+
+test('knockout execution rejects invalid responses without appending', async t => {
+  const {fixture, plan} = await planWithOnlyLastSeriesIncomplete(t, {
+    runId: 'knockout-invalid-response',
+  });
+  const writes = [];
+  let appendCalls = 0;
+
+  await assert.rejects(
+    executeKnockoutPlan(plan, {
+      async runBattle(request) {
+        return acceptedRecord(request, fixture.identity, {
+          pokemon1: 'Pikachu',
+        });
+      },
+      async appendJsonLine() {
+        appendCalls++;
+      },
+      async atomicWriteJson(path, value) {
+        writes.push({path, value});
+      },
+      now: () => INITIAL_TIME,
+    }),
+    error => {
+      assert.match(error.cause.message, /pokemon1.*match the request/i);
+      return true;
+    }
+  );
+
+  assert.equal(appendCalls, 0);
+  assert.equal(writes.length, 1);
+  assert.match(writes[0].path, /run-metadata\.json$/);
+  assert.equal(writes[0].value.status, 'failed');
+});
+
+test('request failure drains already-started knockout successes', async t => {
+  const fixture = await transitionedTournament(t, runIdentity({
+    runId: 'knockout-request-drain',
+    runnerConcurrency: 3,
+  }));
+  const round = fixture.plan.rounds[0];
+  const records = [
+    ...round.series.slice(0, 5).flatMap(series =>
+      completedSeriesRecords(series, fixture.identity)
+    ),
+    ...round.series.slice(5).map(series =>
+      acceptedKnockoutRecord(series, 1, fixture.identity, 'entrant1')
+    ),
+  ];
+  const plan = await replan(fixture, records);
+  const requests = new Map();
+  const events = [];
+  const requestError = new Error('client retries exhausted');
+
+  const execution = executeKnockoutPlan(plan, {
+    runBattle(request) {
+      const operation = deferred();
+      requests.set(request.seriesId, {operation, request});
+      return operation.promise;
+    },
+    async appendJsonLine(path, value) {
+      events.push(`append:${value.matchId}`);
+    },
+    async atomicWriteJson(path, value) {
+      events.push(`${path.split('/').at(-1)}:${value.status || value.stage}`);
+    },
+    now: () => INITIAL_TIME,
+  });
+
+  await waitFor(() => requests.size === 3);
+  const pending = [...requests.values()];
+  pending[0].operation.reject(requestError);
+
+  for (const {operation, request} of pending.slice(1)) {
+    const series = round.series.find(entry => entry.seriesId === request.seriesId);
+    operation.resolve(responseForRequest(
+      request,
+      series,
+      fixture.identity
+    ));
+  }
+
+  await assert.rejects(execution, error => {
+    assert.strictEqual(error.cause, requestError);
+    return true;
+  });
+
+  assert.equal(requests.size, 3);
+  assert.equal(events.filter(event => event.startsWith('append:')).length, 2);
+  assert.equal(events.at(-1), 'run-metadata.json:failed');
+});
+
+test('knockout storage failures do not mark metadata failed', async t => {
+  await t.test('append failure', async t => {
+    const {fixture, plan, series} = await planWithOnlyLastSeriesIncomplete(t, {
+      runId: 'knockout-append-failure',
+    });
+    const storageError = new Error('append failed');
+    let writeCalls = 0;
+
+    await assert.rejects(executeKnockoutPlan(plan, {
+      async runBattle(request) {
+        return responseForRequest(request, series, fixture.identity);
+      },
+      async appendJsonLine() {
+        throw storageError;
+      },
+      async atomicWriteJson() {
+        writeCalls++;
+      },
+    }), error => error === storageError);
+
+    assert.equal(writeCalls, 0);
+  });
+
+  await t.test('checkpoint failure after append', async t => {
+    const {fixture, plan, series} = await planWithOnlyLastSeriesIncomplete(t, {
+      runId: 'knockout-checkpoint-failure',
+    });
+    const storageError = new Error('checkpoint failed');
+    const events = [];
+
+    await assert.rejects(executeKnockoutPlan(plan, {
+      async runBattle(request) {
+        return responseForRequest(request, series, fixture.identity);
+      },
+      async appendJsonLine() {
+        events.push('append');
+      },
+      async atomicWriteJson(path) {
+        events.push(path.split('/').at(-1));
+        throw storageError;
+      },
+    }), error => error === storageError);
+
+    assert.deepEqual(events, ['append', 'checkpoint.json']);
+  });
+
+  await t.test('bracket failure', async t => {
+    const prepared = await planWithOnlyLastSeriesIncomplete(t, {
+      runId: 'knockout-bracket-failure',
+    });
+    const firstWin = acceptedKnockoutRecord(
+      prepared.series,
+      1,
+      prepared.fixture.identity,
+      'entrant1'
+    );
+    const plan = await replan(
+      prepared.fixture,
+      [...prepared.records, firstWin]
+    );
+    const storageError = new Error('bracket failed');
+    const writes = [];
+
+    await assert.rejects(executeKnockoutPlan(plan, {
+      async runBattle(request) {
+        return responseForRequest(
+          request,
+          prepared.series,
+          prepared.fixture.identity
+        );
+      },
+      async appendJsonLine() {},
+      async atomicWriteJson(path) {
+        writes.push(path.split('/').at(-1));
+        if (path.endsWith('bracket.json')) throw storageError;
+      },
+      now: () => INITIAL_TIME,
+    }), error => error === storageError);
+
+    assert.deepEqual(writes, ['checkpoint.json', 'bracket.json']);
+    assert.ok(!writes.includes('run-metadata.json'));
+  });
+});
+
+test('completed round writes enriched bracket before the next checkpoint', async t => {
+  const fixture = await transitionedTournament(t, runIdentity({
+    runId: 'knockout-round-barrier',
+  }));
+  const seriesById = new Map(fixture.plan.rounds[0].series.map(series => [
+    series.seriesId,
+    series,
+  ]));
+  const calls = [];
+  const writes = [];
+
+  await executeKnockoutPlan(fixture.plan, {
+    async runBattle(request) {
+      calls.push(request);
+      return responseForRequest(
+        request,
+        seriesById.get(request.seriesId),
+        fixture.identity
+      );
+    },
+    async appendJsonLine() {},
+    async atomicWriteJson(path, value) {
+      writes.push({name: path.split('/').at(-1), value: structuredClone(value)});
+    },
+    now: () => INITIAL_TIME,
+  });
+
+  const bracketWrite = writes.at(-2);
+  const checkpointWrite = writes.at(-1);
+  assert.equal(bracketWrite.name, 'bracket.json');
+  assert.equal(checkpointWrite.name, 'checkpoint.json');
+  assert.deepEqual(bracketWrite.value.rounds.map(round => round.round), [
+    'r16', 'r8',
+  ]);
+  assert.ok(bracketWrite.value.rounds[0].series.every(series =>
+    series.games.length === 2 &&
+    series.games[0].gameNumber === 1 &&
+    series.games[1].gameNumber === 2 &&
+    series.evaluation.status === 'complete'
+  ));
+  assert.ok(bracketWrite.value.rounds[1].series.every(series =>
+    !Object.hasOwn(series, 'games') && !Object.hasOwn(series, 'evaluation')
+  ));
+  assert.equal(checkpointWrite.value.round, 'r8');
+  assert.ok(calls.every(request => request.matchId.startsWith('r16-')));
+});
+
+test('normal round barrier interruption recovers without next-round HTTP', async t => {
+  const prepared = await planWithOnlyLastSeriesIncomplete(t, {
+    runId: 'knockout-round-barrier-retry',
+  });
+  const firstWin = acceptedKnockoutRecord(
+    prepared.series,
+    1,
+    prepared.fixture.identity,
+    'entrant1'
+  );
+  const plan = await replan(
+    prepared.fixture,
+    [...prepared.records, firstWin]
+  );
+  const checkpointError = new Error('next-round checkpoint interrupted');
+
+  await assert.rejects(executeKnockoutPlan(plan, {
+    async runBattle(request) {
+      return responseForRequest(
+        request,
+        prepared.series,
+        prepared.fixture.identity
+      );
+    },
+    async atomicWriteJson(path, value) {
+      if (path.endsWith('checkpoint.json') && value.round === 'r8') {
+        throw checkpointError;
+      }
+      await atomicWriteStateJson(path, value);
+    },
+    now: () => INITIAL_TIME,
+  }), error => error === checkpointError);
+
+  const recovered = await planTournamentRun({
+    stateRoot: prepared.fixture.stateRoot,
+    identity: prepared.fixture.identity,
+  });
+  assert.equal(recovered.round, 'r8');
+  let requestCalls = 0;
+  const summary = await executeKnockoutPlan(recovered, {
+    async runBattle() {
+      requestCalls++;
+      throw new Error('next round must not execute during barrier retry');
+    },
+    now: () => INITIAL_TIME,
+  });
+
+  assert.equal(requestCalls, 0);
+  assert.equal(summary.round, 'r8');
+  assert.equal(summary.requestedMatchCount, 0);
+  const durableCheckpoint = JSON.parse(await readFile(
+    join(prepared.fixture.runDirectory, 'checkpoint.json'),
+    'utf8'
+  ));
+  assert.equal(durableCheckpoint.round, 'r8');
+  assert.equal(durableCheckpoint.schedulePosition, 0);
+});
+
+test('final completion writes bracket, checkpoint, then metadata', async t => {
+  const {fixture, plan, series} = await planAtFinalRound(t, {
+    runId: 'knockout-final-order',
+  });
+  const writes = [];
+
+  const summary = await executeKnockoutPlan(plan, {
+    async runBattle(request) {
+      return responseForRequest(request, series, fixture.identity);
+    },
+    async appendJsonLine() {},
+    async atomicWriteJson(path, value) {
+      writes.push({name: path.split('/').at(-1), value: structuredClone(value)});
+    },
+    now: () => INITIAL_TIME,
+  });
+
+  assert.deepEqual(writes.slice(-3).map(write => write.name), [
+    'bracket.json',
+    'checkpoint.json',
+    'run-metadata.json',
+  ]);
+  const [bracketWrite, checkpointWrite, metadataWrite] = writes.slice(-3);
+  assert.equal(bracketWrite.value.status, 'completed');
+  assert.equal(bracketWrite.value.rounds.at(-1).series[0].games.length, 2);
+  assert.equal(bracketWrite.value.rounds.at(-1).series[0].evaluation.status, 'complete');
+  assert.deepEqual(bracketWrite.value.champion, summary.champion);
+  assert.equal(checkpointWrite.value.stage, 'complete');
+  assert.equal(checkpointWrite.value.round, 'r2');
+  assert.equal(checkpointWrite.value.schedulePosition, 2);
+  assert.equal(checkpointWrite.value.acceptedResultCount, 142);
+  assert.equal(metadataWrite.value.status, 'completed');
+  assert.equal(metadataWrite.value.completedAt, INITIAL_TIME);
+  assert.equal(summary.stage, 'complete');
+  assert.equal(summary.tournamentComplete, true);
+});
+
+test('final completion interruption is safely repeatable', async t => {
+  const prepared = await planAtFinalRound(t, {
+    runId: 'knockout-final-retry',
+  });
+  const metadataError = new Error('metadata completion interrupted');
+
+  await assert.rejects(executeKnockoutPlan(prepared.plan, {
+    async runBattle(request) {
+      return responseForRequest(
+        request,
+        prepared.series,
+        prepared.fixture.identity
+      );
+    },
+    async atomicWriteJson(path, value) {
+      if (path.endsWith('run-metadata.json') && value.status === 'completed') {
+        throw metadataError;
+      }
+      await atomicWriteStateJson(path, value);
+    },
+    now: () => INITIAL_TIME,
+  }), error => error === metadataError);
+
+  const recovered = await planTournamentRun({
+    stateRoot: prepared.fixture.stateRoot,
+    identity: prepared.fixture.identity,
+  });
+  assert.equal(recovered.stage, 'knockout');
+  assert.equal(recovered.resultComplete, true);
+  assert.equal(recovered.tournamentComplete, false);
+  assert.deepEqual(recovered.nextGameRequests, []);
+  let requestCalls = 0;
+
+  const summary = await executeKnockoutPlan(recovered, {
+    async runBattle() {
+      requestCalls++;
+      throw new Error('completed final must not be re-executed');
+    },
+    now: () => INITIAL_TIME,
+  });
+
+  assert.equal(requestCalls, 0);
+  assert.equal(summary.stage, 'complete');
+  const terminal = await planTournamentRun({
+    stateRoot: prepared.fixture.stateRoot,
+    identity: prepared.fixture.identity,
+  });
+  assert.equal(terminal.terminal, true);
+  assert.equal(terminal.status, 'completed');
+  assert.equal((await readJsonLines(
+    join(prepared.fixture.runDirectory, 'results.jsonl')
+  )).length, 142);
+});
+
+test('knockout execution preserves its supplied plan', async t => {
+  const prepared = await planWithOnlyLastSeriesIncomplete(t, {
+    runId: 'knockout-execution-input-preservation',
+  });
+  const snapshot = JSON.stringify(prepared.plan);
+
+  await executeKnockoutPlan(prepared.plan, {
+    async runBattle(request) {
+      return responseForRequest(
+        request,
+        prepared.series,
+        prepared.fixture.identity
+      );
+    },
+    async appendJsonLine() {},
+    async atomicWriteJson() {},
+    now: () => INITIAL_TIME,
+  });
+
+  assert.equal(JSON.stringify(prepared.plan), snapshot);
+});
+
+test('knockout execution requires an active non-terminal plan', async t => {
+  const {plan} = await planWithOnlyLastSeriesIncomplete(t, {
+    runId: 'knockout-execution-plan-state',
+  });
+
+  for (const invalidPlan of [
+    {...plan, terminal: true},
+    {...plan, stage: 'complete'},
+    {...plan, tournamentComplete: true},
+  ]) {
+    await assert.rejects(
+      executeKnockoutPlan(invalidPlan),
+      /non-terminal, incomplete knockout plan/i
+    );
+  }
 });

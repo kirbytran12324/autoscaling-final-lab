@@ -137,6 +137,42 @@ game, so continued series play uses the next game ID and its derived seed.
 `bracket.json` retains accepted games, including draws, but excludes failed
 HTTP attempts. Each accepted game records its game number, match ID,
 participants, seed, outcome and winner, turns, termination, and protocol hash.
+At a completed-round barrier, each completed series uses this representation:
+
+```json
+{
+  "seriesId": "r16-series-01",
+  "position": 1,
+  "entrant1": {},
+  "entrant2": {},
+  "games": [
+    {
+      "gameNumber": 1,
+      "matchId": "r16-series-01-game-01"
+    }
+  ],
+  "evaluation": {
+    "seriesId": "r16-series-01",
+    "status": "complete",
+    "gamesPlayed": 2,
+    "entrant1Wins": 2,
+    "entrant2Wins": 0,
+    "draws": 0,
+    "nextGameNumber": null,
+    "winner": {},
+    "resolution": "two-wins",
+    "lotteryHash": null
+  }
+}
+```
+
+The abbreviated entrant, game, and winner objects above retain all fields from
+their deterministic tournament or accepted-result representations. `games`
+is in ascending `gameNumber` order and includes accepted draws. Previously
+completed rounds retain this enriched form. The next round is appended in the
+raw form returned by `buildNextKnockoutRound` and is not enriched until its own
+completed-round barrier.
+
 At each completed-round barrier, its next-round entrants retain their original
 group and rank and record the immediately preceding series they won in
 `sourceSeriesId`.
@@ -191,6 +227,21 @@ terminal read-only history: the state layer does not synthesize or rewrite its
 checkpoint, and a failed run is not implicitly resumed.
 
 A crash before the result append causes the missing deterministic request to be sent again. A crash after the append but before the checkpoint update leaves the checkpoint behind, but the accepted `matchId` in `results.jsonl` prevents a duplicate result. A malformed or truncated persisted record is never silently discarded; automatic resume stops and preserves the PVC for diagnosis.
+
+After all series in a non-final knockout round are complete, the runner first
+atomically writes the complete `bracket.json`, including the enriched completed
+round and the next deterministic raw round. Only after that bracket is durable
+does it write the next-round knockout checkpoint with `schedulePosition: 0`.
+It does not execute the next round in the same call. Recovery repeats these
+derived writes when the accepted results prove that the round completed but
+the checkpoint has not crossed the round barrier.
+
+After `r2` is complete, the runner first writes the completed bracket with its
+enriched final series and derived champion, then writes the `stage: "complete"`
+checkpoint, and finally writes `run-metadata.json` with `status: "completed"`
+and `completedAt`. Until that final metadata write is durable, recovery exposes
+the result-complete final as pending knockout finalization so the same derived
+writes can be repeated without executing another game.
 
 The other JSON state files use the same temporary-file, flush, and atomic-rename pattern. Temporary files must be created on the same PVC as their destination so the rename stays within one filesystem. A prior `standings.json` snapshot is derived evidence and never overrides standings recomputed from authoritative `results.jsonl` records after restart.
 

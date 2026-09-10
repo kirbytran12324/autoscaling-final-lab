@@ -821,10 +821,11 @@ function buildKnockoutPlanFromReconstruction(
 
       return {
         terminal: false,
-        stage: 'complete',
+        stage: 'knockout',
         round: currentRound.round,
-        activeRound: null,
-        tournamentComplete: true,
+        activeRound: currentRound.round,
+        tournamentComplete: false,
+        resultComplete: true,
         champion,
         identity: {...identity},
         runDirectory: groupPlan.runDirectory,
@@ -874,7 +875,7 @@ function buildKnockoutRecoveryPlan(
   );
 }
 
-function resolveRunBattle(options) {
+function resolveRunBattle(options, stage = 'Group-stage') {
   if (typeof options.runBattle === 'function') {
     return options.runBattle;
   }
@@ -889,7 +890,7 @@ function resolveRunBattle(options) {
   }
 
   throw new TypeError(
-    'Group-stage execution requires runBattle or a simulator client'
+    `${stage} execution requires runBattle or a simulator client`
   );
 }
 
@@ -1242,6 +1243,745 @@ async function executeGroupStagePlan(plan, options = {}) {
   };
 }
 
+function rawKnockoutSeries(series) {
+  return {
+    seriesId: series.seriesId,
+    position: series.position,
+    entrant1: {...series.entrant1},
+    entrant2: {...series.entrant2},
+  };
+}
+
+function rawKnockoutRound(round) {
+  return {
+    round: round.round,
+    series: round.series.map(rawKnockoutSeries),
+  };
+}
+
+function enrichKnockoutRound(roundState) {
+  return {
+    round: roundState.round.round,
+    series: roundState.seriesStates.map(seriesState => ({
+      ...rawKnockoutSeries(seriesState.series),
+      games: seriesState.games.map(game => {
+        const {seriesId, ...bracketGame} = game;
+        return bracketGame;
+      }),
+      evaluation: structuredClone(seriesState.evaluation),
+    })),
+  };
+}
+
+function validateKnockoutExecutionPlan(plan) {
+  requireObject(plan, 'Knockout execution plan');
+
+  if (plan.terminal !== false || plan.stage !== 'knockout' ||
+      plan.tournamentComplete !== false) {
+    throw new Error(
+      'Knockout execution requires a non-terminal, incomplete knockout plan'
+    );
+  }
+
+  requireObject(plan.metadata, 'Knockout plan metadata');
+  requireObject(plan.identity, 'Knockout plan identity');
+  validateRunMetadata(plan.metadata, plan.identity);
+  const identity = identityFromMetadata(plan.metadata);
+
+  if (plan.metadata.status !== 'running') {
+    throw new Error('Knockout execution requires running metadata');
+  }
+
+  if (typeof plan.runDirectory !== 'string' ||
+      plan.runDirectory.trim() === '') {
+    throw new TypeError(
+      'Knockout execution plan runDirectory must be a non-empty string'
+    );
+  }
+
+  for (const [field, value] of [
+    ['rounds', plan.rounds],
+    ['roundEvaluations', plan.roundEvaluations],
+    ['seriesEvaluations', plan.seriesEvaluations],
+    ['completedSeriesEvaluations', plan.completedSeriesEvaluations],
+    ['nextGameRequests', plan.nextGameRequests],
+    ['validatedGroupRecords', plan.validatedGroupRecords],
+    ['validatedKnockoutRecords', plan.validatedKnockoutRecords],
+  ]) {
+    if (!Array.isArray(value)) {
+      throw new TypeError(`Knockout execution plan ${field} must be an array`);
+    }
+  }
+
+  if (plan.rounds.length === 0 ||
+      plan.roundEvaluations.length !== plan.rounds.length) {
+    throw new Error(
+      'Knockout execution plan rounds and evaluations are inconsistent'
+    );
+  }
+
+  const activeRoundIndex = plan.rounds.length - 1;
+  const activeRound = plan.rounds[activeRoundIndex];
+
+  if (!activeRound || activeRound.round !== plan.round ||
+      plan.activeRound !== plan.round || !Array.isArray(activeRound.series)) {
+    throw new Error('Knockout execution plan active round is inconsistent');
+  }
+
+  const knownSeries = new Map();
+
+  for (const round of plan.rounds) {
+    requireObject(round, 'Knockout plan round');
+
+    if (!Array.isArray(round.series)) {
+      throw new TypeError(`Knockout round ${round.round} series must be an array`);
+    }
+
+    for (const series of round.series) {
+      if (knownSeries.has(series.seriesId)) {
+        throw new Error(`Duplicate knockout series "${series.seriesId}"`);
+      }
+
+      knownSeries.set(series.seriesId, series);
+    }
+  }
+
+  const recordsBySeries = new Map(
+    [...knownSeries.keys()].map(seriesId => [seriesId, []])
+  );
+
+  for (const record of plan.validatedKnockoutRecords) {
+    requireObject(record, 'Validated knockout record');
+    const match = KNOCKOUT_MATCH_ID_PATTERN.exec(record.matchId);
+
+    if (match === null) {
+      throw new Error(`Invalid knockout matchId "${record.matchId}"`);
+    }
+
+    const seriesId = `${match[1]}-series-${match[2]}`;
+    const series = knownSeries.get(seriesId);
+
+    if (series === undefined) {
+      throw new Error(
+        `Validated knockout record has unknown series "${seriesId}"`
+      );
+    }
+
+    const gameNumber = Number(match[3]);
+    const expectedRequest = generateKnockoutSeriesGame(
+      series,
+      gameNumber,
+      identity.tournamentSeed
+    );
+    validateBattleResult(
+      expectedRequest,
+      record,
+      identity.simulatorVersion
+    );
+    recordsBySeries.get(seriesId).push({
+      ...record,
+      seriesId,
+      gameNumber,
+    });
+  }
+
+  const roundStates = [];
+  const calculatedEvaluations = [];
+  const calculatedCompletedEvaluations = [];
+
+  for (const [roundIndex, round] of plan.rounds.entries()) {
+    const evaluationContainer = plan.roundEvaluations[roundIndex];
+
+    if (!evaluationContainer || evaluationContainer.round !== round.round ||
+        !Array.isArray(evaluationContainer.seriesEvaluations) ||
+        evaluationContainer.seriesEvaluations.length !== round.series.length) {
+      throw new Error(
+        `Knockout execution plan evaluations for ${round.round} are invalid`
+      );
+    }
+
+    const seriesStates = round.series.map((series, seriesIndex) => {
+      const games = recordsBySeries.get(series.seriesId)
+        .sort((left, right) => left.gameNumber - right.gameNumber);
+
+      for (const [gameIndex, game] of games.entries()) {
+        if (game.gameNumber !== gameIndex + 1) {
+          throw new Error(
+            `Knockout execution plan has invalid games for ` +
+              `"${series.seriesId}"`
+          );
+        }
+      }
+
+      const evaluation = evaluateKnockoutSeries(
+        series,
+        games,
+        identity.tournamentSeed
+      );
+
+      if (!isDeepStrictEqual(
+        evaluation,
+        evaluationContainer.seriesEvaluations[seriesIndex]
+      )) {
+        throw new Error(
+          `Knockout execution plan evaluation for ` +
+            `"${series.seriesId}" is inconsistent`
+        );
+      }
+
+      if (roundIndex < activeRoundIndex && evaluation.status !== 'complete') {
+        throw new Error(
+          `Prior knockout series "${series.seriesId}" is incomplete`
+        );
+      }
+
+      calculatedEvaluations.push(evaluation);
+      if (evaluation.status === 'complete') {
+        calculatedCompletedEvaluations.push(evaluation);
+      }
+
+      return {
+        series: rawKnockoutSeries(series),
+        games,
+        evaluation,
+      };
+    });
+
+    roundStates.push({
+      round: rawKnockoutRound(round),
+      seriesStates,
+    });
+
+    if (roundIndex > 0) {
+      const previousState = roundStates[roundIndex - 1];
+      const expectedRound = buildNextKnockoutRound(
+        previousState.round,
+        previousState.seriesStates.map(state => state.evaluation)
+      );
+
+      if (!isDeepStrictEqual(expectedRound, rawKnockoutRound(round))) {
+        throw new Error(
+          `Knockout execution plan round ${round.round} is not deterministic`
+        );
+      }
+    }
+  }
+
+  if (!isDeepStrictEqual(plan.seriesEvaluations, calculatedEvaluations) ||
+      !isDeepStrictEqual(
+        plan.completedSeriesEvaluations,
+        calculatedCompletedEvaluations
+      )) {
+    throw new Error('Knockout execution plan series evaluations are invalid');
+  }
+
+  const activeRoundState = roundStates[activeRoundIndex];
+  const expectedRequests = activeRoundState.seriesStates.flatMap(state =>
+    state.evaluation.status === 'complete'
+      ? []
+      : [generateKnockoutSeriesGame(
+        state.series,
+        state.evaluation.nextGameNumber,
+        identity.tournamentSeed
+      )]
+  );
+
+  if (!isDeepStrictEqual(plan.nextGameRequests, expectedRequests)) {
+    throw new Error(
+      'Knockout execution plan next game requests are inconsistent'
+    );
+  }
+
+  const activeRoundAcceptedCount = activeRoundState.seriesStates.reduce(
+    (total, state) => total + state.games.length,
+    0
+  );
+
+  if (!Number.isInteger(plan.acceptedGroupResultCount) ||
+      plan.acceptedGroupResultCount < 0 ||
+      plan.acceptedGroupResultCount !== plan.validatedGroupRecords.length ||
+      plan.acceptedKnockoutResultCount !==
+        plan.validatedKnockoutRecords.length ||
+      plan.acceptedResultCount !==
+        plan.acceptedGroupResultCount + plan.acceptedKnockoutResultCount ||
+      plan.schedulePosition !== activeRoundAcceptedCount) {
+    throw new Error('Knockout execution plan progress fields are inconsistent');
+  }
+
+  const activeRoundComplete = activeRoundState.seriesStates.every(state =>
+    state.evaluation.status === 'complete'
+  );
+
+  if (activeRoundComplete) {
+    if (activeRound.round !== 'r2' || plan.resultComplete !== true ||
+        plan.nextGameRequests.length !== 0) {
+      throw new Error(
+        'Only a result-complete final may have no active knockout work'
+      );
+    }
+
+    const expectedChampion = selectTournamentChampion(
+      activeRoundState.round,
+      activeRoundState.seriesStates[0].games,
+      identity.tournamentSeed
+    );
+
+    if (!isDeepStrictEqual(plan.champion, expectedChampion)) {
+      throw new Error('Knockout execution plan champion is inconsistent');
+    }
+  } else {
+    if (plan.resultComplete === true || plan.champion !== null) {
+      throw new Error(
+        'Incomplete knockout execution plan has final completion fields'
+      );
+    }
+
+    if (plan.nextGameRequests.length === 0) {
+      throw new Error('Knockout execution plan has no schedulable active games');
+    }
+  }
+
+  return {
+    activeRoundComplete,
+    activeRoundIndex,
+    activeRoundState,
+    identity,
+    roundStates,
+  };
+}
+
+function buildKnockoutBracket(
+  plan,
+  roundStates,
+  options
+) {
+  const rounds = roundStates
+    .slice(0, -1)
+    .map(enrichKnockoutRound);
+  const activeRoundState = roundStates.at(-1);
+
+  if (options.enrichActiveRound) {
+    rounds.push(enrichKnockoutRound(activeRoundState));
+  } else {
+    rounds.push(rawKnockoutRound(activeRoundState.round));
+  }
+
+  if (options.nextRound !== undefined) {
+    rounds.push(rawKnockoutRound(options.nextRound));
+  }
+
+  return {
+    schemaVersion: 1,
+    runId: plan.metadata.runId,
+    status: options.status,
+    rounds,
+    champion: options.champion,
+    updatedAt: options.updatedAt,
+  };
+}
+
+class KnockoutStorageFailure extends Error {
+  constructor(operation, cause) {
+    super(`Knockout ${operation} failed: ${cause.message}`, {cause});
+    this.name = 'KnockoutStorageFailure';
+  }
+}
+
+async function executeKnockoutPlan(plan, options = {}) {
+  const validation = validateKnockoutExecutionPlan(plan);
+  requireObject(options, 'Knockout execution options');
+
+  const appendResult = options.appendJsonLine === undefined
+    ? appendJsonLine
+    : options.appendJsonLine;
+  const writeJson = options.atomicWriteJson === undefined
+    ? atomicWriteJson
+    : options.atomicWriteJson;
+  const now = options.now === undefined
+    ? () => new Date().toISOString()
+    : options.now;
+
+  if (typeof appendResult !== 'function' ||
+      typeof writeJson !== 'function' ||
+      typeof now !== 'function') {
+    throw new TypeError(
+      'Knockout persistence dependencies and now must be functions'
+    );
+  }
+
+  const resultsPath = join(plan.runDirectory, 'results.jsonl');
+  const checkpointPath = join(plan.runDirectory, 'checkpoint.json');
+  const metadataPath = join(plan.runDirectory, 'run-metadata.json');
+  const bracketPath = join(plan.runDirectory, 'bracket.json');
+  const activeRound = validation.activeRoundState.round;
+  const checkpointHint = plan.checkpointHint;
+  const requiresRecoveredBarrier = !validation.activeRoundComplete &&
+    (checkpointHint === undefined ||
+      checkpointHint.stage !== 'knockout' ||
+      checkpointHint.round !== activeRound.round);
+
+  function createCheckpoint(stage, round, schedulePosition, count, updatedAt) {
+    const nextCheckpoint = {
+      schemaVersion: 1,
+      stage,
+      round,
+      schedulePosition,
+      acceptedResultCount: count,
+      updatedAt,
+    };
+    validateCheckpoint(nextCheckpoint);
+    return nextCheckpoint;
+  }
+
+  if (requiresRecoveredBarrier) {
+    const updatedAt = now();
+    const bracket = buildKnockoutBracket(plan, validation.roundStates, {
+      champion: null,
+      enrichActiveRound: false,
+      status: 'running',
+      updatedAt,
+    });
+    const recoveredCheckpoint = createCheckpoint(
+      'knockout',
+      activeRound.round,
+      plan.schedulePosition,
+      plan.acceptedResultCount,
+      updatedAt
+    );
+
+    await writeJson(bracketPath, bracket);
+    await writeJson(checkpointPath, recoveredCheckpoint);
+
+    return {
+      stage: 'knockout',
+      round: activeRound.round,
+      tournamentComplete: false,
+      requestedMatchCount: 0,
+      acceptedMatchCount: 0,
+      acceptedResultCount: plan.acceptedResultCount,
+      schedulePosition: plan.schedulePosition,
+    };
+  }
+
+  const runBattle = validation.activeRoundComplete
+    ? undefined
+    : resolveRunBattle(options, 'Knockout-round');
+  const activeSeriesStates = validation.activeRoundState.seriesStates;
+  const seriesStatesById = new Map(activeSeriesStates.map(state => [
+    state.series.seriesId,
+    state,
+  ]));
+  const pendingSeriesStates = plan.nextGameRequests.map(request => {
+    const state = seriesStatesById.get(request.seriesId);
+    return {
+      ...state,
+      games: [...state.games],
+      evaluation: structuredClone(state.evaluation),
+      nextRequest: {...request, seed: [...request.seed]},
+    };
+  });
+
+  validation.activeRoundState.seriesStates = activeSeriesStates.map(state =>
+    pendingSeriesStates.find(candidate =>
+      candidate.series.seriesId === state.series.seriesId
+    ) || state
+  );
+
+  const acceptedThisExecution = new Set();
+  const requestedThisExecution = new Set();
+  let acceptedResultCount = plan.acceptedResultCount;
+  let schedulePosition = plan.schedulePosition;
+  let nextSeriesIndex = 0;
+  let stopAssigning = false;
+  let requestFailure;
+  let storageFailure;
+  let acceptanceTail = Promise.resolve();
+
+  function recordRequestFailure(request, cause) {
+    if (requestFailure === undefined && storageFailure === undefined) {
+      requestFailure = {matchId: request.matchId, cause};
+    }
+    stopAssigning = true;
+  }
+
+  function recordStorageFailure(error) {
+    if (storageFailure === undefined) {
+      storageFailure = error.cause;
+    }
+    stopAssigning = true;
+  }
+
+  async function acceptResponse(seriesState, request, response) {
+    if (storageFailure !== undefined) {
+      throw new KnockoutStorageFailure('acceptance', storageFailure);
+    }
+
+    try {
+      validateBattleResult(
+        request,
+        response,
+        plan.metadata.simulatorVersion
+      );
+    } catch (error) {
+      throw new AcceptanceFailure(
+        `Battle ${request.matchId} returned an invalid response`,
+        error
+      );
+    }
+
+    if (acceptedThisExecution.has(request.matchId)) {
+      throw new AcceptanceFailure(
+        `Battle ${request.matchId} was accepted more than once`
+      );
+    }
+
+    const acceptedGame = {
+      ...response,
+      seriesId: seriesState.series.seriesId,
+      gameNumber: request.gameNumber,
+    };
+    let nextEvaluation;
+
+    try {
+      nextEvaluation = evaluateKnockoutSeries(
+        seriesState.series,
+        [...seriesState.games, acceptedGame],
+        plan.metadata.tournamentSeed
+      );
+    } catch (error) {
+      throw new AcceptanceFailure(
+        `Battle ${request.matchId} cannot advance its knockout series`,
+        error
+      );
+    }
+
+    try {
+      await appendResult(resultsPath, response);
+    } catch (error) {
+      throw new KnockoutStorageFailure('result append', error);
+    }
+
+    seriesState.games.push(acceptedGame);
+    seriesState.evaluation = nextEvaluation;
+    acceptedThisExecution.add(request.matchId);
+    acceptedResultCount++;
+    schedulePosition++;
+
+    let nextCheckpoint;
+
+    try {
+      nextCheckpoint = createCheckpoint(
+        'knockout',
+        activeRound.round,
+        schedulePosition,
+        acceptedResultCount,
+        now()
+      );
+    } catch (error) {
+      throw new KnockoutStorageFailure('checkpoint construction', error);
+    }
+
+    try {
+      await writeJson(checkpointPath, nextCheckpoint);
+    } catch (error) {
+      throw new KnockoutStorageFailure('checkpoint write', error);
+    }
+
+    return nextEvaluation;
+  }
+
+  function queueAcceptance(seriesState, request, response) {
+    const operation = acceptanceTail.then(() =>
+      acceptResponse(seriesState, request, response)
+    );
+
+    acceptanceTail = operation.catch(error => {
+      if (error instanceof KnockoutStorageFailure) {
+        recordStorageFailure(error);
+      } else {
+        recordRequestFailure(
+          request,
+          error.cause === undefined ? error : error.cause
+        );
+      }
+    });
+
+    return operation;
+  }
+
+  async function executeSeries(seriesState) {
+    while (!stopAssigning &&
+        seriesState.evaluation.status !== 'complete') {
+      const request = seriesState.nextRequest;
+
+      if (requestedThisExecution.has(request.matchId)) {
+        recordRequestFailure(
+          request,
+          new Error(`Battle ${request.matchId} was requested more than once`)
+        );
+        return;
+      }
+
+      requestedThisExecution.add(request.matchId);
+      let response;
+
+      try {
+        response = await runBattle(request);
+      } catch (error) {
+        recordRequestFailure(request, error);
+        return;
+      }
+
+      let evaluation;
+
+      try {
+        evaluation = await queueAcceptance(seriesState, request, response);
+      } catch {
+        return;
+      }
+
+      if (stopAssigning || evaluation.status === 'complete') {
+        return;
+      }
+
+      seriesState.nextRequest = generateKnockoutSeriesGame(
+        seriesState.series,
+        evaluation.nextGameNumber,
+        plan.metadata.tournamentSeed
+      );
+    }
+  }
+
+  async function worker() {
+    while (!stopAssigning) {
+      const seriesIndex = nextSeriesIndex;
+
+      if (seriesIndex >= pendingSeriesStates.length) {
+        return;
+      }
+
+      nextSeriesIndex++;
+      await executeSeries(pendingSeriesStates[seriesIndex]);
+    }
+  }
+
+  if (!validation.activeRoundComplete) {
+    const workerCount = Math.min(
+      plan.metadata.runnerConcurrency,
+      pendingSeriesStates.length
+    );
+    await Promise.all(Array.from({length: workerCount}, () => worker()));
+    await acceptanceTail;
+  }
+
+  if (storageFailure !== undefined) {
+    throw storageFailure;
+  }
+
+  if (requestFailure !== undefined) {
+    const failedMetadata = {
+      ...plan.metadata,
+      status: 'failed',
+      completedAt: null,
+    };
+    validateRunMetadata(failedMetadata, validation.identity);
+    await writeJson(metadataPath, failedMetadata);
+
+    throw new Error(
+      `Knockout execution stopped after battle ` +
+        `"${requestFailure.matchId}" failed`,
+      {cause: requestFailure.cause}
+    );
+  }
+
+  const completedEvaluations = validation.activeRoundState.seriesStates
+    .map(state => state.evaluation);
+
+  if (!completedEvaluations.every(evaluation =>
+    evaluation.status === 'complete'
+  )) {
+    throw new Error(
+      `Knockout round ${activeRound.round} stopped before every series completed`
+    );
+  }
+
+  const updatedAt = now();
+
+  if (activeRound.round !== 'r2') {
+    const nextRound = buildNextKnockoutRound(
+      activeRound,
+      completedEvaluations
+    );
+    const bracket = buildKnockoutBracket(plan, validation.roundStates, {
+      champion: null,
+      enrichActiveRound: true,
+      nextRound,
+      status: 'running',
+      updatedAt,
+    });
+    const nextCheckpoint = createCheckpoint(
+      'knockout',
+      nextRound.round,
+      0,
+      acceptedResultCount,
+      updatedAt
+    );
+
+    await writeJson(bracketPath, bracket);
+    await writeJson(checkpointPath, nextCheckpoint);
+
+    return {
+      stage: 'knockout',
+      round: nextRound.round,
+      tournamentComplete: false,
+      requestedMatchCount: requestedThisExecution.size,
+      acceptedMatchCount: acceptedThisExecution.size,
+      acceptedResultCount,
+      schedulePosition: 0,
+    };
+  }
+
+  const champion = selectTournamentChampion(
+    activeRound,
+    validation.activeRoundState.seriesStates[0].games,
+    plan.metadata.tournamentSeed
+  );
+  const bracket = buildKnockoutBracket(plan, validation.roundStates, {
+    champion,
+    enrichActiveRound: true,
+    status: 'completed',
+    updatedAt,
+  });
+  const completeCheckpoint = createCheckpoint(
+    'complete',
+    activeRound.round,
+    schedulePosition,
+    acceptedResultCount,
+    updatedAt
+  );
+  const completedMetadata = {
+    ...plan.metadata,
+    status: 'completed',
+    completedAt: updatedAt,
+  };
+  validateRunMetadata(completedMetadata, validation.identity);
+
+  await writeJson(bracketPath, bracket);
+  await writeJson(checkpointPath, completeCheckpoint);
+  await writeJson(metadataPath, completedMetadata);
+
+  return {
+    stage: 'complete',
+    round: activeRound.round,
+    tournamentComplete: true,
+    champion,
+    requestedMatchCount: requestedThisExecution.size,
+    acceptedMatchCount: acceptedThisExecution.size,
+    acceptedResultCount,
+    schedulePosition,
+  };
+}
+
 async function planTournamentRun(options) {
   requireObject(options, 'Tournament runner options');
 
@@ -1305,5 +2045,6 @@ module.exports = {
   buildInitialKnockoutArtifact,
   buildKnockoutRecoveryPlan,
   executeGroupStagePlan,
+  executeKnockoutPlan,
   planTournamentRun,
 };
