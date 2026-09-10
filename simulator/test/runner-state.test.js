@@ -30,7 +30,7 @@ function completedResult(overrides = {}) {
     winnerSide: 'p1',
     winnerSpecies: 'Snorlax',
     turns: 42,
-    termination: 'neutral',
+    termination: 'natural',
     protocolHash: 'a'.repeat(64),
     servedBy: 'simulator-1',
     durationMs: 120,

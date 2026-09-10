@@ -67,7 +67,7 @@ Resource-capture script ──> experiment evidence ──> report generator
 
 Only simulator Pods autoscale. The HPA uses the simulator Deployment as its `scaleTargetRef`; Locust labels and selectors are separate and are excluded from the HPA target.
 
-The singleton runner generates a deterministic schedule and uses a bounded HTTP worker pool. It appends each accepted simulation result to `results.jsonl` and maintains a compact checkpoint on a ReadWriteOnce PVC. On restart, it reloads the checkpoint and results, ignores completed match IDs, and safely resends only missing work. Because each match ID determines the inputs and seed, a duplicate response is harmless and only one result is accepted.
+The singleton runner generates a deterministic schedule and uses a bounded HTTP worker pool. Its single ReadWriteOnce PVC retains multiple historical runs under `<stateRoot>/runs/<runId>/`, with metadata, results, checkpoint, standings, and bracket artifacts isolated per run directory. One singleton runner writes only the selected run directory at a time. On restart, it verifies that directory's immutable identity, reloads its checkpoint and results, ignores completed match IDs, and safely resends only missing work. Because each match ID determines the inputs and seed, a duplicate response is harmless and only one result is accepted.
 
 The runner and Locust resolve the simulator Service through Kubernetes DNS. A Service routes connections across Ready endpoints but does not guarantee strict request-by-request round robin; clients use enough independent connections, and the returned `servedBy` value is used to verify distribution.
 
@@ -222,7 +222,7 @@ The API uses camelCase field names. The intended final battle response contains:
 
 ## Results, experiment evidence, and report interface
 
-The runner owns tournament execution state and writes these canonical machine-readable artifacts to the PVC:
+The runner owns tournament execution state and writes these canonical machine-readable artifacts beneath the selected `<stateRoot>/runs/<runId>/` directory on the PVC. Other per-run directories are retained as historical evidence and are not touched by the active singleton runner:
 
 - `run-metadata.json`: seed, rule version, dependency and image versions, timestamps, and completion state;
 - `results.jsonl`: one immutable record per accepted simulation;

@@ -6,6 +6,32 @@ This contract defines which runner artifacts are authoritative, when a battle is
 
 ## Persistent artifacts
 
+The runner uses one PVC as a state root and retains each tournament in its own
+directory:
+
+```text
+<stateRoot>/runs/<runId>/
+  run-metadata.json
+  results.jsonl
+  checkpoint.json
+  standings.json
+  bracket.json
+```
+
+Each run ID names exactly one run directory. Historical run directories remain
+on the PVC and are not reused or modified when a different run ID is selected.
+At any time, the singleton runner writes only the selected run directory; it
+does not coordinate concurrent writers to multiple runs or to the same run.
+Recovery is permitted only when the selected directory contains valid metadata
+whose immutable run identity exactly matches the requested run. A directory
+that contains only temporary `run-metadata.json` files matching the state
+writer's atomic-write naming convention may be initialized after an interrupted
+first metadata write. Unknown files or canonical evidence without
+`run-metadata.json` are orphaned state and must be preserved for diagnosis
+rather than initialized over.
+
+The paths in the following table are relative to the selected run directory.
+
 | File | Purpose | Write model |
 | --- | --- | --- |
 | `run-metadata.json` | Identifies the run, tournament seed, rule and dependency versions, mode, timestamps, and completion state | Atomic replacement |
@@ -14,7 +40,14 @@ This contract defines which runner artifacts are authoritative, when a battle is
 | `standings.json` | Derived provisional or final group standings and every tie-break value | Atomic replacement at a bounded periodic cadence during group play and after the complete final calculation |
 | `bracket.json` | Derived knockout positions, series simulations, and winners | Atomic replacement at knockout-round barriers |
 
-`results.jsonl` is the source of truth for whether a `matchId` is complete. The checkpoint is a progress aid and must never override an accepted result.
+`results.jsonl` is the source of truth for whether a `matchId` is complete after
+the record has been validated against the deterministic schedule. The
+checkpoint is only a progress hint and must never override an accepted result.
+The state layer parses persisted records, rejects conflicting duplicates, and
+returns one canonical accepted record per `matchId`; it does not infer schedule
+progress from the number of JSONL records. The lifecycle loader exposes these
+as `acceptedRecords` and the optional `checkpointHint`; raw JSONL records are
+not part of its downstream return value.
 
 Provisional standings are derived from the currently accepted records in
 `results.jsonl`. Their points, mini-table values, and Sonneborn–Berger values
@@ -87,15 +120,20 @@ For each accepted simulation, the runner:
 3. updates in-memory tournament state; and
 4. writes the new checkpoint through a temporary file in the same directory, flushes it, and atomically renames it over `checkpoint.json`.
 
-On startup or restart, the runner:
+On startup or restart, the state layer:
 
 1. loads and validates the run metadata;
 2. reads every complete record from `results.jsonl` and builds the completed-`matchId` index;
 3. rejects conflicting duplicate IDs or malformed persisted evidence;
-4. loads the checkpoint as a progress hint;
-5. reconciles it with the authoritative results; and
-6. recomputes provisional or final standings from `results.jsonl`; and
-7. skips completed matches and resends only missing work.
+4. returns one canonical accepted record per `matchId`; and
+5. loads and returns the checkpoint, when present, as an unmodified progress hint.
+
+For a running tournament, the tournament runner then generates the
+deterministic schedule, validates the canonical records against it, and only
+then reconciles checkpoint position and counts, recomputes standings, skips
+completed matches, and resends missing work. A `completed` or `failed` run is
+terminal read-only history: the state layer does not synthesize or rewrite its
+checkpoint, and a failed run is not implicitly resumed.
 
 A crash before the result append causes the missing deterministic request to be sent again. A crash after the append but before the checkpoint update leaves the checkpoint behind, but the accepted `matchId` in `results.jsonl` prevents a duplicate result. A malformed or truncated persisted record is never silently discarded; automatic resume stops and preserves the PVC for diagnosis.
 
