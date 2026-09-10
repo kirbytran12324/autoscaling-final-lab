@@ -145,14 +145,7 @@ Scoring is win = 3 points, draw = 1 point for each participant, and loss = 0. Ra
 
 Save every intermediate tie-break value in the standings output. The top 16 participants from each group advance.
 
-During group play, standings are provisional calculations derived from the
-currently accepted results. The runner may atomically replace
-`standings.json` with bounded periodic provisional snapshots so progress is
-observable without making the snapshot authoritative. The exact cadence
-belongs to the later runner implementation; it must not introduce round
-barriers or otherwise delay independent group matches. A group standing is
-final only after every unordered pair has one accepted result, and only that
-complete final standing may be used to select advancing participants.
+During group play, standings are provisional calculations derived from the currently accepted results. The runner atomically replaces `standings.json` after each absolute multiple of 10 accepted group results in sample mode or 1,000 in full mode so progress is observable without making the snapshot authoritative. Recovery at a cadence boundary safely rewrites the derived snapshot before assigning more work. Snapshot generation and atomic replacement occur in the runner's serialized persistence path. This may briefly pause further request assignment at a cadence boundary, but it does not create group-stage round barriers; already-started independent matches may still complete. A group standing is final only after every unordered pair has one accepted result, and only that complete final standing may be used to select advancing participants.
 
 ### Full knockout stage
 

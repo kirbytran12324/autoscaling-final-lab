@@ -40,6 +40,53 @@ The paths in the following table are relative to the selected run directory.
 | `standings.json` | Derived provisional or final group standings and every tie-break value | Atomic replacement at a bounded periodic cadence during group play and after the complete final calculation |
 | `bracket.json` | Derived knockout positions, series simulations, and winners | Atomic replacement at knockout-round barriers |
 
+`standings.json` uses this versioned wrapper:
+
+```json
+{
+  "schemaVersion": 1,
+  "runId": "sample-2026-09-10",
+  "status": "provisional",
+  "acceptedResultCount": 10,
+  "expectedResultCount": 112,
+  "advancingCount": 4,
+  "updatedAt": "2026-09-10T01:02:03.000Z",
+  "groups": []
+}
+```
+
+`groups` always contains the four existing group-standing results in A, B, C,
+D order. Each result retains its `group`, provisional or final `status`,
+completed and expected match counts, and ranked `standings` entries with all
+tie-break values. Sample runs replace this artifact after each absolute
+multiple of 10 accepted group results, while full runs use multiples of 1,000.
+The runner also writes a mandatory final artifact after every scheduled group
+match is accepted.
+
+The initial `bracket.json` written at the group-to-knockout barrier uses this
+wrapper:
+
+```json
+{
+  "schemaVersion": 1,
+  "runId": "sample-2026-09-10",
+  "status": "running",
+  "rounds": [
+    {
+      "round": "r16",
+      "series": []
+    }
+  ],
+  "champion": null,
+  "updatedAt": "2026-09-10T01:02:03.000Z"
+}
+```
+
+The first `rounds` entry is the unmodified initial round returned by the
+tournament bracket builder: `r16` with eight series in sample mode or `r64`
+with 32 series in full mode. Later runner slices append later rounds and
+eventually replace `champion`; this transition does neither.
+
 `results.jsonl` is the source of truth for whether a `matchId` is complete after
 the record has been validated against the deterministic schedule. The
 checkpoint is only a progress hint and must never override an accepted result.
@@ -56,9 +103,11 @@ provisional snapshot is never an advancement input: only a complete final
 group standing, with every unordered pair present exactly once, may select
 advancing participants.
 
-The runner may atomically replace `standings.json` with bounded periodic
-provisional snapshots during group play. The exact snapshot cadence belongs to
-the later runner implementation and must not introduce round barriers.
+The runner atomically replaces `standings.json` with bounded provisional
+snapshots after each absolute multiple of 10 accepted group results in sample
+mode or 1,000 in full mode. On recovery at a cadence boundary, it rewrites the
+reconciled group checkpoint and snapshot before assigning more work. Snapshot
+writes do not introduce round barriers.
 
 ## Accepting a simulation result
 

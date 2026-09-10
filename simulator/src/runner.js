@@ -13,14 +13,25 @@ const {
 } = require('./runner-state');
 const {validateBattleResult} = require('./simulator-client');
 const {
+  FULL_ADVANCERS_PER_GROUP,
   FULL_GROUP_SIZES,
+  SAMPLE_ADVANCERS_PER_GROUP,
   SAMPLE_GROUP_SIZES,
   buildFullRoster,
+  buildInitialKnockoutRound,
   buildSampleRoster,
+  calculateGroupStandings,
   generateGroupStageSchedule,
+  selectAdvancers,
   shuffleRoster,
   splitRosterIntoGroups,
 } = require('./tournament');
+
+const GROUP_NAMES = Object.freeze(['A', 'B', 'C', 'D']);
+const PROVISIONAL_CADENCE = Object.freeze({
+  sample: 10,
+  full: 1000,
+});
 
 function requireObject(value, description) {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) {
@@ -183,6 +194,20 @@ function identityFromMetadata(metadata) {
   };
 }
 
+function expectedGroupResultCount(groups) {
+  requireObject(groups, 'Execution plan groups');
+
+  return GROUP_NAMES.reduce((total, groupName) => {
+    const group = groups[groupName];
+
+    if (!Array.isArray(group)) {
+      throw new TypeError(`Execution plan group ${groupName} must be an array`);
+    }
+
+    return total + group.length * (group.length - 1) / 2;
+  }, 0);
+}
+
 function validateExecutionPlan(plan) {
   requireObject(plan, 'Group-stage execution plan');
 
@@ -208,9 +233,11 @@ function validateExecutionPlan(plan) {
 
   if (!Array.isArray(plan.groupSchedule) ||
       !Array.isArray(plan.missingGroupMatches) ||
-      !Array.isArray(plan.completedMatchIds)) {
+      !Array.isArray(plan.completedMatchIds) ||
+      !Array.isArray(plan.validatedRecords)) {
     throw new TypeError(
-      'Execution plan schedule, missing matches, and completed IDs must be arrays'
+      'Execution plan schedule, records, missing matches, and completed IDs ' +
+        'must be arrays'
     );
   }
 
@@ -254,6 +281,37 @@ function validateExecutionPlan(plan) {
     );
   }
 
+  const acceptedRecordsByMatchId = new Map();
+
+  for (const record of plan.validatedRecords) {
+    requireObject(record, 'Validated group result');
+    const scheduledRequest = scheduleByMatchId.get(record.matchId);
+
+    if (scheduledRequest === undefined || !completedIds.has(record.matchId)) {
+      throw new Error(
+        `Validated record "${record.matchId}" is not a completed scheduled match`
+      );
+    }
+
+    validateBattleResult(
+      scheduledRequest,
+      record,
+      plan.metadata.simulatorVersion
+    );
+
+    if (acceptedRecordsByMatchId.has(record.matchId)) {
+      throw new Error(`Duplicate validated record "${record.matchId}"`);
+    }
+
+    acceptedRecordsByMatchId.set(record.matchId, record);
+  }
+
+  if (acceptedRecordsByMatchId.size !== completedIds.size) {
+    throw new Error(
+      'Execution plan validated records do not match completed match IDs'
+    );
+  }
+
   let expectedPosition = 0;
 
   while (expectedPosition < plan.groupSchedule.length &&
@@ -283,7 +341,129 @@ function validateExecutionPlan(plan) {
     }
   }
 
-  return {completedIds, identity};
+  return {
+    acceptedRecordsByMatchId,
+    completedIds,
+    expectedResultCount: expectedGroupResultCount(plan.groups),
+    identity,
+    scheduleByMatchId,
+  };
+}
+
+function buildGroupStandingsArtifact(
+  plan,
+  acceptedRecordsByMatchId,
+  status,
+  updatedAt
+) {
+  if (!(acceptedRecordsByMatchId instanceof Map)) {
+    throw new TypeError('Accepted group records must be a Map');
+  }
+
+  if (status !== 'provisional' && status !== 'final') {
+    throw new TypeError('Standings status must be provisional or final');
+  }
+
+  const expectedResultCount = expectedGroupResultCount(plan.groups);
+  const scheduleByMatchId = buildScheduleLookup(plan.groupSchedule);
+  const resultsByGroup = new Map(
+    GROUP_NAMES.map(groupName => [groupName, []])
+  );
+
+  for (const [matchId, record] of acceptedRecordsByMatchId) {
+    const scheduledRequest = scheduleByMatchId.get(matchId);
+
+    if (scheduledRequest === undefined) {
+      throw new Error(
+        `Accepted record "${matchId}" has no scheduled group match`
+      );
+    }
+
+    validateBattleResult(
+      scheduledRequest,
+      record,
+      plan.metadata.simulatorVersion
+    );
+    resultsByGroup.get(scheduledRequest.group).push({
+      ...record,
+      group: scheduledRequest.group,
+    });
+  }
+
+  if (status === 'final' &&
+      acceptedRecordsByMatchId.size !== expectedResultCount) {
+    throw new RangeError(
+      `Final standings require ${expectedResultCount} accepted group results; ` +
+        `received ${acceptedRecordsByMatchId.size}`
+    );
+  }
+
+  const groups = GROUP_NAMES.map(groupName =>
+    calculateGroupStandings(
+      groupName,
+      plan.groups[groupName],
+      resultsByGroup.get(groupName),
+      plan.metadata.tournamentSeed,
+      {requireComplete: status === 'final'}
+    )
+  );
+
+  if (status === 'final' && groups.some(group => group.status !== 'final')) {
+    throw new RangeError('Final standings require every group to be complete');
+  }
+
+  const advancingCount = plan.metadata.mode === 'sample'
+    ? SAMPLE_ADVANCERS_PER_GROUP
+    : FULL_ADVANCERS_PER_GROUP;
+
+  return {
+    schemaVersion: 1,
+    runId: plan.metadata.runId,
+    status,
+    acceptedResultCount: acceptedRecordsByMatchId.size,
+    expectedResultCount,
+    advancingCount,
+    updatedAt,
+    groups,
+  };
+}
+
+function buildInitialKnockoutArtifact(plan, finalStandings, updatedAt) {
+  requireObject(finalStandings, 'Final standings artifact');
+  const advancingCount = plan.metadata.mode === 'sample'
+    ? SAMPLE_ADVANCERS_PER_GROUP
+    : FULL_ADVANCERS_PER_GROUP;
+
+  if (finalStandings.status !== 'final' ||
+      finalStandings.runId !== plan.metadata.runId ||
+      !Array.isArray(finalStandings.groups) ||
+      finalStandings.groups.length !== GROUP_NAMES.length ||
+      finalStandings.groups.some((group, index) =>
+        group.group !== GROUP_NAMES[index]
+      ) ||
+      finalStandings.advancingCount !== advancingCount ||
+      finalStandings.acceptedResultCount !==
+        finalStandings.expectedResultCount ||
+      finalStandings.expectedResultCount !==
+        expectedGroupResultCount(plan.groups)) {
+    throw new Error(
+      'Initial knockout construction requires complete final standings'
+    );
+  }
+
+  const groupAdvancers = finalStandings.groups.map(groupStanding =>
+    selectAdvancers(groupStanding, finalStandings.advancingCount)
+  );
+  const initialRound = buildInitialKnockoutRound(groupAdvancers);
+
+  return {
+    schemaVersion: 1,
+    runId: plan.metadata.runId,
+    status: 'running',
+    rounds: [initialRound],
+    champion: null,
+    updatedAt,
+  };
 }
 
 function resolveRunBattle(options) {
@@ -320,9 +500,21 @@ class StorageFailure extends Error {
 }
 
 async function executeGroupStagePlan(plan, options = {}) {
-  const {completedIds, identity} = validateExecutionPlan(plan);
+  const {
+    acceptedRecordsByMatchId,
+    completedIds,
+    expectedResultCount,
+    identity,
+  } = validateExecutionPlan(plan);
+  const cadence = PROVISIONAL_CADENCE[plan.metadata.mode];
+  const requiresFinalTransition =
+    plan.acceptedResultCount === expectedResultCount;
+  const requiresRecoveredSnapshot = plan.acceptedResultCount > 0 &&
+    plan.acceptedResultCount < expectedResultCount &&
+    plan.acceptedResultCount % cadence === 0;
 
-  if (plan.missingGroupMatches.length === 0) {
+  if (plan.missingGroupMatches.length === 0 &&
+      !requiresFinalTransition && !requiresRecoveredSnapshot) {
     return {
       stage: 'groups',
       requestedMatchCount: 0,
@@ -334,7 +526,9 @@ async function executeGroupStagePlan(plan, options = {}) {
 
   requireObject(options, 'Group-stage execution options');
 
-  const runBattle = resolveRunBattle(options);
+  const runBattle = plan.missingGroupMatches.length === 0
+    ? undefined
+    : resolveRunBattle(options);
   const appendResult = options.appendJsonLine === undefined
     ? appendJsonLine
     : options.appendJsonLine;
@@ -356,6 +550,8 @@ async function executeGroupStagePlan(plan, options = {}) {
   const resultsPath = join(plan.runDirectory, 'results.jsonl');
   const checkpointPath = join(plan.runDirectory, 'checkpoint.json');
   const metadataPath = join(plan.runDirectory, 'run-metadata.json');
+  const standingsPath = join(plan.runDirectory, 'standings.json');
+  const bracketPath = join(plan.runDirectory, 'bracket.json');
   const acceptedThisExecution = new Set();
   let acceptedResultCount = plan.acceptedResultCount;
   let schedulePosition = plan.schedulePosition;
@@ -364,6 +560,29 @@ async function executeGroupStagePlan(plan, options = {}) {
   let requestFailure;
   let storageFailure;
   let acceptanceTail = Promise.resolve();
+
+  function createGroupCheckpoint() {
+    const checkpoint = {
+      schemaVersion: 1,
+      stage: 'groups',
+      round: null,
+      schedulePosition,
+      acceptedResultCount,
+      updatedAt: now(),
+    };
+    validateCheckpoint(checkpoint);
+    return checkpoint;
+  }
+
+  async function writeProvisionalStandings(updatedAt) {
+    const provisionalStandings = buildGroupStandingsArtifact(
+      plan,
+      acceptedRecordsByMatchId,
+      'provisional',
+      updatedAt
+    );
+    await writeJson(standingsPath, provisionalStandings);
+  }
 
   function recordRequestFailure(match, cause) {
     if (requestFailure === undefined && storageFailure === undefined) {
@@ -411,6 +630,7 @@ async function executeGroupStagePlan(plan, options = {}) {
 
     completedIds.add(match.matchId);
     acceptedThisExecution.add(match.matchId);
+    acceptedRecordsByMatchId.set(match.matchId, response);
     acceptedResultCount++;
 
     while (schedulePosition < plan.groupSchedule.length &&
@@ -421,15 +641,7 @@ async function executeGroupStagePlan(plan, options = {}) {
     let nextCheckpoint;
 
     try {
-      nextCheckpoint = {
-        schemaVersion: 1,
-        stage: 'groups',
-        round: null,
-        schedulePosition,
-        acceptedResultCount,
-        updatedAt: now(),
-      };
-      validateCheckpoint(nextCheckpoint);
+      nextCheckpoint = createGroupCheckpoint();
     } catch (error) {
       throw new StorageFailure('checkpoint construction', error);
     }
@@ -438,6 +650,15 @@ async function executeGroupStagePlan(plan, options = {}) {
       await writeJson(checkpointPath, nextCheckpoint);
     } catch (error) {
       throw new StorageFailure('checkpoint write', error);
+    }
+
+    if (acceptedResultCount < expectedResultCount &&
+        acceptedResultCount % cadence === 0) {
+      try {
+        await writeProvisionalStandings(nextCheckpoint.updatedAt);
+      } catch (error) {
+        throw new StorageFailure('provisional standings write', error);
+      }
     }
   }
 
@@ -486,6 +707,33 @@ async function executeGroupStagePlan(plan, options = {}) {
     }
   }
 
+  if (requiresRecoveredSnapshot) {
+    let recoveredCheckpoint;
+
+    try {
+      recoveredCheckpoint = createGroupCheckpoint();
+      await writeJson(checkpointPath, recoveredCheckpoint);
+    } catch (error) {
+      throw error;
+    }
+
+    try {
+      await writeProvisionalStandings(recoveredCheckpoint.updatedAt);
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  if (plan.missingGroupMatches.length === 0 && !requiresFinalTransition) {
+    return {
+      stage: 'groups',
+      requestedMatchCount: 0,
+      acceptedMatchCount: 0,
+      acceptedResultCount,
+      schedulePosition,
+    };
+  }
+
   const workerCount = Math.min(
     plan.metadata.runnerConcurrency,
     plan.missingGroupMatches.length
@@ -516,6 +764,65 @@ async function executeGroupStagePlan(plan, options = {}) {
         `"${requestFailure.matchId}" failed`,
       {cause: requestFailure.cause}
     );
+  }
+
+  if (acceptedResultCount === expectedResultCount) {
+    let transitionCheckpoint;
+    let finalStandings;
+    let bracket;
+
+    try {
+      const updatedAt = now();
+      transitionCheckpoint = {
+        schemaVersion: 1,
+        stage: 'knockout',
+        round: plan.metadata.mode === 'sample' ? 'r16' : 'r64',
+        schedulePosition: 0,
+        acceptedResultCount,
+        updatedAt,
+      };
+      validateCheckpoint(transitionCheckpoint);
+      finalStandings = buildGroupStandingsArtifact(
+        plan,
+        acceptedRecordsByMatchId,
+        'final',
+        updatedAt
+      );
+      bracket = buildInitialKnockoutArtifact(
+        plan,
+        finalStandings,
+        updatedAt
+      );
+    } catch (error) {
+      throw error;
+    }
+
+    try {
+      await writeJson(standingsPath, finalStandings);
+    } catch (error) {
+      throw error;
+    }
+
+    try {
+      await writeJson(bracketPath, bracket);
+    } catch (error) {
+      throw error;
+    }
+
+    try {
+      await writeJson(checkpointPath, transitionCheckpoint);
+    } catch (error) {
+      throw error;
+    }
+
+    return {
+      stage: 'knockout',
+      round: transitionCheckpoint.round,
+      requestedMatchCount: nextMatchIndex,
+      acceptedMatchCount: acceptedThisExecution.size,
+      acceptedResultCount,
+      schedulePosition: 0,
+    };
   }
 
   return {
@@ -561,6 +868,8 @@ async function planTournamentRun(options) {
 
 module.exports = {
   buildGroupStageRecoveryPlan,
+  buildGroupStandingsArtifact,
+  buildInitialKnockoutArtifact,
   executeGroupStagePlan,
   planTournamentRun,
 };

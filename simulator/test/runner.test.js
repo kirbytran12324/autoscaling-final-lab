@@ -15,6 +15,8 @@ const test = require('node:test');
 const configuredSampleRoster = require('../config/sample_roster.json');
 const {
   buildGroupStageRecoveryPlan,
+  buildGroupStandingsArtifact,
+  buildInitialKnockoutArtifact,
   executeGroupStagePlan,
   planTournamentRun,
 } = require('../src/runner');
@@ -131,6 +133,9 @@ function executionSubset(plan, length, completedIndexes = []) {
       match,
     ])),
     completedMatchIds,
+    validatedRecords: completedIndexes.map(index =>
+      acceptedRecord(groupSchedule[index], plan.identity)
+    ),
     missingGroupMatches: groupSchedule.filter(match =>
       !completedIds.has(match.matchId)
     ),
@@ -648,7 +653,7 @@ test('checkpoint position advances only after a contiguous prefix exists', async
   assert.equal(summary.schedulePosition, 5);
 });
 
-test('a fully recovered plan performs no execution operations', async t => {
+test('a non-final no-work plan performs no execution operations', async t => {
   const identity = runIdentity({runId: 'nothing-missing'});
   const plan = executionSubset(await newPlan(t, identity), 4, [0, 1, 2, 3]);
   const snapshot = JSON.stringify(plan);
@@ -917,4 +922,488 @@ test('successful execution does not mutate its supplied plan', async t => {
   });
 
   assert.equal(JSON.stringify(plan), snapshot);
+});
+
+test('provisional standings use absolute sample and full cadences', async t => {
+  const cases = [
+    {
+      mode: 'sample',
+      cadence: 10,
+      recoveredCount: 7,
+      scheduleLength: 11,
+    },
+    {
+      mode: 'full',
+      cadence: 1000,
+      recoveredCount: 997,
+      scheduleLength: 1001,
+    },
+  ];
+
+  for (const testCase of cases) {
+    await t.test(testCase.mode, async t => {
+      const identity = runIdentity({
+        runId: `${testCase.mode}-cadence`,
+        mode: testCase.mode,
+        runnerConcurrency: 2,
+      });
+      const basePlan = await newPlan(t, identity);
+      const recoveredIndexes = Array.from(
+        {length: testCase.recoveredCount},
+        (_, index) => index
+      );
+      const plan = executionSubset(
+        basePlan,
+        testCase.scheduleLength,
+        recoveredIndexes
+      );
+      const standingsWrites = [];
+
+      await executeGroupStagePlan(plan, {
+        async runBattle(match) {
+          return acceptedRecord(match, identity);
+        },
+        async appendJsonLine() {},
+        async atomicWriteJson(path, value) {
+          if (path.endsWith('standings.json')) {
+            standingsWrites.push(structuredClone(value));
+          }
+        },
+        now: () => INITIAL_TIME,
+      });
+
+      assert.equal(standingsWrites.length, 1);
+      assert.equal(
+        standingsWrites[0].acceptedResultCount,
+        testCase.cadence
+      );
+      assert.equal(standingsWrites[0].status, 'provisional');
+    });
+  }
+});
+
+test('recovery retries a missed boundary snapshot before new work', async t => {
+  const identity = runIdentity({
+    runId: 'retry-recovered-snapshot',
+    runnerConcurrency: 1,
+  });
+  const plan = executionSubset(
+    await newPlan(t, identity),
+    11,
+    Array.from({length: 10}, (_, index) => index)
+  );
+  const snapshot = JSON.stringify(plan);
+  const events = [];
+  const standingsWrites = [];
+
+  await executeGroupStagePlan(plan, {
+    async runBattle(match) {
+      events.push(`request:${match.matchId}`);
+      return acceptedRecord(match, identity);
+    },
+    async appendJsonLine() {
+      events.push('append');
+    },
+    async atomicWriteJson(path, value) {
+      if (path.endsWith('standings.json')) {
+        events.push('standings');
+        standingsWrites.push(structuredClone(value));
+      } else {
+        events.push('checkpoint');
+      }
+    },
+    now: () => INITIAL_TIME,
+  });
+
+  assert.deepEqual(events, [
+    'checkpoint',
+    'standings',
+    `request:${plan.groupSchedule[10].matchId}`,
+    'append',
+    'checkpoint',
+  ]);
+  assert.equal(standingsWrites.length, 1);
+  assert.equal(standingsWrites[0].status, 'provisional');
+  assert.equal(standingsWrites[0].acceptedResultCount, 10);
+  assert.equal(JSON.stringify(plan), snapshot);
+});
+
+test('ordinary non-boundary results do not write standings', async t => {
+  const identity = runIdentity({runId: 'non-boundary-standings'});
+  const plan = executionSubset(await newPlan(t, identity), 9);
+  let standingsWrites = 0;
+
+  await executeGroupStagePlan(plan, {
+    async runBattle(match) {
+      return acceptedRecord(match, identity);
+    },
+    async appendJsonLine() {},
+    async atomicWriteJson(path) {
+      if (path.endsWith('standings.json')) standingsWrites++;
+    },
+    now: () => INITIAL_TIME,
+  });
+
+  assert.equal(standingsWrites, 0);
+});
+
+test('provisional artifact contains all groups and joined schedule identity', async t => {
+  const identity = runIdentity({runId: 'provisional-shape'});
+  const plan = await newPlan(t, identity);
+  const match = plan.groupSchedule[0];
+  const response = acceptedRecord(match, identity);
+  const responseSnapshot = structuredClone(response);
+  const artifact = buildGroupStandingsArtifact(
+    plan,
+    new Map([[match.matchId, response]]),
+    'provisional',
+    INITIAL_TIME
+  );
+
+  assert.deepEqual(Object.keys(artifact), [
+    'schemaVersion',
+    'runId',
+    'status',
+    'acceptedResultCount',
+    'expectedResultCount',
+    'advancingCount',
+    'updatedAt',
+    'groups',
+  ]);
+  assert.equal(artifact.schemaVersion, 1);
+  assert.equal(artifact.runId, identity.runId);
+  assert.equal(artifact.status, 'provisional');
+  assert.equal(artifact.acceptedResultCount, 1);
+  assert.equal(artifact.expectedResultCount, 112);
+  assert.equal(artifact.advancingCount, 4);
+  assert.equal(artifact.updatedAt, INITIAL_TIME);
+  assert.deepEqual(
+    artifact.groups.map(group => group.group),
+    ['A', 'B', 'C', 'D']
+  );
+  assert.equal(artifact.groups[0].completedMatches, 1);
+  assert.ok(artifact.groups.every(group =>
+    group.expectedMatches === 28
+  ));
+  assert.deepEqual(response, responseSnapshot);
+  assert.equal(Object.hasOwn(response, 'group'), false);
+});
+
+test('result checkpoint precedes a provisional standings snapshot', async t => {
+  const identity = runIdentity({
+    runId: 'provisional-order',
+    runnerConcurrency: 1,
+  });
+  const plan = executionSubset(
+    await newPlan(t, identity),
+    10,
+    Array.from({length: 9}, (_, index) => index)
+  );
+  const events = [];
+
+  await executeGroupStagePlan(plan, {
+    async runBattle(match) {
+      return acceptedRecord(match, identity);
+    },
+    async appendJsonLine() {
+      events.push('append');
+    },
+    async atomicWriteJson(path) {
+      events.push(path.endsWith('checkpoint.json')
+        ? 'checkpoint'
+        : 'standings');
+    },
+    now: () => INITIAL_TIME,
+  });
+
+  assert.deepEqual(events, ['append', 'checkpoint', 'standings']);
+});
+
+test('provisional standings failure remains recoverable storage failure', async t => {
+  const identity = runIdentity({
+    runId: 'provisional-failure',
+    runnerConcurrency: 1,
+  });
+  const plan = executionSubset(
+    await newPlan(t, identity),
+    11,
+    Array.from({length: 9}, (_, index) => index)
+  );
+  const snapshot = JSON.stringify(plan);
+  const events = [];
+  const standingsError = new Error('standings volume unavailable');
+  let requestCount = 0;
+
+  await assert.rejects(
+    executeGroupStagePlan(plan, {
+      async runBattle(match) {
+        requestCount++;
+        return acceptedRecord(match, identity);
+      },
+      async appendJsonLine() {
+        events.push('append');
+      },
+      async atomicWriteJson(path) {
+        if (path.endsWith('standings.json')) {
+          events.push('standings');
+          throw standingsError;
+        }
+        events.push('checkpoint');
+      },
+      now: () => INITIAL_TIME,
+    }),
+    error => error === standingsError
+  );
+
+  assert.equal(requestCount, 1);
+  assert.deepEqual(events, ['append', 'checkpoint', 'standings']);
+  assert.equal(JSON.stringify(plan), snapshot);
+  const metadata = JSON.parse(await readFile(
+    join(plan.runDirectory, 'run-metadata.json'),
+    'utf8'
+  ));
+  assert.equal(metadata.status, 'running');
+});
+
+test('final standings reject an incomplete group stage', async t => {
+  const identity = runIdentity({runId: 'incomplete-final'});
+  const plan = await newPlan(t, identity);
+  const match = plan.groupSchedule[0];
+
+  assert.throws(
+    () => buildGroupStandingsArtifact(
+      plan,
+      new Map([[match.matchId, acceptedRecord(match, identity)]]),
+      'final',
+      INITIAL_TIME
+    ),
+    /final standings require 112.*received 1/i
+  );
+});
+
+test('sample finalization writes standings, r16 bracket, then checkpoint', async t => {
+  const identity = runIdentity({runId: 'sample-finalization'});
+  const basePlan = await newPlan(t, identity);
+  const plan = executionSubset(
+    basePlan,
+    basePlan.groupSchedule.length,
+    basePlan.groupSchedule.map((_, index) => index)
+  );
+  const snapshot = JSON.stringify(plan);
+  const writes = [];
+
+  const summary = await executeGroupStagePlan(plan, {
+    async atomicWriteJson(path, value) {
+      writes.push({path, value: structuredClone(value)});
+    },
+    now: () => INITIAL_TIME,
+  });
+
+  assert.deepEqual(writes.map(write => write.path.split('/').at(-1)), [
+    'standings.json',
+    'bracket.json',
+    'checkpoint.json',
+  ]);
+  const [standingsWrite, bracketWrite, checkpointWrite] = writes;
+  assert.equal(standingsWrite.value.status, 'final');
+  assert.equal(standingsWrite.value.acceptedResultCount, 112);
+  assert.equal(standingsWrite.value.expectedResultCount, 112);
+  assert.equal(standingsWrite.value.advancingCount, 4);
+  assert.deepEqual(
+    standingsWrite.value.groups.map(group => group.group),
+    ['A', 'B', 'C', 'D']
+  );
+  assert.ok(standingsWrite.value.groups.every(group =>
+    group.status === 'final' &&
+    group.completedMatches === 28 &&
+    group.expectedMatches === 28
+  ));
+  assert.equal(bracketWrite.value.schemaVersion, 1);
+  assert.equal(bracketWrite.value.runId, identity.runId);
+  assert.equal(bracketWrite.value.status, 'running');
+  assert.equal(bracketWrite.value.rounds.length, 1);
+  assert.equal(bracketWrite.value.rounds[0].round, 'r16');
+  assert.equal(bracketWrite.value.rounds[0].series.length, 8);
+  assert.equal(bracketWrite.value.champion, null);
+  assert.deepEqual(checkpointWrite.value, {
+    schemaVersion: 1,
+    stage: 'knockout',
+    round: 'r16',
+    schedulePosition: 0,
+    acceptedResultCount: 112,
+    updatedAt: INITIAL_TIME,
+  });
+  assert.deepEqual(summary, {
+    stage: 'knockout',
+    round: 'r16',
+    requestedMatchCount: 0,
+    acceptedMatchCount: 0,
+    acceptedResultCount: 112,
+    schedulePosition: 0,
+  });
+  assert.equal(JSON.stringify(plan), snapshot);
+});
+
+test('full final standings select sixteen advancers into r64', async t => {
+  const identity = runIdentity({
+    runId: 'full-initial-bracket',
+    mode: 'full',
+  });
+  const plan = await newPlan(t, identity);
+  const expectedResultCount = 130816;
+  const finalStandings = {
+    schemaVersion: 1,
+    runId: identity.runId,
+    status: 'final',
+    acceptedResultCount: expectedResultCount,
+    expectedResultCount,
+    advancingCount: 16,
+    updatedAt: INITIAL_TIME,
+    groups: ['A', 'B', 'C', 'D'].map(groupName => {
+      const groupRoster = plan.groups[groupName];
+      const groupMatchCount =
+        groupRoster.length * (groupRoster.length - 1) / 2;
+
+      return {
+        group: groupName,
+        status: 'final',
+        completedMatches: groupMatchCount,
+        expectedMatches: groupMatchCount,
+        standings: groupRoster.map((species, index) => ({
+          group: groupName,
+          rank: index + 1,
+          speciesId: species.id,
+          species: species.name,
+        })),
+      };
+    }),
+  };
+
+  const bracket = buildInitialKnockoutArtifact(
+    plan,
+    finalStandings,
+    INITIAL_TIME
+  );
+
+  assert.equal(bracket.rounds[0].round, 'r64');
+  assert.equal(bracket.rounds[0].series.length, 32);
+  assert.ok(bracket.rounds[0].series.every(series =>
+    series.entrant1.rank <= 16 && series.entrant2.rank <= 16
+  ));
+});
+
+test('final artifact failures never advance the knockout checkpoint', async t => {
+  for (const failedArtifact of ['standings.json', 'bracket.json']) {
+    await t.test(failedArtifact, async t => {
+      const identity = runIdentity({
+        runId: `fail-final-${failedArtifact.split('.')[0]}`,
+      });
+      const basePlan = await newPlan(t, identity);
+      const plan = executionSubset(
+        basePlan,
+        basePlan.groupSchedule.length,
+        basePlan.groupSchedule.map((_, index) => index)
+      );
+      const writes = [];
+      const storageError = new Error(`${failedArtifact} failed`);
+
+      await assert.rejects(
+        executeGroupStagePlan(plan, {
+          async atomicWriteJson(path) {
+            const fileName = path.split('/').at(-1);
+            writes.push(fileName);
+            if (fileName === failedArtifact) throw storageError;
+          },
+          now: () => INITIAL_TIME,
+        }),
+        error => error === storageError
+      );
+
+      assert.equal(writes.includes('checkpoint.json'), false);
+      assert.deepEqual(
+        writes,
+        failedArtifact === 'standings.json'
+          ? ['standings.json']
+          : ['standings.json', 'bracket.json']
+      );
+      const metadata = JSON.parse(await readFile(
+        join(plan.runDirectory, 'run-metadata.json'),
+        'utf8'
+      ));
+      assert.equal(metadata.status, 'running');
+    });
+  }
+});
+
+test('interrupted final transition is deterministic and safely repeatable', async t => {
+  const identity = runIdentity({runId: 'repeat-final-transition'});
+  const initial = await newPlan(t, identity);
+  await writeRecords(
+    initial.runDirectory,
+    initial.groupSchedule.map(match => acceptedRecord(match, identity))
+  );
+  const recovered = await planTournamentRun({
+    stateRoot: join(initial.runDirectory, '..', '..'),
+    identity,
+  });
+  const checkpointError = new Error('transition checkpoint interrupted');
+
+  await assert.rejects(
+    executeGroupStagePlan(recovered, {
+      async atomicWriteJson(path, value) {
+        if (path.endsWith('checkpoint.json')) throw checkpointError;
+        await atomicWriteStateJson(path, value);
+      },
+      now: () => INITIAL_TIME,
+    }),
+    error => error === checkpointError
+  );
+
+  const firstStandings = await readFile(
+    join(initial.runDirectory, 'standings.json'),
+    'utf8'
+  );
+  const firstBracket = await readFile(
+    join(initial.runDirectory, 'bracket.json'),
+    'utf8'
+  );
+  const groupCheckpoint = JSON.parse(await readFile(
+    join(initial.runDirectory, 'checkpoint.json'),
+    'utf8'
+  ));
+  assert.equal(groupCheckpoint.stage, 'groups');
+
+  const retriedPlan = await planTournamentRun({
+    stateRoot: join(initial.runDirectory, '..', '..'),
+    identity,
+  });
+  await executeGroupStagePlan(retriedPlan, {
+    now: () => INITIAL_TIME,
+  });
+
+  assert.equal(
+    await readFile(join(initial.runDirectory, 'standings.json'), 'utf8'),
+    firstStandings
+  );
+  assert.equal(
+    await readFile(join(initial.runDirectory, 'bracket.json'), 'utf8'),
+    firstBracket
+  );
+  const transitionCheckpoint = JSON.parse(await readFile(
+    join(initial.runDirectory, 'checkpoint.json'),
+    'utf8'
+  ));
+  assert.deepEqual(transitionCheckpoint, {
+    schemaVersion: 1,
+    stage: 'knockout',
+    round: 'r16',
+    schedulePosition: 0,
+    acceptedResultCount: 112,
+    updatedAt: INITIAL_TIME,
+  });
+  const metadata = JSON.parse(await readFile(
+    join(initial.runDirectory, 'run-metadata.json'),
+    'utf8'
+  ));
+  assert.equal(metadata.status, 'running');
 });
