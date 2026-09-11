@@ -190,6 +190,7 @@ function createSimulatorClient(options) {
           `Battle request timed out after ${timeoutMs} ms`
         );
         timeoutError.name = 'TimeoutError';
+        timeoutError.code = 'SIMULATOR_TIMEOUT';
 
         let timeoutHandle;
         const timeout = new Promise((_, reject) => {
@@ -214,9 +215,14 @@ function createSimulatorClient(options) {
                 !Number.isInteger(response.status) ||
                 response.status < 200 ||
                 response.status >= 300) {
-              throw new Error(
+              const responseError = new Error(
                 `Simulator returned HTTP ${response && response.status}`
               );
+              responseError.code = 'SIMULATOR_HTTP_ERROR';
+              responseError.status = Number.isInteger(response && response.status)
+                ? response.status
+                : null;
+              throw responseError;
             }
 
             const result = await response.json();
@@ -235,10 +241,13 @@ function createSimulatorClient(options) {
         }
       }
 
-      throw new Error(
+      const exhaustedError = new Error(
         `Battle ${String(request && request.matchId)} failed after 4 attempts`,
         {cause: finalFailure}
       );
+      exhaustedError.code = 'SIMULATOR_RETRIES_EXHAUSTED';
+      exhaustedError.attempts = 4;
+      throw exhaustedError;
     },
   };
 }

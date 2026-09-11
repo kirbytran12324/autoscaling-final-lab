@@ -67,7 +67,7 @@ Resource-capture script ──> experiment evidence ──> report generator
 
 Only simulator Pods autoscale. The HPA uses the simulator Deployment as its `scaleTargetRef`; Locust labels and selectors are separate and are excluded from the HPA target.
 
-The singleton runner generates a deterministic schedule and uses a bounded HTTP worker pool. Its single ReadWriteOnce PVC retains multiple historical runs under `<stateRoot>/runs/<runId>/`, with metadata, results, checkpoint, standings, and bracket artifacts isolated per run directory. One singleton runner writes only the selected run directory at a time. On restart, it verifies that directory's immutable identity, reloads its checkpoint and results, ignores completed match IDs, and safely resends only missing work. Because each match ID determines the inputs and seed, a duplicate response is harmless and only one result is accepted.
+The singleton runner generates a deterministic schedule and uses a bounded HTTP worker pool. Its single ReadWriteOnce PVC retains multiple historical runs under `<stateRoot>/runs/<runId>/`, with metadata, roster, results, checkpoint, standings, bracket, and failure-diagnostic artifacts isolated per run directory. One singleton runner writes only the selected run directory at a time. Before its first battle request, a new run atomically creates an immutable `roster.json` containing the exact selected and shuffled entrant order. On restart, the runner verifies the directory's immutable identity, loads and validates that persisted roster instead of rebuilding it from mutable configuration, reloads its checkpoint and results, ignores completed match IDs, and safely resends only missing work. A missing, corrupt, or conflicting established roster stops recovery without overwriting evidence. Because each match ID determines the inputs and seed, a duplicate response is harmless and only one result is accepted.
 
 The runner and Locust resolve the simulator Service through Kubernetes DNS. A Service routes connections across Ready endpoints but does not guarantee strict request-by-request round robin; clients use enough independent connections, and the returned `servedBy` value is used to verify distribution.
 
@@ -125,7 +125,8 @@ the current game and the next game uses its next game ID and derived seed.
 - After 100 completed turns, force a tie before accepting choices for a further turn.
 - A natural Showdown tie is also a draw.
 - An application timeout, stream exception, invalid response, or HTTP failure is an operational error rather than a draw. Retry the same `matchId` and seed up to three times with exponential backoff, then fail the tournament.
-- Retain the full input log for failed or sampled battles, but not every full protocol by default.
+- Successful records in `results.jsonl` retain their complete request identity and deterministic output fields. Do not write a redundant sampled-success input file.
+- After a request exhausts the existing retry policy, append a reproduction-oriented record to non-authoritative `failures.jsonl` before marking the run failed when storage permits. It contains run, match, stage and round context, the request input, timestamp, and normalized error/status details. It is never accepted as tournament progress.
 
 ### Full group stage
 
@@ -215,10 +216,12 @@ The API uses camelCase field names. The intended final battle response contains:
 
 ## Results, experiment evidence, and report interface
 
-The runner owns tournament execution state and writes these canonical machine-readable artifacts beneath the selected `<stateRoot>/runs/<runId>/` directory on the PVC. Other per-run directories are retained as historical evidence and are not touched by the active singleton runner:
+The runner owns tournament execution state and writes these machine-readable artifacts beneath the selected `<stateRoot>/runs/<runId>/` directory on the PVC. Other per-run directories are retained as historical evidence and are not touched by the active singleton runner:
 
 - `run-metadata.json`: seed, rule version, dependency and image versions, timestamps, and completion state;
+- `roster.json`: immutable run identity, normalized roster seed, and the exact final entrant order used after selection and deterministic shuffle;
 - `results.jsonl`: one immutable record per accepted simulation;
+- `failures.jsonl`: optional append-only diagnostics for requests that exhausted all retries; never authoritative for completion or progress;
 - `standings.json`: atomically replaced provisional or final group scores and
   every tie-break value;
 - `bracket.json`: bracket positions, accepted series games, and winners. It
@@ -236,6 +239,17 @@ treating a prior `standings.json` snapshot as source state. Provisional points,
 mini-table values, and Sonneborn–Berger values reflect only the accepted
 results available when the snapshot was calculated and can change as later
 results are accepted.
+
+The executable runner is `npm run runner` in the simulator image. A future
+singleton Kubernetes Job supplies `TOURNAMENT_RUN_ID`, `TOURNAMENT_MODE`,
+`TOURNAMENT_SEED`, `TOURNAMENT_STATE_ROOT`, `SIMULATOR_BASE_URL`,
+`RUNNER_CONCURRENCY`, `RULES_VERSION`, `SIMULATOR_VERSION`, and
+`SIMULATOR_IMAGE`. All are required; identity-critical values have no implicit
+defaults. `SIMULATOR_REQUEST_TIMEOUT_MS` is optional and otherwise uses the
+client's documented 30-second default. `npm run runner -- --check-config`
+validates this environment and roster selection without contacting the
+simulator or creating run state. The image still starts the simulator server
+by default; the future Job overrides its command with the runner npm script.
 
 The report provides a run summary, sortable group tables with advancement cutoffs, the knockout bracket and series details, a searchable simulation table, and an autoscaling chart aligned with request rate, latency, and failures. It is read-only and never becomes the source of truth.
 

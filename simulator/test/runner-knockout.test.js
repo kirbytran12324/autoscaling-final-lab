@@ -18,6 +18,7 @@ const {
   planTournamentRun,
 } = require('../src/runner');
 const {
+  appendJsonLine: appendStateJsonLine,
   atomicWriteJson: atomicWriteStateJson,
   readJsonLines,
 } = require('../src/runner-state');
@@ -633,6 +634,10 @@ test('knockout planning preserves supplied state and derived artifacts', async t
       record.matchId,
       record,
     ])),
+    roster: JSON.parse(await readFile(
+      join(fixture.runDirectory, 'roster.json'),
+      'utf8'
+    )),
     standings: structuredClone(fixture.plan.finalStandings),
     bracket: {rounds: structuredClone(fixture.plan.rounds)},
     resumed: true,
@@ -908,6 +913,10 @@ test('request failure drains already-started knockout successes', async t => {
     async appendJsonLine(path, value) {
       events.push(`append:${value.matchId}`);
     },
+    async appendFailureJsonLine(path, value) {
+      events.push(`failure:${value.matchId}`);
+      await appendStateJsonLine(path, value);
+    },
     async atomicWriteJson(path, value) {
       events.push(`${path.split('/').at(-1)}:${value.status || value.stage}`);
     },
@@ -935,6 +944,16 @@ test('request failure drains already-started knockout successes', async t => {
   assert.equal(requests.size, 3);
   assert.equal(events.filter(event => event.startsWith('append:')).length, 2);
   assert.equal(events.at(-1), 'run-metadata.json:failed');
+  assert.match(events.at(-2), /^failure:r16-series-/);
+
+  const failure = JSON.parse(await readFile(
+    join(plan.runDirectory, 'failures.jsonl'),
+    'utf8'
+  ));
+  assert.equal(failure.stage, 'knockout');
+  assert.equal(failure.round, 'r16');
+  assert.equal(failure.matchId, pending[0].request.matchId);
+  assert.deepEqual(failure.request, pending[0].request);
 });
 
 test('knockout storage failures do not mark metadata failed', async t => {

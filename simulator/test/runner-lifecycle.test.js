@@ -15,11 +15,16 @@ const test = require('node:test');
 
 const {
   appendJsonLine,
+  atomicWriteJson,
+  calculateRosterHash,
   initializeOrResumeRun,
+  loadOrCreateRunRoster,
   resolveRunDirectory,
   validateCheckpoint,
   validateRunMetadata,
 } = require('../src/runner-state');
+const {listBaseSpecies} = require('../src/catalog');
+const {deriveShowdownSeed} = require('../src/tournament');
 
 const INITIAL_TIME = '2026-09-10T01:02:03.000Z';
 const RESUME_TIME = '2026-09-10T04:05:06.000Z';
@@ -95,6 +100,27 @@ async function initialize(stateRoot, identity = runIdentity(), now = INITIAL_TIM
     identity,
     now: () => now,
   });
+}
+
+async function persistTestRoster(runDirectory, identity = runIdentity()) {
+  const roster = {
+    schemaVersion: 1,
+    runId: identity.runId,
+    mode: identity.mode,
+    tournamentSeed: identity.tournamentSeed,
+    rosterSeed: deriveShowdownSeed(identity.tournamentSeed, 'roster'),
+    entrants: listBaseSpecies()
+      .slice(0, identity.mode === 'sample' ? 32 : 1025)
+      .map((species, index) => ({
+        position: index + 1,
+        nationalDexNumber: species.num,
+        speciesId: species.id,
+        species: species.name,
+      })),
+  };
+  roster.rosterHash = calculateRosterHash(roster);
+  await atomicWriteJson(join(runDirectory, 'roster.json'), roster);
+  return roster;
 }
 
 async function readEvidence(runDirectory) {
@@ -250,6 +276,7 @@ test('matching persisted identity resumes and returns completed index', async t 
   const stateRoot = await createStateRoot(t);
   const identity = runIdentity();
   const initial = await initialize(stateRoot, identity);
+  await persistTestRoster(initial.runDirectory, identity);
   const first = completedResult();
   const second = completedResult({matchId: 'group-A-000002'});
   await appendJsonLine(join(initial.runDirectory, 'results.jsonl'), first);
@@ -271,6 +298,47 @@ test('matching persisted identity resumes and returns completed index', async t 
   }));
   assert.equal(resumed.resumed, true);
   assert.equal(resumed.terminal, false);
+});
+
+test('an established roster cannot be replaced by a conflicting roster', async t => {
+  const stateRoot = await createStateRoot(t);
+  const identity = runIdentity({runId: 'immutable-roster-conflict'});
+  const initial = await initialize(stateRoot, identity);
+  const established = await persistTestRoster(initial.runDirectory, identity);
+  const conflicting = structuredClone(established);
+  [conflicting.entrants[0], conflicting.entrants[1]] = [
+    conflicting.entrants[1],
+    conflicting.entrants[0],
+  ];
+  conflicting.entrants[0].position = 1;
+  conflicting.entrants[1].position = 2;
+  conflicting.rosterHash = calculateRosterHash(conflicting);
+  const rosterPath = join(initial.runDirectory, 'roster.json');
+  const before = await readFile(rosterPath, 'utf8');
+
+  await assert.rejects(
+    loadOrCreateRunRoster({
+      runDirectory: initial.runDirectory,
+      identity,
+      roster: conflicting,
+    }),
+    /conflicts with the requested roster/i
+  );
+  assert.equal(await readFile(rosterPath, 'utf8'), before);
+});
+
+test('accepted results without roster evidence refuse recovery', async t => {
+  const stateRoot = await createStateRoot(t);
+  const initial = await initialize(stateRoot);
+  await appendJsonLine(
+    join(initial.runDirectory, 'results.jsonl'),
+    completedResult()
+  );
+
+  await assert.rejects(
+    initialize(stateRoot),
+    /accepted results.*no immutable roster\.json/i
+  );
 });
 
 test('identity mismatch refuses resume without changing files', async t => {
@@ -369,6 +437,7 @@ test('missing checkpoint remains absent for schedule-aware recovery', async t =>
   const runDirectory = resolveRunDirectory(stateRoot, identity.runId);
   await mkdir(runDirectory, {recursive: true});
   await writeJson(join(runDirectory, 'run-metadata.json'), runMetadata(identity));
+  await persistTestRoster(runDirectory, identity);
   await appendJsonLine(join(runDirectory, 'results.jsonl'), completedResult());
   const before = await readEvidence(runDirectory);
 
@@ -381,6 +450,7 @@ test('missing checkpoint remains absent for schedule-aware recovery', async t =>
 test('inconsistent checkpoint progress is returned without rewrite', async t => {
   const stateRoot = await createStateRoot(t);
   const initial = await initialize(stateRoot);
+  await persistTestRoster(initial.runDirectory);
   await appendJsonLine(
     join(initial.runDirectory, 'results.jsonl'),
     completedResult()
@@ -414,6 +484,7 @@ test('completed and failed runs are terminal read-only history', async t => {
           completedAt: status === 'completed' ? RESUME_TIME : null,
         })
       );
+      await persistTestRoster(runDirectory, identity);
       await appendJsonLine(
         join(runDirectory, 'results.jsonl'),
         completedResult()
@@ -435,6 +506,7 @@ test('completed and failed runs are terminal read-only history', async t => {
 test('identical duplicate JSONL records return one accepted record', async t => {
   const stateRoot = await createStateRoot(t);
   const initial = await initialize(stateRoot);
+  await persistTestRoster(initial.runDirectory);
   const first = completedResult();
   const duplicate = structuredClone(first);
   await appendJsonLine(join(initial.runDirectory, 'results.jsonl'), first);

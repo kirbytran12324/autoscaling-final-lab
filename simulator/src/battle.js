@@ -17,6 +17,8 @@ function makeTeam(speciesName) {
     evs: {hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0},
     ivs: {hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31},
     level: 100,
+    gender: species.gender || 'M',
+    happiness: 255,
   }];
 }
 
@@ -110,8 +112,13 @@ async function simulateBattle({
         return {
           outcome: winnerSide ? 'win' : 'tie',
           winnerSide,
+          winnerSpecies: winnerSide === 'p1'
+            ? p1Team[0].species
+            : winnerSide === 'p2'
+              ? p2Team[0].species
+              : null,
           turns: capped ? completedTurns : result.turns,
-          seed: result.seed,
+          seed: [...seed],
           termination: capped ? 'turn-cap' : 'natural',
           protocolHash: protocolHash.digest('hex'),
           protocolLineCount,
@@ -146,4 +153,4 @@ async function simulateBattle({
   return completedBattle;
 }
 
-module.exports = {simulateBattle};
+module.exports = {makeTeam, simulateBattle};

@@ -8,6 +8,7 @@ RUN npm ci --omit=dev --ignore-scripts
 
 COPY src ./src
 COPY test ./test
+COPY config ./config
 
 RUN npm test
 
@@ -23,6 +24,7 @@ WORKDIR /app
 COPY --from=test /app/node_modules ./node_modules
 COPY --chown=node:node package.json ./
 COPY --chown=node:node src ./src
+COPY --chown=node:node config ./config
 
 USER node
 

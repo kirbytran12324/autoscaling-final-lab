@@ -12,7 +12,6 @@ const {tmpdir} = require('node:os');
 const {join} = require('node:path');
 const test = require('node:test');
 
-const configuredSampleRoster = require('../config/sample_roster.json');
 const {
   buildGroupStageRecoveryPlan,
   buildGroupStandingsArtifact,
@@ -175,6 +174,59 @@ test('a new sample run plans all 112 group matches as missing', async t => {
   assert.deepEqual(plan.missingGroupMatches, plan.groupSchedule);
   assert.equal(plan.acceptedResultCount, 0);
   assert.equal(plan.schedulePosition, 0);
+
+  const roster = JSON.parse(await readFile(
+    join(plan.runDirectory, 'roster.json'),
+    'utf8'
+  ));
+  assert.equal(roster.runId, plan.identity.runId);
+  assert.deepEqual(roster.rosterSeed, plan.rosterSeed);
+  assert.deepEqual(
+    roster.entrants.map(entrant => entrant.species),
+    plan.roster.map(species => species.name)
+  );
+  assert.match(roster.rosterHash, /^[0-9a-f]{64}$/);
+});
+
+test('restart uses the persisted roster instead of mutable sample config', async t => {
+  const identity = runIdentity({runId: 'persisted-roster-restart'});
+  const initial = await newPlan(t, identity);
+  const before = await readFile(join(initial.runDirectory, 'roster.json'), 'utf8');
+
+  const resumed = await planTournamentRun({
+    stateRoot: join(initial.runDirectory, '..', '..'),
+    identity,
+    sampleRoster: ['this changed configuration must not be read'],
+  });
+
+  assert.deepEqual(
+    resumed.roster.map(species => species.name),
+    initial.roster.map(species => species.name)
+  );
+  assert.deepEqual(resumed.groupSchedule, initial.groupSchedule);
+  assert.equal(
+    await readFile(join(initial.runDirectory, 'roster.json'), 'utf8'),
+    before
+  );
+});
+
+test('restart rejects a corrupt immutable roster without overwriting it', async t => {
+  const identity = runIdentity({runId: 'corrupt-persisted-roster'});
+  const initial = await newPlan(t, identity);
+  const rosterPath = join(initial.runDirectory, 'roster.json');
+  const roster = JSON.parse(await readFile(rosterPath, 'utf8'));
+  roster.entrants[0].species = 'Corrupted';
+  await writeJson(rosterPath, roster);
+  const before = await readFile(rosterPath, 'utf8');
+
+  await assert.rejects(
+    planTournamentRun({
+      stateRoot: join(initial.runDirectory, '..', '..'),
+      identity,
+    }),
+    /roster hash does not match/i
+  );
+  assert.equal(await readFile(rosterPath, 'utf8'), before);
 });
 
 test('full mode builds the complete deterministic group schedule', async t => {
@@ -405,16 +457,18 @@ test('planning is deterministic, schedule ordered, and input preserving', async 
       record.matchId,
       record,
     ])),
+    roster: JSON.parse(await readFile(
+      join(initial.runDirectory, 'roster.json'),
+      'utf8'
+    )),
     resumed: true,
     terminal: false,
   };
   const stateSnapshot = structuredClone(runState);
   const identitySnapshot = structuredClone(identity);
-  const roster = [...configuredSampleRoster];
-  const rosterSnapshot = [...roster];
 
-  const first = buildGroupStageRecoveryPlan(runState, identity, roster);
-  const second = buildGroupStageRecoveryPlan(runState, identity, roster);
+  const first = buildGroupStageRecoveryPlan(runState, identity);
+  const second = buildGroupStageRecoveryPlan(runState, identity);
 
   assert.deepEqual(first.groupSchedule, second.groupSchedule);
   assert.deepEqual(first.rosterSeed, second.rosterSeed);
@@ -434,7 +488,6 @@ test('planning is deterministic, schedule ordered, and input preserving', async 
   );
   assert.deepEqual(runState, stateSnapshot);
   assert.deepEqual(identity, identitySnapshot);
-  assert.deepEqual(roster, rosterSnapshot);
 });
 
 test('checkpoint stage does not override incomplete group evidence', async t => {
@@ -713,7 +766,13 @@ test('terminal HTTP failure drains started successes before failing metadata', a
   const plan = executionSubset(await newPlan(t, identity), 8);
   const requests = new Map();
   const events = [];
-  const terminalCause = new Error('client retries exhausted');
+  const responseCause = new Error('Simulator returned HTTP 503');
+  responseCause.code = 'SIMULATOR_HTTP_ERROR';
+  responseCause.status = 503;
+  const terminalCause = new Error('client retries exhausted', {
+    cause: responseCause,
+  });
+  terminalCause.code = 'SIMULATOR_RETRIES_EXHAUSTED';
 
   const execution = executeGroupStagePlan(plan, {
     runBattle(match) {
@@ -724,6 +783,10 @@ test('terminal HTTP failure drains started successes before failing metadata', a
     async appendJsonLine(path, value) {
       assert.match(path, /results\.jsonl$/);
       events.push(`append:${value.matchId}`);
+      await appendStateJsonLine(path, value);
+    },
+    async appendFailureJsonLine(path, value) {
+      events.push(`failure:${value.matchId}`);
       await appendStateJsonLine(path, value);
     },
     async atomicWriteJson(path, value) {
@@ -759,6 +822,7 @@ test('terminal HTTP failure drains started successes before failing metadata', a
     successful.map(match => `append:${match.matchId}`).sort()
   );
   assert.equal(events.at(-1), 'metadata:failed');
+  assert.equal(events.at(-2), `failure:${failed.matchId}`);
   assert.equal(events.filter(event =>
     event.startsWith('checkpoint:')
   ).length, 2);
@@ -769,6 +833,56 @@ test('terminal HTTP failure drains started successes before failing metadata', a
   assert.equal(metadata.status, 'failed');
   assert.equal(metadata.startedAt, INITIAL_TIME);
   assert.equal(metadata.completedAt, null);
+
+  const failures = await readJsonLines(
+    join(plan.runDirectory, 'failures.jsonl')
+  );
+  assert.equal(failures.length, 1);
+  assert.deepEqual(failures[0], {
+    schemaVersion: 1,
+    runId: identity.runId,
+    matchId: failed.matchId,
+    stage: 'groups',
+    round: null,
+    request: failed,
+    failedAt: INITIAL_TIME,
+    error: {
+      name: 'Error',
+      code: 'SIMULATOR_RETRIES_EXHAUSTED',
+      status: 503,
+      message: terminalCause.message,
+      cause: {
+        name: 'Error',
+        code: 'SIMULATOR_HTTP_ERROR',
+        status: 503,
+        message: responseCause.message,
+      },
+    },
+  });
+});
+
+test('failure diagnostics never count as accepted tournament results', async t => {
+  const identity = runIdentity({runId: 'failure-log-non-authoritative'});
+  const initial = await newPlan(t, identity);
+  await appendStateJsonLine(join(initial.runDirectory, 'failures.jsonl'), {
+    schemaVersion: 1,
+    runId: identity.runId,
+    matchId: initial.groupSchedule[0].matchId,
+    stage: 'groups',
+    round: null,
+    request: initial.groupSchedule[0],
+    failedAt: INITIAL_TIME,
+    error: {name: 'Error', code: null, status: 503, message: 'unavailable'},
+  });
+
+  const recovered = await planTournamentRun({
+    stateRoot: join(initial.runDirectory, '..', '..'),
+    identity,
+  });
+
+  assert.equal(recovered.acceptedResultCount, 0);
+  assert.equal(recovered.completedMatchIds.length, 0);
+  assert.equal(recovered.missingGroupMatches.length, 112);
 });
 
 test('result append failure leaves progress unchanged', async t => {
@@ -880,6 +994,10 @@ test('plan construction and execution reject mismatched identity', async t => {
     checkpointHint: plan.checkpointHint,
     acceptedRecords: plan.validatedRecords,
     completedMatches: new Map(),
+    roster: JSON.parse(await readFile(
+      join(plan.runDirectory, 'roster.json'),
+      'utf8'
+    )),
     resumed: true,
     terminal: false,
   };

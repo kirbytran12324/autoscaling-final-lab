@@ -21,6 +21,7 @@ const {
   generateGroupStageSchedule,
   generateKnockoutSeriesGame,
   selectAdvancers,
+  selectTournamentRoster,
   selectTournamentChampion,
   shuffleRoster,
   splitRosterIntoGroups,
@@ -358,6 +359,18 @@ test('buildFullRoster returns the complete sorted catalog', () => {
   assert.deepEqual(
     roster.map(species => species.num),
     Array.from({length: 1025}, (_, index) => index + 1)
+  );
+});
+
+test('selectTournamentRoster delegates sample and full mode selection', () => {
+  assert.equal(
+    selectTournamentRoster('sample', sampleSpeciesNames()).length,
+    32
+  );
+  assert.equal(selectTournamentRoster('full').length, 1025);
+  assert.throws(
+    () => selectTournamentRoster('preview', []),
+    /mode must be sample or full/i
   );
 });
 

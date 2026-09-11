@@ -91,6 +91,18 @@ function buildFullRoster() {
   return validateAndSortRoster(listBaseSpecies(), 1025);
 }
 
+function selectTournamentRoster(mode, configuredSampleRoster) {
+  if (mode === 'sample') {
+    return buildSampleRoster(configuredSampleRoster);
+  }
+
+  if (mode === 'full') {
+    return buildFullRoster();
+  }
+
+  throw new RangeError('Tournament mode must be sample or full');
+}
+
 function shuffleRoster(preparedRoster, tournamentSeed) {
   if (!Array.isArray(preparedRoster)) {
     throw new TypeError('Prepared roster must be an array');
@@ -1173,6 +1185,7 @@ module.exports = {
   deriveShowdownSeed,
   buildSampleRoster,
   buildFullRoster,
+  selectTournamentRoster,
   shuffleRoster,
   splitRosterIntoGroups,
   generateGroupStageSchedule,

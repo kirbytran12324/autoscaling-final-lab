@@ -4,12 +4,16 @@ const {join} = require('node:path');
 const {isDeepStrictEqual} = require('node:util');
 
 const sampleRosterConfiguration = require('../config/sample_roster.json');
+const {getBaseSpecies} = require('./catalog');
 const {
   appendJsonLine,
   atomicWriteJson,
+  calculateRosterHash,
   initializeOrResumeRun,
+  loadOrCreateRunRoster,
   validateCheckpoint,
   validateRunMetadata,
+  validateRunRoster,
 } = require('./runner-state');
 const {validateBattleResult} = require('./simulator-client');
 const {
@@ -19,15 +23,14 @@ const {
   NEXT_KNOCKOUT_ROUND,
   SAMPLE_ADVANCERS_PER_GROUP,
   SAMPLE_GROUP_SIZES,
-  buildFullRoster,
   buildInitialKnockoutRound,
   buildNextKnockoutRound,
-  buildSampleRoster,
   calculateGroupStandings,
   evaluateKnockoutSeries,
   generateGroupStageSchedule,
   generateKnockoutSeriesGame,
   selectAdvancers,
+  selectTournamentRoster,
   selectTournamentChampion,
   shuffleRoster,
   splitRosterIntoGroups,
@@ -65,10 +68,45 @@ function buildScheduleLookup(schedule) {
   return scheduleByMatchId;
 }
 
+function buildRunRoster(identity, rosterSeed, shuffledRoster) {
+  const roster = {
+    schemaVersion: 1,
+    runId: identity.runId,
+    mode: identity.mode,
+    tournamentSeed: identity.tournamentSeed,
+    rosterSeed: [...rosterSeed],
+    entrants: shuffledRoster.map((species, index) => ({
+      position: index + 1,
+      nationalDexNumber: species.num,
+      speciesId: species.id,
+      species: species.name,
+    })),
+  };
+  roster.rosterHash = calculateRosterHash(roster);
+  validateRunRoster(roster, identity);
+  return roster;
+}
+
+function loadRosterSpecies(roster, identity) {
+  validateRunRoster(roster, identity);
+
+  return roster.entrants.map((entrant, index) => {
+    const species = getBaseSpecies(entrant.species);
+
+    if (species.id !== entrant.speciesId ||
+        species.num !== entrant.nationalDexNumber) {
+      throw new Error(
+        `Run roster entrant ${index + 1} conflicts with the pinned catalog`
+      );
+    }
+
+    return species;
+  });
+}
+
 function reconstructGroupStage(
   runState,
-  identity,
-  configuredSampleRoster = sampleRosterConfiguration
+  identity
 ) {
   requireObject(runState, 'Run state');
   requireObject(identity, 'Run identity');
@@ -78,13 +116,11 @@ function reconstructGroupStage(
     throw new Error('Cannot build a group-stage plan for a terminal run');
   }
 
-  const preparedRoster = identity.mode === 'sample'
-    ? buildSampleRoster(configuredSampleRoster)
-    : buildFullRoster();
-  const {rosterSeed, shuffledRoster} = shuffleRoster(
-    preparedRoster,
-    identity.tournamentSeed
-  );
+  if (runState.roster === undefined) {
+    throw new Error('Group-stage planning requires immutable roster.json');
+  }
+  const rosterSeed = [...runState.roster.rosterSeed];
+  const shuffledRoster = loadRosterSpecies(runState.roster, identity);
   const groupSizes = identity.mode === 'sample'
     ? SAMPLE_GROUP_SIZES
     : FULL_GROUP_SIZES;
@@ -180,13 +216,11 @@ function reconstructGroupStage(
 
 function buildGroupStageRecoveryPlan(
   runState,
-  identity,
-  configuredSampleRoster = sampleRosterConfiguration
+  identity
 ) {
   const reconstruction = reconstructGroupStage(
     runState,
-    identity,
-    configuredSampleRoster
+    identity
   );
 
   if (reconstruction.knockoutRecords.length > 0) {
@@ -866,11 +900,10 @@ function buildKnockoutPlanFromReconstruction(
 
 function buildKnockoutRecoveryPlan(
   runState,
-  identity,
-  configuredSampleRoster = sampleRosterConfiguration
+  identity
 ) {
   return buildKnockoutPlanFromReconstruction(
-    reconstructGroupStage(runState, identity, configuredSampleRoster),
+    reconstructGroupStage(runState, identity),
     identity
   );
 }
@@ -892,6 +925,64 @@ function resolveRunBattle(options, stage = 'Group-stage') {
   throw new TypeError(
     `${stage} execution requires runBattle or a simulator client`
   );
+}
+
+function normalizeFailureError(error) {
+  const source = error instanceof Error ? error : new Error(String(error));
+  const cause = source.cause instanceof Error ? source.cause : undefined;
+  const status = Number.isInteger(source.status)
+    ? source.status
+    : Number.isInteger(cause && cause.status) ? cause.status : null;
+  const code = typeof source.code === 'string' && source.code !== ''
+    ? source.code
+    : typeof (cause && cause.code) === 'string' && cause.code !== ''
+      ? cause.code
+      : null;
+  const normalized = {
+    name: source.name || 'Error',
+    code,
+    status,
+    message: source.message,
+  };
+
+  if (cause !== undefined) {
+    normalized.cause = {
+      name: cause.name || 'Error',
+      code: typeof cause.code === 'string' && cause.code !== ''
+        ? cause.code
+        : null,
+      status: Number.isInteger(cause.status) ? cause.status : null,
+      message: cause.message,
+    };
+  }
+
+  return normalized;
+}
+
+function buildFailureRecord(identity, request, stage, round, failedAt, cause) {
+  requireObject(request, 'Failed battle request');
+
+  if ((stage !== 'groups' && stage !== 'knockout') ||
+      (stage === 'groups' && round !== null) ||
+      (stage === 'knockout' &&
+        (typeof round !== 'string' || round.trim() === ''))) {
+    throw new TypeError('Failure stage and round context are invalid');
+  }
+
+  if (typeof failedAt !== 'string' || !Number.isFinite(Date.parse(failedAt))) {
+    throw new TypeError('Failure timestamp must be a valid ISO timestamp');
+  }
+
+  return {
+    schemaVersion: 1,
+    runId: identity.runId,
+    matchId: request.matchId,
+    stage,
+    round,
+    request: structuredClone(request),
+    failedAt,
+    error: normalizeFailureError(cause),
+  };
 }
 
 class AcceptanceFailure extends Error {
@@ -961,6 +1052,7 @@ async function executeGroupStagePlan(plan, options = {}) {
   const metadataPath = join(plan.runDirectory, 'run-metadata.json');
   const standingsPath = join(plan.runDirectory, 'standings.json');
   const bracketPath = join(plan.runDirectory, 'bracket.json');
+  const failuresPath = join(plan.runDirectory, 'failures.jsonl');
   const acceptedThisExecution = new Set();
   let acceptedResultCount = plan.acceptedResultCount;
   let schedulePosition = plan.schedulePosition;
@@ -995,7 +1087,7 @@ async function executeGroupStagePlan(plan, options = {}) {
 
   function recordRequestFailure(match, cause) {
     if (requestFailure === undefined && storageFailure === undefined) {
-      requestFailure = {matchId: match.matchId, cause};
+      requestFailure = {request: structuredClone(match), cause};
     }
     stopAssigning = true;
   }
@@ -1155,6 +1247,24 @@ async function executeGroupStagePlan(plan, options = {}) {
   }
 
   if (requestFailure !== undefined) {
+    const appendFailure = options.appendFailureJsonLine === undefined
+      ? appendJsonLine
+      : options.appendFailureJsonLine;
+
+    if (typeof appendFailure !== 'function') {
+      throw new TypeError('appendFailureJsonLine must be a function');
+    }
+
+    const failureRecord = buildFailureRecord(
+      identity,
+      requestFailure.request,
+      'groups',
+      null,
+      now(),
+      requestFailure.cause
+    );
+    await appendFailure(failuresPath, failureRecord);
+
     const failedMetadata = {
       ...plan.metadata,
       status: 'failed',
@@ -1170,7 +1280,7 @@ async function executeGroupStagePlan(plan, options = {}) {
 
     throw new Error(
       `Group-stage execution stopped after battle ` +
-        `"${requestFailure.matchId}" failed`,
+        `"${requestFailure.request.matchId}" failed`,
       {cause: requestFailure.cause}
     );
   }
@@ -1613,6 +1723,7 @@ async function executeKnockoutPlan(plan, options = {}) {
   const checkpointPath = join(plan.runDirectory, 'checkpoint.json');
   const metadataPath = join(plan.runDirectory, 'run-metadata.json');
   const bracketPath = join(plan.runDirectory, 'bracket.json');
+  const failuresPath = join(plan.runDirectory, 'failures.jsonl');
   const activeRound = validation.activeRoundState.round;
   const checkpointHint = plan.checkpointHint;
   const requiresRecoveredBarrier = !validation.activeRoundComplete &&
@@ -1699,7 +1810,7 @@ async function executeKnockoutPlan(plan, options = {}) {
 
   function recordRequestFailure(request, cause) {
     if (requestFailure === undefined && storageFailure === undefined) {
-      requestFailure = {matchId: request.matchId, cause};
+      requestFailure = {request: structuredClone(request), cause};
     }
     stopAssigning = true;
   }
@@ -1879,6 +1990,24 @@ async function executeKnockoutPlan(plan, options = {}) {
   }
 
   if (requestFailure !== undefined) {
+    const appendFailure = options.appendFailureJsonLine === undefined
+      ? appendJsonLine
+      : options.appendFailureJsonLine;
+
+    if (typeof appendFailure !== 'function') {
+      throw new TypeError('appendFailureJsonLine must be a function');
+    }
+
+    const failureRecord = buildFailureRecord(
+      validation.identity,
+      requestFailure.request,
+      'knockout',
+      activeRound.round,
+      now(),
+      requestFailure.cause
+    );
+    await appendFailure(failuresPath, failureRecord);
+
     const failedMetadata = {
       ...plan.metadata,
       status: 'failed',
@@ -1889,7 +2018,7 @@ async function executeKnockoutPlan(plan, options = {}) {
 
     throw new Error(
       `Knockout execution stopped after battle ` +
-        `"${requestFailure.matchId}" failed`,
+        `"${requestFailure.request.matchId}" failed`,
       {cause: requestFailure.cause}
     );
   }
@@ -2005,12 +2134,41 @@ async function planTournamentRun(options) {
     };
   }
 
+  if (runState.roster === undefined) {
+    const selectRoster = options.selectRoster === undefined
+      ? mode => selectTournamentRoster(
+        mode,
+        options.sampleRoster === undefined
+          ? sampleRosterConfiguration
+          : options.sampleRoster
+      )
+      : options.selectRoster;
+
+    if (typeof selectRoster !== 'function') {
+      throw new TypeError('selectRoster must be a function');
+    }
+
+    const preparedRoster = await selectRoster(options.identity.mode);
+    const {rosterSeed, shuffledRoster} = shuffleRoster(
+      preparedRoster,
+      options.identity.tournamentSeed
+    );
+    const requestedRoster = buildRunRoster(
+      options.identity,
+      rosterSeed,
+      shuffledRoster
+    );
+    const persistedRoster = await loadOrCreateRunRoster({
+      runDirectory: runState.runDirectory,
+      identity: options.identity,
+      roster: requestedRoster,
+    });
+    runState.roster = persistedRoster.roster;
+  }
+
   const reconstruction = reconstructGroupStage(
     runState,
-    options.identity,
-    options.sampleRoster === undefined
-      ? sampleRosterConfiguration
-      : options.sampleRoster
+    options.identity
   );
   const checkpointStage = runState.checkpointHint === undefined
     ? undefined
@@ -2040,6 +2198,14 @@ async function planTournamentRun(options) {
 }
 
 async function runTournament(options) {
+  const onProgress = options.onProgress === undefined
+    ? () => {}
+    : options.onProgress;
+
+  if (typeof onProgress !== 'function') {
+    throw new TypeError('onProgress must be a function');
+  }
+
   while (true) {
     const plan = await planTournamentRun(options);
 
@@ -2068,12 +2234,14 @@ async function runTournament(options) {
     }
 
     if (plan.stage === 'groups') {
-      await executeGroupStagePlan(plan, options);
+      const progress = await executeGroupStagePlan(plan, options);
+      await onProgress(progress);
       continue;
     }
 
     if (plan.stage === 'knockout') {
-      await executeKnockoutPlan(plan, options);
+      const progress = await executeKnockoutPlan(plan, options);
+      await onProgress(progress);
       continue;
     }
 

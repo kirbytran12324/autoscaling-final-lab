@@ -12,7 +12,9 @@ directory:
 ```text
 <stateRoot>/runs/<runId>/
   run-metadata.json
+  roster.json
   results.jsonl
+  failures.jsonl
   checkpoint.json
   standings.json
   bracket.json
@@ -35,7 +37,9 @@ The paths in the following table are relative to the selected run directory.
 | File | Purpose | Write model |
 | --- | --- | --- |
 | `run-metadata.json` | Identifies the run, tournament seed, rule and dependency versions, mode, timestamps, and completion state | Atomic replacement |
+| `roster.json` | Immutable exact entrant order after mode selection and deterministic shuffle, including run identity, roster seed, and an integrity hash | Atomic create; never replace |
 | `results.jsonl` | Append-only authoritative record of accepted simulations | Append one newline-terminated record, then flush it before advancing the checkpoint |
+| `failures.jsonl` | Optional non-authoritative diagnostics for requests that exhausted all retry attempts | Append one newline-terminated record and flush it before marking the run failed when storage permits |
 | `checkpoint.json` | Records the current stage, round, and schedule position so normal resume is efficient | Atomic replacement |
 | `standings.json` | Derived provisional or final group standings and every tie-break value | Atomic replacement at a bounded periodic cadence during group play and after the complete final calculation |
 | `bracket.json` | Derived knockout positions, series simulations, and winners | Atomic replacement at knockout-round barriers |
@@ -115,6 +119,19 @@ mode or 1,000 in full mode. On recovery at a cadence boundary, it rewrites the
 reconciled group checkpoint and snapshot before assigning more work. Snapshot
 writes do not introduce round barriers.
 
+`roster.json` is created after sample/full selection and deterministic shuffle
+and before the first battle request. Its `entrants` array stores one-based
+positions, National Dex numbers, species IDs, and canonical species names in
+the exact order used by the run. Its immutable identity fields are `runId`,
+`mode`, and `tournamentSeed`; `rosterSeed` is the normalized four-integer
+Showdown seed, and `rosterHash` detects corrupt contents. Recovery loads this
+artifact and resolves its entrants against the pinned catalog. It does not
+reselect from `sample_roster.json` or rebuild the full roster. A run with
+accepted results but no roster, an identity mismatch, a corrupt hash, an
+invalid catalog entrant, or an attempted conflicting replacement fails safely
+and preserves the existing directory. A crash after initial metadata but
+before the roster create may repeat selection because no battle was accepted.
+
 ## Accepting a simulation result
 
 Before appending a response, the runner validates that:
@@ -128,6 +145,17 @@ Before appending a response, the runner validates that:
 - `servedBy` is a non-empty simulator process or Pod identifier.
 
 An invalid response, HTTP failure, application timeout, or stream failure is an operational error. The runner does not append it. It retries the same `matchId`, participants, and seed up to three times with exponential backoff, then marks the tournament failed.
+
+When those retries are exhausted, the runner appends one diagnostic record to
+`failures.jsonl` before replacing running metadata with failed metadata when
+storage permits. The record contains `runId`, `matchId`, `stage`, `round`, the
+complete request object, `failedAt`, and normalized error name, code, HTTP
+status, message, and final cause details when available. This file records only
+terminal request failures. It is never read as an accepted result, never
+changes accepted-result counts or schedule position, and never participates in
+standings, bracket, checkpoint, or champion reconstruction. Successful inputs
+and outputs already coexist in `results.jsonl`, so there is no separate
+sampled-success input artifact.
 
 Every accepted knockout simulation is called a game. Its stable `matchId`
 uses a two-digit suffix such as `r64-series-03-game-02`. Operational retries
@@ -214,10 +242,11 @@ For each accepted simulation, the runner:
 On startup or restart, the state layer:
 
 1. loads and validates the run metadata;
-2. reads every complete record from `results.jsonl` and builds the completed-`matchId` index;
-3. rejects conflicting duplicate IDs or malformed persisted evidence;
-4. returns one canonical accepted record per `matchId`; and
-5. loads and returns the checkpoint, when present, as an unmodified progress hint.
+2. loads and validates the immutable roster, rejecting accepted results when it is absent;
+3. reads every complete record from `results.jsonl` and builds the completed-`matchId` index;
+4. rejects conflicting duplicate IDs or malformed persisted evidence;
+5. returns one canonical accepted record per `matchId`; and
+6. loads and returns the checkpoint, when present, as an unmodified progress hint.
 
 For a running tournament, the tournament runner then generates the
 deterministic schedule, validates the canonical records against it, and only

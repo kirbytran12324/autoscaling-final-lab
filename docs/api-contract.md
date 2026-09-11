@@ -11,7 +11,7 @@ Runs one deterministic Pokémon battle.
   "matchId": "group-001",
   "pokemon1": "Snorlax",
   "pokemon2": "Clefable",
-  "seed": [12345, 2343, 34567, 45678],
+  "seed": [12345, 23456, 34567, 45678],
   "maxTurns": 100
 }
 ```

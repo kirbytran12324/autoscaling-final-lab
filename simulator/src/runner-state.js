@@ -1,7 +1,8 @@
 'use strict';
 
-const {randomUUID} = require('node:crypto');
+const {createHash, randomUUID} = require('node:crypto');
 const {
+  link,
   mkdir,
   open,
   readFile,
@@ -38,6 +39,7 @@ const RUN_IDENTITY_FIELDS = Object.freeze([
 ]);
 const RUN_STATUSES = new Set(['running', 'completed', 'failed']);
 const CHECKPOINT_STAGES = new Set(['groups', 'knockout', 'complete']);
+const ROSTER_COUNTS = Object.freeze({sample: 32, full: 1025});
 const UUID_PATTERN =
   '[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-' +
   '[0-9a-f]{12}';
@@ -208,6 +210,105 @@ function validateCheckpoint(checkpoint) {
   return checkpoint;
 }
 
+function rosterHashPayload(roster) {
+  return {
+    runId: roster.runId,
+    mode: roster.mode,
+    tournamentSeed: roster.tournamentSeed,
+    rosterSeed: roster.rosterSeed,
+    entrants: roster.entrants,
+  };
+}
+
+function calculateRosterHash(roster) {
+  return createHash('sha256')
+    .update(JSON.stringify(rosterHashPayload(roster)), 'utf8')
+    .digest('hex');
+}
+
+function validateRunRoster(roster, expectedIdentity) {
+  requireObject(roster, 'Run roster');
+  validateRunIdentity(expectedIdentity, 'Expected run identity');
+
+  if (roster.schemaVersion !== 1) {
+    throw new TypeError('Run roster schemaVersion must be 1');
+  }
+
+  for (const field of ['runId', 'mode', 'tournamentSeed']) {
+    if (!isDeepStrictEqual(roster[field], expectedIdentity[field])) {
+      throw new Error(
+        `Run roster identity mismatch for immutable field "${field}"`
+      );
+    }
+  }
+
+  if (!Array.isArray(roster.rosterSeed) || roster.rosterSeed.length !== 4 ||
+      roster.rosterSeed.some(value =>
+        !Number.isInteger(value) || value < 0 || value > 65535
+      )) {
+    throw new TypeError(
+      'Run roster rosterSeed must contain four integers from 0 through 65535'
+    );
+  }
+
+  const expectedCount = ROSTER_COUNTS[expectedIdentity.mode];
+  if (!Array.isArray(roster.entrants) ||
+      roster.entrants.length !== expectedCount) {
+    throw new RangeError(
+      `Run roster must contain exactly ${expectedCount} entrants`
+    );
+  }
+
+  const numbers = new Set();
+  const ids = new Set();
+  const names = new Set();
+
+  for (const [index, entrant] of roster.entrants.entries()) {
+    requireObject(entrant, `Run roster entrant ${index + 1}`);
+
+    if (entrant.position !== index + 1) {
+      throw new RangeError(
+        `Run roster entrant ${index + 1} has an invalid position`
+      );
+    }
+
+    if (!Number.isInteger(entrant.nationalDexNumber) ||
+        entrant.nationalDexNumber < 1 || entrant.nationalDexNumber > 1025) {
+      throw new RangeError(
+        `Run roster entrant ${index + 1} has an invalid National Dex number`
+      );
+    }
+
+    requireNonEmptyString(
+      entrant.speciesId,
+      `Run roster entrant ${index + 1} speciesId`
+    );
+    requireNonEmptyString(
+      entrant.species,
+      `Run roster entrant ${index + 1} species`
+    );
+
+    if (numbers.has(entrant.nationalDexNumber) || ids.has(entrant.speciesId) ||
+        names.has(entrant.species)) {
+      throw new RangeError(
+        `Run roster contains duplicate entrant "${entrant.species}"`
+      );
+    }
+
+    numbers.add(entrant.nationalDexNumber);
+    ids.add(entrant.speciesId);
+    names.add(entrant.species);
+  }
+
+  if (typeof roster.rosterHash !== 'string' ||
+      !/^[0-9a-f]{64}$/.test(roster.rosterHash) ||
+      roster.rosterHash !== calculateRosterHash(roster)) {
+    throw new Error('Run roster hash does not match its immutable contents');
+  }
+
+  return roster;
+}
+
 function haveSameDeterministicResult(left, right) {
   return DETERMINISTIC_RESULT_FIELDS.every(field =>
     isDeepStrictEqual(left[field], right[field])
@@ -311,6 +412,88 @@ async function atomicWriteJson(filePath, value) {
 
     throw error;
   }
+}
+
+async function atomicCreateJson(filePath, value) {
+  const serialized = serializeJsonLine(value);
+  const directory = dirname(filePath);
+  const temporaryPath = join(
+    directory,
+    `.${basename(filePath)}.${process.pid}.${randomUUID()}.tmp`
+  );
+  let temporaryFile;
+  let ownsTemporaryFile = false;
+
+  try {
+    temporaryFile = await open(temporaryPath, 'wx');
+    ownsTemporaryFile = true;
+    await temporaryFile.writeFile(serialized, 'utf8');
+    await temporaryFile.sync();
+    await temporaryFile.close();
+    temporaryFile = undefined;
+    await link(temporaryPath, filePath);
+    await unlink(temporaryPath);
+    ownsTemporaryFile = false;
+  } catch (error) {
+    if (temporaryFile !== undefined) {
+      try {
+        await temporaryFile.close();
+      } catch {
+        // Preserve the error that interrupted the immutable create.
+      }
+    }
+
+    if (ownsTemporaryFile) {
+      try {
+        await unlink(temporaryPath);
+      } catch (cleanupError) {
+        if (cleanupError.code !== 'ENOENT') error.cleanupError = cleanupError;
+      }
+    }
+
+    throw error;
+  }
+}
+
+async function loadOrCreateRunRoster(options) {
+  requireObject(options, 'Run roster options');
+  validateRunIdentity(options.identity);
+  requireNonEmptyString(options.runDirectory, 'runDirectory');
+  const rosterPath = join(options.runDirectory, 'roster.json');
+  let existing = await readJsonFile(rosterPath, 'run roster JSON');
+
+  if (existing !== undefined) {
+    validateRunRoster(existing, options.identity);
+
+    if (options.roster !== undefined &&
+        !isDeepStrictEqual(existing, options.roster)) {
+      throw new Error('Persisted run roster conflicts with the requested roster');
+    }
+
+    return {created: false, roster: existing};
+  }
+
+  if (options.roster === undefined) {
+    return {created: false, roster: undefined};
+  }
+
+  validateRunRoster(options.roster, options.identity);
+
+  try {
+    await atomicCreateJson(rosterPath, options.roster);
+    return {created: true, roster: options.roster};
+  } catch (error) {
+    if (error.code !== 'EEXIST') throw error;
+  }
+
+  existing = await readJsonFile(rosterPath, 'run roster JSON');
+  validateRunRoster(existing, options.identity);
+
+  if (!isDeepStrictEqual(existing, options.roster)) {
+    throw new Error('Persisted run roster conflicts with the requested roster');
+  }
+
+  return {created: false, roster: existing};
 }
 
 async function appendJsonLine(filePath, value) {
@@ -446,6 +629,7 @@ async function initializeOrResumeRun(options) {
   const metadataPath = join(runDirectory, 'run-metadata.json');
   const resultsPath = join(runDirectory, 'results.jsonl');
   const checkpointPath = join(runDirectory, 'checkpoint.json');
+  const rosterPath = join(runDirectory, 'roster.json');
 
   const hasOnlyRecoverableMetadataTemporaryFiles =
     entries.every(isMetadataTemporaryFile);
@@ -485,6 +669,7 @@ async function initializeOrResumeRun(options) {
       checkpointHint: checkpoint,
       acceptedRecords: [],
       completedMatches: new Map(),
+      roster: undefined,
       resumed: false,
       terminal: false,
     };
@@ -500,6 +685,12 @@ async function initializeOrResumeRun(options) {
   const metadata = await readJsonFile(metadataPath, 'run metadata JSON');
   validateRunMetadata(metadata, options.identity);
 
+  const roster = await readJsonFile(rosterPath, 'run roster JSON');
+
+  if (roster !== undefined) {
+    validateRunRoster(roster, options.identity);
+  }
+
   const rawRecords = await readJsonLines(resultsPath);
   const completedMatches = buildCompletedMatchIndex(rawRecords);
   const acceptedRecords = [...completedMatches.values()];
@@ -512,6 +703,12 @@ async function initializeOrResumeRun(options) {
     validateCheckpoint(checkpointHint);
   }
 
+  if (roster === undefined && acceptedRecords.length > 0) {
+    throw new Error(
+      'Run has accepted results but no immutable roster.json'
+    );
+  }
+
   const terminal = metadata.status === 'completed' ||
     metadata.status === 'failed';
 
@@ -521,6 +718,7 @@ async function initializeOrResumeRun(options) {
     checkpointHint,
     acceptedRecords,
     completedMatches,
+    roster,
     resumed: !terminal,
     terminal,
   };
@@ -528,11 +726,14 @@ async function initializeOrResumeRun(options) {
 
 module.exports = {
   appendJsonLine,
+  calculateRosterHash,
   atomicWriteJson,
   buildCompletedMatchIndex,
   initializeOrResumeRun,
+  loadOrCreateRunRoster,
   readJsonLines,
   resolveRunDirectory,
   validateCheckpoint,
   validateRunMetadata,
+  validateRunRoster,
 };
