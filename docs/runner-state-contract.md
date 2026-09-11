@@ -18,6 +18,7 @@ directory:
   checkpoint.json
   standings.json
   bracket.json
+  report.html              # optional derived output after completion
 ```
 
 Each run ID names exactly one run directory. Historical run directories remain
@@ -43,6 +44,15 @@ The paths in the following table are relative to the selected run directory.
 | `checkpoint.json` | Records the current stage, round, and schedule position so normal resume is efficient | Atomic replacement |
 | `standings.json` | Derived provisional or final group standings and every tie-break value | Atomic replacement at a bounded periodic cadence during group play and after the complete final calculation |
 | `bracket.json` | Derived knockout positions, series simulations, and winners | Atomic replacement at knockout-round barriers |
+| `report.html` | Optional, non-authoritative, self-contained offline report generated only from completed run artifacts | Temporary file followed by atomic replacement; safely regenerable |
+
+`report.html` is not runner state. The runner recovery loader ignores it as an
+unknown-to-recovery derived file, it is permitted to exist after completion,
+and it must never influence accepted-result, checkpoint, standings, bracket,
+or champion reconstruction. The standalone report command may replace it after
+validating the complete canonical artifact set, but does not modify any JSON or
+JSONL file. Temporary report files follow the same-directory atomic-write model
+and are not authoritative evidence.
 
 `standings.json` uses this versioned wrapper:
 

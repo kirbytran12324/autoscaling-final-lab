@@ -1,0 +1,85 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: tournament-state
+  namespace: autoscaling-lab
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  volumeMode: Filesystem
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: tournament-runner
+  namespace: autoscaling-lab
+spec:
+  backoffLimit: 3
+  completions: 1
+  parallelism: 1
+  podReplacementPolicy: Failed
+  template:
+    metadata:
+      labels:
+        app: tournament-runner
+    spec:
+      automountServiceAccountToken: false
+      containers:
+      - args:
+        - run
+        - runner
+        command:
+        - npm
+        env:
+        - name: TOURNAMENT_RUN_ID
+          value: sample-32-001
+        - name: TOURNAMENT_MODE
+          value: sample
+        - name: TOURNAMENT_SEED
+          value: sample-32-seed-001
+        - name: TOURNAMENT_STATE_ROOT
+          value: /data/tournaments
+        - name: SIMULATOR_BASE_URL
+          value: http://metronome-simulator
+        - name: RUNNER_CONCURRENCY
+          value: "2"
+        - name: RULES_VERSION
+          value: metronome-singles-v1
+        - name: SIMULATOR_VERSION
+          value: pokemon-showdown@0.11.11
+        - name: SIMULATOR_IMAGE
+          value: metronome-simulator:phase5
+        image: metronome-simulator:phase5
+        imagePullPolicy: IfNotPresent
+        name: runner
+        resources:
+          limits:
+            cpu: 500m
+            memory: 512Mi
+          requests:
+            cpu: 100m
+            memory: 128Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+        volumeMounts:
+        - mountPath: /data/tournaments
+          name: tournament-state
+      restartPolicy: Never
+      securityContext:
+        fsGroup: 1000
+        runAsGroup: 1000
+        runAsNonRoot: true
+        runAsUser: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      volumes:
+      - name: tournament-state
+        persistentVolumeClaim:
+          claimName: tournament-state

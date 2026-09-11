@@ -1,0 +1,181 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: "2026-09-11T07:13:10Z"
+  finalizers:
+  - batch.kubernetes.io/job-tracking
+  generateName: tournament-runner-
+  generation: 1
+  labels:
+    app: tournament-runner
+    batch.kubernetes.io/controller-uid: f7069f40-aabc-40ff-95ef-23000f66fd79
+    batch.kubernetes.io/job-name: tournament-runner
+    controller-uid: f7069f40-aabc-40ff-95ef-23000f66fd79
+    job-name: tournament-runner
+  name: tournament-runner-dzwnx
+  namespace: autoscaling-lab
+  ownerReferences:
+  - apiVersion: batch/v1
+    blockOwnerDeletion: true
+    controller: true
+    kind: Job
+    name: tournament-runner
+    uid: f7069f40-aabc-40ff-95ef-23000f66fd79
+  resourceVersion: "300368"
+  uid: 01f04fc6-0ffc-4c3b-9171-c5adfe30b4a0
+spec:
+  automountServiceAccountToken: false
+  containers:
+  - args:
+    - run
+    - runner
+    command:
+    - npm
+    env:
+    - name: TOURNAMENT_RUN_ID
+      value: sample-32-001
+    - name: TOURNAMENT_MODE
+      value: sample
+    - name: TOURNAMENT_SEED
+      value: sample-32-seed-001
+    - name: TOURNAMENT_STATE_ROOT
+      value: /data/tournaments
+    - name: SIMULATOR_BASE_URL
+      value: http://metronome-simulator
+    - name: RUNNER_CONCURRENCY
+      value: "2"
+    - name: RULES_VERSION
+      value: metronome-singles-v1
+    - name: SIMULATOR_VERSION
+      value: pokemon-showdown@0.11.11
+    - name: SIMULATOR_IMAGE
+      value: metronome-simulator:phase5
+    image: metronome-simulator:phase5
+    imagePullPolicy: IfNotPresent
+    name: runner
+    resources:
+      limits:
+        cpu: 500m
+        memory: 512Mi
+      requests:
+        cpu: 100m
+        memory: 128Mi
+    securityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+        - ALL
+      readOnlyRootFilesystem: true
+    terminationMessagePath: /dev/termination-log
+    terminationMessagePolicy: File
+    volumeMounts:
+    - mountPath: /data/tournaments
+      name: tournament-state
+  dnsPolicy: ClusterFirst
+  enableServiceLinks: true
+  nodeName: desktop-worker2
+  preemptionPolicy: PreemptLowerPriority
+  priority: 0
+  restartPolicy: Never
+  schedulerName: default-scheduler
+  securityContext:
+    fsGroup: 1000
+    runAsGroup: 1000
+    runAsNonRoot: true
+    runAsUser: 1000
+    seccompProfile:
+      type: RuntimeDefault
+  serviceAccount: default
+  serviceAccountName: default
+  terminationGracePeriodSeconds: 30
+  tolerations:
+  - effect: NoExecute
+    key: node.kubernetes.io/not-ready
+    operator: Exists
+    tolerationSeconds: 300
+  - effect: NoExecute
+    key: node.kubernetes.io/unreachable
+    operator: Exists
+    tolerationSeconds: 300
+  volumes:
+  - name: tournament-state
+    persistentVolumeClaim:
+      claimName: tournament-state
+status:
+  allocatedResources:
+    cpu: 100m
+    memory: 128Mi
+  conditions:
+  - lastProbeTime: null
+    lastTransitionTime: "2026-09-11T07:13:10Z"
+    observedGeneration: 1
+    status: "True"
+    type: PodReadyToStartContainers
+  - lastProbeTime: null
+    lastTransitionTime: "2026-09-11T07:13:10Z"
+    observedGeneration: 1
+    status: "True"
+    type: Initialized
+  - lastProbeTime: null
+    lastTransitionTime: "2026-09-11T07:13:10Z"
+    observedGeneration: 1
+    status: "True"
+    type: Ready
+  - lastProbeTime: null
+    lastTransitionTime: "2026-09-11T07:13:10Z"
+    observedGeneration: 1
+    status: "True"
+    type: ContainersReady
+  - lastProbeTime: null
+    lastTransitionTime: "2026-09-11T07:13:10Z"
+    observedGeneration: 1
+    status: "True"
+    type: PodScheduled
+  containerStatuses:
+  - allocatedResources:
+      cpu: 100m
+      memory: 128Mi
+    containerID: containerd://54dee5c645c5d94392e2d0b2de03f04a11660d96e5409a07f3d815d2af5d319e
+    image: docker.io/library/metronome-simulator:phase5
+    imageID: docker.io/library/metronome-simulator@sha256:6bbff8424cceed9e6879aa3c2f6e8840c104e8f5284494cbe938770ff15b37a9
+    lastState: {}
+    name: runner
+    ready: true
+    resources:
+      limits:
+        cpu: 500m
+        memory: 512Mi
+      requests:
+        cpu: 100m
+        memory: 128Mi
+    restartCount: 0
+    started: true
+    state:
+      running:
+        startedAt: "2026-09-11T07:13:10Z"
+    user:
+      linux:
+        gid: 1000
+        supplementalGroups:
+        - 1000
+        uid: 1000
+    volumeMounts:
+    - mountPath: /data/tournaments
+      name: tournament-state
+  hostIP: 172.19.0.4
+  hostIPs:
+  - ip: 172.19.0.4
+  observedGeneration: 1
+  phase: Running
+  podIP: 10.244.2.10
+  podIPs:
+  - ip: 10.244.2.10
+  qosClass: Burstable
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+  startTime: "2026-09-11T07:13:10Z"

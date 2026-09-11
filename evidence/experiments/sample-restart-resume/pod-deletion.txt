@@ -1,0 +1,1 @@
+pod "tournament-runner-dbsx7" deleted from autoscaling-lab namespace

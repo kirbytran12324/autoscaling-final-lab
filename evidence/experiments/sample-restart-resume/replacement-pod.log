@@ -1,0 +1,16 @@
+
+> metronome-simulator@0.1.0 runner
+> node src/runner-cli.js
+
+Tournament starting: runId=sample-32-001 mode=sample
+Tournament progress: stage=knockout round=r16 accepted=112
+Tournament progress: stage=knockout round=r8 accepted=130
+Tournament progress: stage=knockout round=r4 accepted=138
+Tournament progress: stage=knockout round=r2 accepted=142
+Tournament progress: stage=complete round=r2 accepted=144
+Tournament completed: runId=sample-32-001 state=/data/tournaments/runs/sample-32-001
+npm notice
+npm notice New major version of npm available! 11.19.0 -> 12.0.2
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2
+npm notice To update run: npm install -g npm@12.0.2
+npm notice

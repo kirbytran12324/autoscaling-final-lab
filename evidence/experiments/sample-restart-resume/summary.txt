@@ -1,0 +1,14 @@
+result=job-completed
+namespace=autoscaling-lab
+job=tournament-runner
+run_id=sample-32-001
+interruption_stage=groups
+interruption_threshold=10
+first_pod=tournament-runner-dbsx7
+first_pod_uid=a05ceb9a-303b-43e5-a744-e56019739281
+replacement_pod=tournament-runner-dzwnx
+replacement_pod_uid=01f04fc6-0ffc-4c3b-9171-c5adfe30b4a0
+pvc=tournament-state
+pvc_preserved=true
+job_preserved=true
+artifact_audit_required=true

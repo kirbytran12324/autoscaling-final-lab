@@ -1,6 +1,6 @@
 # Metronome Tournament Autoscaling Lab — Technical Design
 
-Status: active implementation design, updated 2026-09-08.
+Status: active implementation design, updated 2026-09-11.
 Final resource sizing, HPA values, VPA comparison and acceptance results remain pending.
 
 ## Environment
@@ -40,7 +40,15 @@ The following implementation is complete and verified:
 - Kubernetes manifests define the simulator Deployment and ClusterIP Service;
 - Metrics Server is installed and supplies node and Pod resource metrics;
 - Locust runs as an in-cluster workload; and
-- one-replica and three-replica exploratory experiments have been completed.
+- one-replica and three-replica exploratory experiments have been completed;
+- the singleton tournament-runner Job and its `npm run runner` command override
+  are implemented; and
+- the 32-species restart/resume validation completed successfully with a
+  deliberate runner Pod replacement, preserved Job and PVC, and completed run;
+- sample run `sample-32-001` completed with 144 accepted results, 144 unique
+  match IDs, and Rayquaza as champion; and
+- its self-contained `report.html` was generated and opened locally through
+  `file://`, confirming the required offline report path.
 
 The implemented request and response shapes are documented in the [Simulator API Contract](api-contract.md). The exploratory results and evidence links are recorded in the [single-Pod baseline](baseline-experiment.md) and [three-Pod experiment](three-pod-experiment.md).
 
@@ -189,6 +197,13 @@ The sample contains 112 group-stage battles and 15 knockout series. At two to se
 
 This mode validates the complete runner, checkpoint, standings, bracket, and reporting pipeline. It does not replace the required 1,025-species tournament.
 
+The accepted Phase 5 run, `sample-32-001`, completed with 144 accepted
+simulation results and 144 unique match IDs. Rayquaza won the final series and
+is the recorded sample champion. The derived self-contained `report.html` was
+generated from the completed artifacts and opened locally through `file://`
+without network resources.
+
+
 ## Application and API boundary
 
 The service owns the fixed battle rules. Clients provide two valid base species, a `matchId`, and a four-number seed; they cannot submit arbitrary teams, moves, abilities, or formats.
@@ -222,6 +237,8 @@ The runner owns tournament execution state and writes these machine-readable art
 - `roster.json`: immutable run identity, normalized roster seed, and the exact final entrant order used after selection and deterministic shuffle;
 - `results.jsonl`: one immutable record per accepted simulation;
 - `failures.jsonl`: optional append-only diagnostics for requests that exhausted all retries; never authoritative for completion or progress;
+- `checkpoint.json`: atomically replaced progress hint whose final `complete`
+  state is required by report validation but never overrides `results.jsonl`;
 - `standings.json`: atomically replaced provisional or final group scores and
   every tie-break value;
 - `bracket.json`: bracket positions, accepted series games, and winners. It
@@ -233,6 +250,26 @@ The separate [resource-capture script](../scripts/capture-resource-usage.sh), no
 
 The report generator combines the tournament artifacts with separately captured experiment evidence and produces a self-contained `report.html` with embedded data, CSS, and JavaScript. It works offline after being copied into the repository and has no CDN dependency. Regeneration from identical inputs produces substantively identical content apart from an explicitly labelled generation timestamp.
 
+The implemented generator is invoked from `simulator/` with `npm run report`.
+`TOURNAMENT_STATE_ROOT` and `TOURNAMENT_RUN_ID` are required and select
+`<stateRoot>/runs/<runId>/`; `REPORT_RESTART_EVIDENCE_DIR` and
+`REPORT_AUTOSCALING_EVIDENCE_DIR` are optional. The default output is
+`<stateRoot>/runs/<runId>/report.html`. Before writing, the generator validates
+the completed metadata, immutable roster and hash, authoritative result set,
+final checkpoint, recomputed standings, deterministic bracket progression,
+every knockout game, and champion. Missing, malformed, incomplete, unknown, or
+identity-conflicting core evidence stops generation. The HTML is written to a
+same-directory temporary file and atomically renamed, so regeneration may
+safely replace an earlier report without exposing a partial file.
+
+The simulation explorer keeps the full accepted result set in escaped embedded
+JSON but creates at most 100 table rows in the document at once. Search,
+filters, sorting, and pagination run locally. Restart evidence is displayed
+only when compatible current-harness artifacts for the same run are supplied;
+Pod identities are never inferred. Autoscaling charts are displayed only for a
+compatible supplied `autoscaling-timeline.csv`; absence retains the explicit
+Phase 7 placeholder rather than presenting empty measurements as evidence.
+
 `results.jsonl` remains authoritative for accepted simulations. After a
 restart, the runner recomputes standings from those results rather than
 treating a prior `standings.json` snapshot as source state. Provisional points,
@@ -240,8 +277,9 @@ mini-table values, and Sonneborn–Berger values reflect only the accepted
 results available when the snapshot was calculated and can change as later
 results are accepted.
 
-The executable runner is `npm run runner` in the simulator image. A future
-singleton Kubernetes Job supplies `TOURNAMENT_RUN_ID`, `TOURNAMENT_MODE`,
+The executable runner is `npm run runner` in the simulator image. The
+implemented singleton Kubernetes Job under `k8s/runner/` supplies
+`TOURNAMENT_RUN_ID`, `TOURNAMENT_MODE`,
 `TOURNAMENT_SEED`, `TOURNAMENT_STATE_ROOT`, `SIMULATOR_BASE_URL`,
 `RUNNER_CONCURRENCY`, `RULES_VERSION`, `SIMULATOR_VERSION`, and
 `SIMULATOR_IMAGE`. All are required; identity-critical values have no implicit
@@ -249,11 +287,21 @@ defaults. `SIMULATOR_REQUEST_TIMEOUT_MS` is optional and otherwise uses the
 client's documented 30-second default. `npm run runner -- --check-config`
 validates this environment and roster selection without contacting the
 simulator or creating run state. The image still starts the simulator server
-by default; the future Job overrides its command with the runner npm script.
+by default; the runner Job overrides its command with the runner npm script.
 
-The report provides a run summary, sortable group tables with advancement cutoffs, the knockout bracket and series details, a searchable simulation table, and an autoscaling chart aligned with request rate, latency, and failures. It is read-only and never becomes the source of truth.
+The report provides a run summary, integrity and reproducibility checks,
+sortable group tables with advancement cutoffs, the knockout bracket and
+expandable series/game details, a bounded searchable simulation table,
+operational timing and Pod summaries, restart/resume evidence, and—when
+supplied—an autoscaling chart aligned across replica count, request rate, p95
+latency, and failures. It is read-only and never becomes the source of truth.
 
-### Deferred Pokémon Showdown replay viewer
+### Deferred optional UI polish and Pokémon Showdown replay viewer
+
+The implemented offline report design is accepted for the required lab
+interface. Further visual or interaction polish is deferred optional work,
+alongside the separate replay-viewer viability spike; neither is a phase gate
+or assignment deliverable.
 
 After the 32-species sample tournament, restart/resume validation, and offline report are complete, perform a bounded viability spike for a separate read-only replay viewer. A user should be able to search for a matchup, select a recorded simulation, and watch it turn by turn using the actual Pokémon Showdown battle UI rather than only reading a move log or final result.
 
@@ -406,11 +454,14 @@ The final audit package is complete only when it contains all of the following:
 
 The current implementation state is:
 
-- phases 1–4 complete;
+- phases 1–5 complete;
 - Metrics Server completed early;
 - exploratory fixed-replica testing completed early;
-- phase 5 active;
-- the optional replay-viewer spike deferred until after the phase 5 sample-tournament gate; and
+- phase 5 complete: `sample-32-001` produced 144 unique accepted results,
+  Rayquaza was champion, and the generated self-contained report was opened
+  locally offline;
+- further report UI polish and the replay-viewer spike deferred as optional
+  work; and
 - phases 6–10 pending.
 
 The remaining phase gates are:
@@ -419,8 +470,11 @@ The remaining phase gates are:
 2. **Pinned simulator contract — complete.** Deterministic battle and catalog contracts are tested.
 3. **Local HTTP service — complete.** Battle, liveness, readiness, and validation paths are implemented.
 4. **Container and single-Pod Kubernetes path — complete.** The secured simulator Deployment and ClusterIP Service run in Kubernetes.
-5. **Runner, PVC, sample tournament, and report — active.** Complete the 32-species tournament end to end, validate restart/resume, and open the generated report offline.
-6. **Measure and right-size — pending.** Establish the sustainable one-Pod operating point and select resource values.
+5. **Runner, PVC, sample tournament, and report — complete.** The runner Job,
+   32-species tournament, and restart/resume validation are complete. Generate
+   the offline report from the completed artifacts and open it locally to exit
+   the phase.
+6. **Measure and right-size — active.** Establish the sustainable one-Pod operating point and select resource values.
 7. **HPA acceptance evidence — pending; Metrics Server and exploratory comparison completed early.** Select the HPA values, then capture steady load, scale-out, service health, and recovery through scale-down.
 8. **VPA recommendation comparison — pending.** Collect and compare Off-mode recommendations.
 9. **Capacity and scheduler diagnosis — pending.** Produce a scheduler-level `Insufficient cpu` Pending Pod using calculated requests.

@@ -1,0 +1,2 @@
+persistentvolumeclaim/tournament-state unchanged (server dry run)
+job.batch/tournament-runner created (server dry run)

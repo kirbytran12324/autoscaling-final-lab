@@ -1,0 +1,121 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"batch/v1","kind":"Job","metadata":{"annotations":{},"name":"tournament-runner","namespace":"autoscaling-lab"},"spec":{"backoffLimit":3,"completions":1,"parallelism":1,"podReplacementPolicy":"Failed","template":{"metadata":{"labels":{"app":"tournament-runner"}},"spec":{"automountServiceAccountToken":false,"containers":[{"args":["run","runner"],"command":["npm"],"env":[{"name":"TOURNAMENT_RUN_ID","value":"sample-32-001"},{"name":"TOURNAMENT_MODE","value":"sample"},{"name":"TOURNAMENT_SEED","value":"sample-32-seed-001"},{"name":"TOURNAMENT_STATE_ROOT","value":"/data/tournaments"},{"name":"SIMULATOR_BASE_URL","value":"http://metronome-simulator"},{"name":"RUNNER_CONCURRENCY","value":"2"},{"name":"RULES_VERSION","value":"metronome-singles-v1"},{"name":"SIMULATOR_VERSION","value":"pokemon-showdown@0.11.11"},{"name":"SIMULATOR_IMAGE","value":"metronome-simulator:phase5"}],"image":"metronome-simulator:phase5","imagePullPolicy":"IfNotPresent","name":"runner","resources":{"limits":{"cpu":"500m","memory":"512Mi"},"requests":{"cpu":"100m","memory":"128Mi"}},"securityContext":{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]},"readOnlyRootFilesystem":true},"volumeMounts":[{"mountPath":"/data/tournaments","name":"tournament-state"}]}],"restartPolicy":"Never","securityContext":{"fsGroup":1000,"runAsGroup":1000,"runAsNonRoot":true,"runAsUser":1000,"seccompProfile":{"type":"RuntimeDefault"}},"volumes":[{"name":"tournament-state","persistentVolumeClaim":{"claimName":"tournament-state"}}]}}}}
+  creationTimestamp: "2026-09-11T07:12:47Z"
+  generation: 1
+  labels:
+    app: tournament-runner
+    batch.kubernetes.io/controller-uid: f7069f40-aabc-40ff-95ef-23000f66fd79
+    batch.kubernetes.io/job-name: tournament-runner
+    controller-uid: f7069f40-aabc-40ff-95ef-23000f66fd79
+    job-name: tournament-runner
+  name: tournament-runner
+  namespace: autoscaling-lab
+  resourceVersion: "300401"
+  uid: f7069f40-aabc-40ff-95ef-23000f66fd79
+spec:
+  backoffLimit: 3
+  completionMode: NonIndexed
+  completions: 1
+  manualSelector: false
+  parallelism: 1
+  podReplacementPolicy: Failed
+  selector:
+    matchLabels:
+      batch.kubernetes.io/controller-uid: f7069f40-aabc-40ff-95ef-23000f66fd79
+  suspend: false
+  template:
+    metadata:
+      labels:
+        app: tournament-runner
+        batch.kubernetes.io/controller-uid: f7069f40-aabc-40ff-95ef-23000f66fd79
+        batch.kubernetes.io/job-name: tournament-runner
+        controller-uid: f7069f40-aabc-40ff-95ef-23000f66fd79
+        job-name: tournament-runner
+    spec:
+      automountServiceAccountToken: false
+      containers:
+      - args:
+        - run
+        - runner
+        command:
+        - npm
+        env:
+        - name: TOURNAMENT_RUN_ID
+          value: sample-32-001
+        - name: TOURNAMENT_MODE
+          value: sample
+        - name: TOURNAMENT_SEED
+          value: sample-32-seed-001
+        - name: TOURNAMENT_STATE_ROOT
+          value: /data/tournaments
+        - name: SIMULATOR_BASE_URL
+          value: http://metronome-simulator
+        - name: RUNNER_CONCURRENCY
+          value: "2"
+        - name: RULES_VERSION
+          value: metronome-singles-v1
+        - name: SIMULATOR_VERSION
+          value: pokemon-showdown@0.11.11
+        - name: SIMULATOR_IMAGE
+          value: metronome-simulator:phase5
+        image: metronome-simulator:phase5
+        imagePullPolicy: IfNotPresent
+        name: runner
+        resources:
+          limits:
+            cpu: 500m
+            memory: 512Mi
+          requests:
+            cpu: 100m
+            memory: 128Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - mountPath: /data/tournaments
+          name: tournament-state
+      dnsPolicy: ClusterFirst
+      restartPolicy: Never
+      schedulerName: default-scheduler
+      securityContext:
+        fsGroup: 1000
+        runAsGroup: 1000
+        runAsNonRoot: true
+        runAsUser: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      terminationGracePeriodSeconds: 30
+      volumes:
+      - name: tournament-state
+        persistentVolumeClaim:
+          claimName: tournament-state
+status:
+  completionTime: "2026-09-11T07:13:21Z"
+  conditions:
+  - lastProbeTime: "2026-09-11T07:13:21Z"
+    lastTransitionTime: "2026-09-11T07:13:21Z"
+    message: Reached expected number of succeeded pods
+    reason: CompletionsReached
+    status: "True"
+    type: SuccessCriteriaMet
+  - lastProbeTime: "2026-09-11T07:13:21Z"
+    lastTransitionTime: "2026-09-11T07:13:21Z"
+    message: Reached expected number of succeeded pods
+    reason: CompletionsReached
+    status: "True"
+    type: Complete
+  failed: 1
+  ready: 0
+  startTime: "2026-09-11T07:12:47Z"
+  succeeded: 1
+  terminating: 0
+  uncountedTerminatedPods: {}

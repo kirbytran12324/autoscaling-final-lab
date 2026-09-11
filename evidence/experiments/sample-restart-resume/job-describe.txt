@@ -1,0 +1,65 @@
+Name:             tournament-runner
+Namespace:        autoscaling-lab
+Selector:         batch.kubernetes.io/controller-uid=f7069f40-aabc-40ff-95ef-23000f66fd79
+Labels:           app=tournament-runner
+                  batch.kubernetes.io/controller-uid=f7069f40-aabc-40ff-95ef-23000f66fd79
+                  batch.kubernetes.io/job-name=tournament-runner
+                  controller-uid=f7069f40-aabc-40ff-95ef-23000f66fd79
+                  job-name=tournament-runner
+Annotations:      <none>
+Parallelism:      1
+Completions:      1
+Completion Mode:  NonIndexed
+Suspend:          false
+Backoff Limit:    3
+Start Time:       Fri, 11 Sep 2026 14:12:47 +0700
+Completed At:     Fri, 11 Sep 2026 14:13:21 +0700
+Duration:         34s
+Pods Statuses:    0 Active (0 Ready) / 1 Succeeded / 1 Failed
+Pod Template:
+  Labels:  app=tournament-runner
+           batch.kubernetes.io/controller-uid=f7069f40-aabc-40ff-95ef-23000f66fd79
+           batch.kubernetes.io/job-name=tournament-runner
+           controller-uid=f7069f40-aabc-40ff-95ef-23000f66fd79
+           job-name=tournament-runner
+  Containers:
+   runner:
+    Image:      metronome-simulator:phase5
+    Port:       <none>
+    Host Port:  <none>
+    Command:
+      npm
+    Args:
+      run
+      runner
+    Limits:
+      cpu:     500m
+      memory:  512Mi
+    Requests:
+      cpu:     100m
+      memory:  128Mi
+    Environment:
+      TOURNAMENT_RUN_ID:      sample-32-001
+      TOURNAMENT_MODE:        sample
+      TOURNAMENT_SEED:        sample-32-seed-001
+      TOURNAMENT_STATE_ROOT:  /data/tournaments
+      SIMULATOR_BASE_URL:     http://metronome-simulator
+      RUNNER_CONCURRENCY:     2
+      RULES_VERSION:          metronome-singles-v1
+      SIMULATOR_VERSION:      pokemon-showdown@0.11.11
+      SIMULATOR_IMAGE:        metronome-simulator:phase5
+    Mounts:
+      /data/tournaments from tournament-state (rw)
+  Volumes:
+   tournament-state:
+    Type:          PersistentVolumeClaim (a reference to a PersistentVolumeClaim in the same namespace)
+    ClaimName:     tournament-state
+    ReadOnly:      false
+  Node-Selectors:  <none>
+  Tolerations:     <none>
+Events:
+  Type    Reason            Age   From            Message
+  ----    ------            ----  ----            -------
+  Normal  SuccessfulCreate  35s   job-controller  Created pod: tournament-runner-dbsx7
+  Normal  SuccessfulCreate  12s   job-controller  Created pod: tournament-runner-dzwnx
+  Normal  Completed         1s    job-controller  Job completed

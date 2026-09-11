@@ -1,0 +1,34 @@
+LAST SEEN   TYPE     REASON              OBJECT                                      MESSAGE
+40m         Normal   Scheduled           pod/tournament-runner-km9s4                 Successfully assigned autoscaling-lab/tournament-runner-km9s4 to desktop-worker2
+40m         Normal   SuccessfulCreate    job/tournament-runner                       Created pod: tournament-runner-km9s4
+40m         Normal   Pulling             pod/tournament-runner-km9s4                 Pulling image "metronome-simulator:phase5"
+40m         Normal   Started             pod/tournament-runner-km9s4                 Container started
+40m         Normal   Pulled              pod/tournament-runner-km9s4                 Successfully pulled image "metronome-simulator:phase5" in 3.09s (3.09s including waiting). Image size: 112997154 bytes.
+40m         Normal   Created             pod/tournament-runner-km9s4                 Container created
+40m         Normal   Completed           job/tournament-runner                       Job completed
+36m         Normal   SuccessfulDelete    replicaset/metronome-simulator-75c6d4c677   Deleted pod: metronome-simulator-75c6d4c677-blkzn
+36m         Normal   Killing             pod/metronome-simulator-75c6d4c677-blkzn    Stopping container simulator
+36m         Normal   Scheduled           pod/metronome-simulator-7dd44bf454-6dqdb    Successfully assigned autoscaling-lab/metronome-simulator-7dd44bf454-6dqdb to desktop-worker2
+36m         Normal   SuccessfulCreate    replicaset/metronome-simulator-7dd44bf454   Created pod: metronome-simulator-7dd44bf454-6dqdb
+36m         Normal   ScalingReplicaSet   deployment/metronome-simulator              Scaled down replica set metronome-simulator-75c6d4c677 from 3 to 1
+36m         Normal   ScalingReplicaSet   deployment/metronome-simulator              Scaled up replica set metronome-simulator-7dd44bf454 from 0 to 1
+36m         Normal   SuccessfulDelete    replicaset/metronome-simulator-75c6d4c677   Deleted pod: metronome-simulator-75c6d4c677-trx2m
+36m         Normal   Killing             pod/metronome-simulator-75c6d4c677-trx2m    Stopping container simulator
+36m         Normal   Created             pod/metronome-simulator-7dd44bf454-6dqdb    Container created
+36m         Normal   Pulled              pod/metronome-simulator-7dd44bf454-6dqdb    Container image "metronome-simulator:phase5" already present on machine and can be accessed by the pod
+36m         Normal   Started             pod/metronome-simulator-7dd44bf454-6dqdb    Container started
+36m         Normal   ScalingReplicaSet   deployment/metronome-simulator              Scaled down replica set metronome-simulator-75c6d4c677 from 1 to 0
+36m         Normal   Killing             pod/metronome-simulator-75c6d4c677-zkh7r    Stopping container simulator
+36m         Normal   SuccessfulDelete    replicaset/metronome-simulator-75c6d4c677   Deleted pod: metronome-simulator-75c6d4c677-zkh7r
+35s         Normal   Scheduled           pod/tournament-runner-dbsx7                 Successfully assigned autoscaling-lab/tournament-runner-dbsx7 to desktop-worker2
+35s         Normal   SuccessfulCreate    job/tournament-runner                       Created pod: tournament-runner-dbsx7
+34s         Normal   Pulled              pod/tournament-runner-dbsx7                 Container image "metronome-simulator:phase5" already present on machine and can be accessed by the pod
+34s         Normal   Created             pod/tournament-runner-dbsx7                 Container created
+34s         Normal   Started             pod/tournament-runner-dbsx7                 Container started
+23s         Normal   Killing             pod/tournament-runner-dbsx7                 Stopping container runner
+12s         Normal   Started             pod/tournament-runner-dzwnx                 Container started
+12s         Normal   Created             pod/tournament-runner-dzwnx                 Container created
+12s         Normal   Pulled              pod/tournament-runner-dzwnx                 Container image "metronome-simulator:phase5" already present on machine and can be accessed by the pod
+12s         Normal   Scheduled           pod/tournament-runner-dzwnx                 Successfully assigned autoscaling-lab/tournament-runner-dzwnx to desktop-worker2
+12s         Normal   SuccessfulCreate    job/tournament-runner                       Created pod: tournament-runner-dzwnx
+1s          Normal   Completed           job/tournament-runner                       Job completed

@@ -23,7 +23,7 @@ spec:
 
       containers:
         - name: simulator
-          image: metronome-simulator:0.1.0
+          image: metronome-simulator:phase5
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 3000

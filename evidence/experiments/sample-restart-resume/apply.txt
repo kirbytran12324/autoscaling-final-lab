@@ -1,0 +1,2 @@
+persistentvolumeclaim/tournament-state unchanged
+job.batch/tournament-runner created
