@@ -2039,6 +2039,50 @@ async function planTournamentRun(options) {
   return reconstruction.plan;
 }
 
+async function runTournament(options) {
+  while (true) {
+    const plan = await planTournamentRun(options);
+
+    if (plan.terminal === true) {
+      if (plan.status !== 'completed' && plan.status !== 'failed') {
+        throw new Error(
+          `Unknown terminal tournament planner status "${String(plan.status)}"`
+        );
+      }
+
+      return {
+        terminal: true,
+        stage: plan.status === 'completed' ? 'complete' : 'failed',
+        status: plan.status,
+        tournamentComplete: plan.status === 'completed',
+        runDirectory: plan.runDirectory,
+        metadata: plan.metadata,
+      };
+    }
+
+    if (plan.terminal !== false) {
+      throw new Error(
+        `Unknown tournament planner action for terminal value ` +
+          `"${String(plan.terminal)}"`
+      );
+    }
+
+    if (plan.stage === 'groups') {
+      await executeGroupStagePlan(plan, options);
+      continue;
+    }
+
+    if (plan.stage === 'knockout') {
+      await executeKnockoutPlan(plan, options);
+      continue;
+    }
+
+    throw new Error(
+      `Unknown non-terminal tournament planner stage "${String(plan.stage)}"`
+    );
+  }
+}
+
 module.exports = {
   buildGroupStageRecoveryPlan,
   buildGroupStandingsArtifact,
@@ -2047,4 +2091,5 @@ module.exports = {
   executeGroupStagePlan,
   executeKnockoutPlan,
   planTournamentRun,
+  runTournament,
 };
