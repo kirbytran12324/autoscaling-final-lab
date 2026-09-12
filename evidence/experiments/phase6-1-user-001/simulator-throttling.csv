@@ -1,0 +1,17 @@
+timestamp,pod,container,container_id,restart_count,cgroup_version,nr_periods,nr_throttled,throttled_time_raw,throttled_time_unit,throttled_seconds,status
+2026-09-12T10:06:24+00:00,metronome-simulator-7dd44bf454-6dqdb,simulator,containerd://929c8714198dee4ca842a08edc0e7676b7ea4e2a249fadc25d77cfbec0482794,1,v2,3225,91,8000272,microseconds,8.000272,ok
+2026-09-12T10:06:39+00:00,metronome-simulator-7dd44bf454-6dqdb,simulator,containerd://929c8714198dee4ca842a08edc0e7676b7ea4e2a249fadc25d77cfbec0482794,1,v2,3343,197,20364638,microseconds,20.364638,ok
+2026-09-12T10:06:55+00:00,metronome-simulator-7dd44bf454-6dqdb,simulator,containerd://929c8714198dee4ca842a08edc0e7676b7ea4e2a249fadc25d77cfbec0482794,1,v2,3496,341,32333787,microseconds,32.333787,ok
+2026-09-12T10:07:09+00:00,metronome-simulator-7dd44bf454-6dqdb,simulator,containerd://929c8714198dee4ca842a08edc0e7676b7ea4e2a249fadc25d77cfbec0482794,1,v2,3641,486,43761691,microseconds,43.761691,ok
+2026-09-12T10:07:25+00:00,metronome-simulator-7dd44bf454-6dqdb,simulator,containerd://929c8714198dee4ca842a08edc0e7676b7ea4e2a249fadc25d77cfbec0482794,1,v2,3795,640,55113608,microseconds,55.113608,ok
+2026-09-12T10:07:39+00:00,metronome-simulator-7dd44bf454-6dqdb,simulator,containerd://929c8714198dee4ca842a08edc0e7676b7ea4e2a249fadc25d77cfbec0482794,1,v2,3939,784,65089795,microseconds,65.089795,ok
+2026-09-12T10:07:54+00:00,metronome-simulator-7dd44bf454-6dqdb,simulator,containerd://929c8714198dee4ca842a08edc0e7676b7ea4e2a249fadc25d77cfbec0482794,1,v2,4091,928,75987555,microseconds,75.987555,ok
+2026-09-12T10:08:09+00:00,metronome-simulator-7dd44bf454-6dqdb,simulator,containerd://929c8714198dee4ca842a08edc0e7676b7ea4e2a249fadc25d77cfbec0482794,1,v2,4242,1079,85179197,microseconds,85.179197,ok
+2026-09-12T10:08:24+00:00,metronome-simulator-7dd44bf454-6dqdb,simulator,containerd://929c8714198dee4ca842a08edc0e7676b7ea4e2a249fadc25d77cfbec0482794,1,v2,4393,1230,95921751,microseconds,95.921751,ok
+2026-09-12T10:08:39+00:00,metronome-simulator-7dd44bf454-6dqdb,simulator,containerd://929c8714198dee4ca842a08edc0e7676b7ea4e2a249fadc25d77cfbec0482794,1,v2,4544,1379,105472030,microseconds,105.472030,ok
+2026-09-12T10:08:54+00:00,metronome-simulator-7dd44bf454-6dqdb,simulator,containerd://929c8714198dee4ca842a08edc0e7676b7ea4e2a249fadc25d77cfbec0482794,1,v2,4686,1521,114058774,microseconds,114.058774,ok
+2026-09-12T10:09:09+00:00,metronome-simulator-7dd44bf454-6dqdb,simulator,containerd://929c8714198dee4ca842a08edc0e7676b7ea4e2a249fadc25d77cfbec0482794,1,v2,4838,1673,125013001,microseconds,125.013001,ok
+2026-09-12T10:09:24+00:00,metronome-simulator-7dd44bf454-6dqdb,simulator,containerd://929c8714198dee4ca842a08edc0e7676b7ea4e2a249fadc25d77cfbec0482794,1,v2,4990,1816,133534236,microseconds,133.534236,ok
+2026-09-12T10:09:39+00:00,metronome-simulator-7dd44bf454-6dqdb,simulator,containerd://929c8714198dee4ca842a08edc0e7676b7ea4e2a249fadc25d77cfbec0482794,1,v2,5034,1850,136050418,microseconds,136.050418,ok
+2026-09-12T10:09:54+00:00,metronome-simulator-7dd44bf454-6dqdb,simulator,containerd://929c8714198dee4ca842a08edc0e7676b7ea4e2a249fadc25d77cfbec0482794,1,v2,5043,1850,136050418,microseconds,136.050418,ok
+2026-09-12T10:10:09+00:00,metronome-simulator-7dd44bf454-6dqdb,simulator,containerd://929c8714198dee4ca842a08edc0e7676b7ea4e2a249fadc25d77cfbec0482794,1,v2,5047,1850,136050418,microseconds,136.050418,ok
