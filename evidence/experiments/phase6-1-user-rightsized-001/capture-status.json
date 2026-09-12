@@ -1,0 +1,13 @@
+{
+  "schemaVersion": "2",
+  "experimentId": "phase6-1-user-rightsized-001",
+  "status": "complete",
+  "startedAt": "2026-09-12T15:36:16+00:00",
+  "endedAt": "2026-09-12T15:40:18+00:00",
+  "exitCode": 0,
+  "sampleCount": 16,
+  "failedSampleCount": 0,
+  "warningCount": 0,
+  "finalValidation": "ok",
+  "interruptionSignal": null
+}
