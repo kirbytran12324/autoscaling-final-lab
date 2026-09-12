@@ -1,0 +1,17 @@
+timestamp,pod,pod_uid,node,phase,pod_ready,container_ready,restart_count,container_id
+2026-09-12T10:14:31+00:00,metronome-simulator-7dd44bf454-6dqdb,64226dac-a280-4476-a8ee-5711dd1f4662,desktop-worker2,Running,True,true,1,containerd://929c8714198dee4ca842a08edc0e7676b7ea4e2a249fadc25d77cfbec0482794
+2026-09-12T10:14:45+00:00,metronome-simulator-7dd44bf454-6dqdb,64226dac-a280-4476-a8ee-5711dd1f4662,desktop-worker2,Running,True,true,1,containerd://929c8714198dee4ca842a08edc0e7676b7ea4e2a249fadc25d77cfbec0482794
+2026-09-12T10:15:01+00:00,metronome-simulator-7dd44bf454-6dqdb,64226dac-a280-4476-a8ee-5711dd1f4662,desktop-worker2,Running,True,true,1,containerd://929c8714198dee4ca842a08edc0e7676b7ea4e2a249fadc25d77cfbec0482794
+2026-09-12T10:15:16+00:00,metronome-simulator-7dd44bf454-6dqdb,64226dac-a280-4476-a8ee-5711dd1f4662,desktop-worker2,Running,True,true,1,containerd://929c8714198dee4ca842a08edc0e7676b7ea4e2a249fadc25d77cfbec0482794
+2026-09-12T10:15:30+00:00,metronome-simulator-7dd44bf454-6dqdb,64226dac-a280-4476-a8ee-5711dd1f4662,desktop-worker2,Running,True,true,1,containerd://929c8714198dee4ca842a08edc0e7676b7ea4e2a249fadc25d77cfbec0482794
+2026-09-12T10:15:45+00:00,metronome-simulator-7dd44bf454-6dqdb,64226dac-a280-4476-a8ee-5711dd1f4662,desktop-worker2,Running,True,true,1,containerd://929c8714198dee4ca842a08edc0e7676b7ea4e2a249fadc25d77cfbec0482794
+2026-09-12T10:16:01+00:00,metronome-simulator-7dd44bf454-6dqdb,64226dac-a280-4476-a8ee-5711dd1f4662,desktop-worker2,Running,True,true,1,containerd://929c8714198dee4ca842a08edc0e7676b7ea4e2a249fadc25d77cfbec0482794
+2026-09-12T10:16:16+00:00,metronome-simulator-7dd44bf454-6dqdb,64226dac-a280-4476-a8ee-5711dd1f4662,desktop-worker2,Running,True,true,1,containerd://929c8714198dee4ca842a08edc0e7676b7ea4e2a249fadc25d77cfbec0482794
+2026-09-12T10:16:31+00:00,metronome-simulator-7dd44bf454-6dqdb,64226dac-a280-4476-a8ee-5711dd1f4662,desktop-worker2,Running,True,true,1,containerd://929c8714198dee4ca842a08edc0e7676b7ea4e2a249fadc25d77cfbec0482794
+2026-09-12T10:16:46+00:00,metronome-simulator-7dd44bf454-6dqdb,64226dac-a280-4476-a8ee-5711dd1f4662,desktop-worker2,Running,True,true,1,containerd://929c8714198dee4ca842a08edc0e7676b7ea4e2a249fadc25d77cfbec0482794
+2026-09-12T10:17:01+00:00,metronome-simulator-7dd44bf454-6dqdb,64226dac-a280-4476-a8ee-5711dd1f4662,desktop-worker2,Running,True,true,1,containerd://929c8714198dee4ca842a08edc0e7676b7ea4e2a249fadc25d77cfbec0482794
+2026-09-12T10:17:16+00:00,metronome-simulator-7dd44bf454-6dqdb,64226dac-a280-4476-a8ee-5711dd1f4662,desktop-worker2,Running,True,true,1,containerd://929c8714198dee4ca842a08edc0e7676b7ea4e2a249fadc25d77cfbec0482794
+2026-09-12T10:17:31+00:00,metronome-simulator-7dd44bf454-6dqdb,64226dac-a280-4476-a8ee-5711dd1f4662,desktop-worker2,Running,True,true,1,containerd://929c8714198dee4ca842a08edc0e7676b7ea4e2a249fadc25d77cfbec0482794
+2026-09-12T10:17:46+00:00,metronome-simulator-7dd44bf454-6dqdb,64226dac-a280-4476-a8ee-5711dd1f4662,desktop-worker2,Running,True,true,1,containerd://929c8714198dee4ca842a08edc0e7676b7ea4e2a249fadc25d77cfbec0482794
+2026-09-12T10:18:01+00:00,metronome-simulator-7dd44bf454-6dqdb,64226dac-a280-4476-a8ee-5711dd1f4662,desktop-worker2,Running,True,true,1,containerd://929c8714198dee4ca842a08edc0e7676b7ea4e2a249fadc25d77cfbec0482794
+2026-09-12T10:18:16+00:00,metronome-simulator-7dd44bf454-6dqdb,64226dac-a280-4476-a8ee-5711dd1f4662,desktop-worker2,Running,True,true,1,containerd://929c8714198dee4ca842a08edc0e7676b7ea4e2a249fadc25d77cfbec0482794
