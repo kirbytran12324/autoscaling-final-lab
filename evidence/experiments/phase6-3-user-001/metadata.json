@@ -1,0 +1,87 @@
+{
+  "schemaVersion": "2",
+  "experimentId": "phase6-3-user-001",
+  "profile": "load",
+  "captureStartedAt": "2026-09-12T10:27:46+00:00",
+  "captureDurationSeconds": 240,
+  "sampleIntervalSeconds": 15,
+  "source": {
+    "gitRevision": "ad3dbd9b8f3286b93295af7551fd28cce4714ce9",
+    "worktreeDirty": false,
+    "dirtyWorktreeOverride": false
+  },
+  "locustUiLabels": {
+    "users": 3,
+    "spawnRate": 3,
+    "runSeconds": 180,
+    "metadataOnly": true,
+    "notice": "These values describe the intended Locust UI settings; this script does not configure Locust."
+  },
+  "simulator": {
+    "namespace": "autoscaling-lab",
+    "deployment": "metronome-simulator",
+    "deploymentUid": "c7846d60-3603-4085-9345-3916f54bcf97",
+    "deploymentGeneration": 5,
+    "deploymentIdentitySpecSha256": "5e0d134c1e3b286c7678078c8fd3dbc85bf3af41db03734739053e3035c8b73d",
+    "replicasAtPreflight": 1,
+    "container": {
+      "name": "simulator",
+      "image": "metronome-simulator:phase5",
+      "resources": {
+        "limits": {
+          "cpu": "500m",
+          "memory": "512Mi"
+        },
+        "requests": {
+          "cpu": "100m",
+          "memory": "128Mi"
+        }
+      }
+    },
+    "runningPodAtPreflight": {
+      "name": "metronome-simulator-7dd44bf454-6dqdb",
+      "uid": "64226dac-a280-4476-a8ee-5711dd1f4662",
+      "node": "desktop-worker2",
+      "image": "docker.io/library/metronome-simulator:phase5",
+      "imageId": "docker.io/library/metronome-simulator@sha256:6bbff8424cceed9e6879aa3c2f6e8840c104e8f5284494cbe938770ff15b37a9",
+      "containerId": "containerd://929c8714198dee4ca842a08edc0e7676b7ea4e2a249fadc25d77cfbec0482794",
+      "restartCount": 1
+    }
+  },
+  "locust": {
+    "namespace": "load-testing",
+    "deployment": "metronome-load-test",
+    "deploymentUid": "565e5d18-f147-4d4e-9962-5f7d57cd1971",
+    "deploymentGeneration": 2,
+    "deploymentIdentitySpecSha256": "2a050af961d07f0a85de5f6d38e145efe7f14e7c1719036df9ec25c5b5a90368",
+    "replicasAtPreflight": 1,
+    "container": {
+      "name": "locust",
+      "image": "metronome-load-test:0.1.1",
+      "resources": {
+        "limits": {
+          "cpu": "1",
+          "memory": "512Mi"
+        },
+        "requests": {
+          "cpu": "100m",
+          "memory": "128Mi"
+        }
+      }
+    },
+    "runningPodAtPreflight": {
+      "name": "metronome-load-test-7c6bb54d47-nbj96",
+      "uid": "20f68786-55ea-47ea-a54c-bf14f228a581",
+      "node": "desktop-worker3",
+      "image": "docker.io/library/metronome-load-test:0.1.1",
+      "imageId": "docker.io/library/metronome-load-test@sha256:d93f8fdd41ebca539477fd840bcc7948ba96ca3422f9566a25cdc125f7d018b2",
+      "containerId": "containerd://dec23eeaf7ed427cbb448895dcbe05d2d09fe43c36958fce332a733d1aedcf9a",
+      "restartCount": 10
+    }
+  },
+  "throttlingCounters": {
+    "cumulative": true,
+    "resetOnContainerRestart": true,
+    "analysisRequirement": "Calculate deltas only within the same containerId and account for restarts."
+  }
+}
