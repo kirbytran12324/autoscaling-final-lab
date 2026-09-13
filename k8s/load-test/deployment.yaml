@@ -20,7 +20,7 @@ spec:
             type: RuntimeDefault
       containers:
         - name: locust
-          image: metronome-load-test:0.1.1
+          image: metronome-load-test:0.1.2
           imagePullPolicy: IfNotPresent
           env:
             - name: LOCUST_HOST

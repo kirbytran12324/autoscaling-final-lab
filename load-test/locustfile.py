@@ -7,13 +7,14 @@ User count and spawn rate remain Locust settings so the same workload can be
 used for the low-, moderate-, and high-concurrency phases.
 """
 
+from collections import Counter
 from itertools import count
 import logging
 import os
 import socket
 from uuid import uuid4
 
-from locust import HttpUser, constant, task
+from locust import HttpUser, constant, events, task
 
 SPECIES_PAIRS = (
     ("Blissey", "Shuckle"),
@@ -36,7 +37,7 @@ BATTLE_REQUEST_TIMEOUT_SECONDS = float(
 )
 
 _request_numbers = count(1)
-_observed_servers: set[str] = set()
+_served_by_counts: Counter[str] = Counter()
 _match_id_prefix = "-".join(
     (
         os.getenv("LOAD_TEST_RUN_ID") or uuid4().hex,
@@ -44,6 +45,24 @@ _match_id_prefix = "-".join(
         str(os.getpid()),
     )
 )
+
+
+@events.test_start.add_listener
+def reset_served_by_counts(environment, **kwargs) -> None:
+    """Start each Locust run with an empty per-server distribution."""
+
+    _served_by_counts.clear()
+
+
+@events.test_stop.add_listener
+def print_served_by_distribution(environment, **kwargs) -> None:
+    """Log a stable summary that can be compared with the Ready Pod set."""
+
+    distribution = ", ".join(
+        f"{served_by}={_served_by_counts[served_by]}"
+        for served_by in sorted(_served_by_counts)
+    )
+    logging.info("servedBy distribution: %s", distribution or "(none)")
 
 
 def seed_from_counter(request_number: int) -> list[int]:
@@ -85,6 +104,7 @@ class BattleUser(HttpUser):
             json=payload,
             name="/v1/battles",
             catch_response=True,
+            headers={"Connection": "close"},
             timeout=BATTLE_REQUEST_TIMEOUT_SECONDS,
         ) as response:
             if response.error is not None:
@@ -125,12 +145,11 @@ class BattleUser(HttpUser):
                 return
 
             served_by = result["servedBy"]
-            if not isinstance(served_by, str) or not served_by:
+            if not isinstance(served_by, str) or not served_by.strip():
                 response.failure(
                     "HTTP 200 response field servedBy was not a non-empty string"
                 )
                 return
 
-            if served_by not in _observed_servers:
-                _observed_servers.add(served_by)
-                logging.info("Observed simulator servedBy=%s", served_by)
+            response.success()
+            _served_by_counts[served_by] += 1
