@@ -241,12 +241,94 @@ function renderRestart(evidence) {
 function renderAutoscaling(evidence) {
   if (evidence.status === 'absent') {
     return `<section id="autoscaling"><h2>Autoscaling evidence</h2>` +
-      `<div class="placeholder">Pending Phase 7 — no HPA acceptance evidence was supplied for this report generation.</div></section>`;
+      `<div class="placeholder">Phase 7 HPA evidence was not supplied for this report generation.</div></section>`;
   }
   if (evidence.status === 'incompatible') {
     return `<section id="autoscaling"><h2>Autoscaling evidence</h2>` +
       `<div class="placeholder">Supplied autoscaling evidence is incompatible: ` +
       `${escapeHtml(evidence.reason)}. No chart was rendered.</div></section>`;
+  }
+  if (evidence.format === 'phase7-recorder-v1') {
+    const sequence = evidence.transitions
+      .map(transition => transition.desiredReplicas)
+      .join(' → ');
+    const transitionRows = evidence.transitions.map(transition =>
+      `<tr><td>${escapeHtml(transition.timestamp)}</td>` +
+      `<td>${transition.desiredReplicas}</td>` +
+      `<td>${transition.readyReplicas === null ? 'Unavailable' : transition.readyReplicas}</td></tr>`
+    ).join('');
+    const distributionRows = evidence.distribution.map(entry =>
+      `<tr><td>${escapeHtml(entry.pod)}</td><td>${entry.count}</td></tr>`
+    ).join('');
+    const configuration = evidence.configuration;
+    const locust = evidence.locust;
+    return `<section id="autoscaling"><h2>Phase 7 HPA acceptance</h2>` +
+      `<div class="callout verdict-pass"><strong>Phase 7 HPA experiment: ` +
+      `${escapeHtml(evidence.verdict)}</strong><br>` +
+      `CPU load scaled the simulator from one to six Ready replicas, all six ` +
+      `served successful requests, and the Deployment returned to one replica.</div>` +
+      `<div class="metric-grid">${[
+        metric('Experiment', evidence.experimentId),
+        metric('Desired replica sequence', sequence),
+        metric('Load to six Ready', `${evidence.timing.scaleOutSeconds} seconds`),
+        metric('Load stop to first scale-in', `${evidence.timing.firstScaleInSeconds} seconds`),
+        metric('Load stop to one Ready', `${evidence.timing.returnToMinimumSeconds} seconds`),
+        metric('Requests', locust.requests.toLocaleString('en-US')),
+        metric('Failures', locust.failures, `${(locust.failureRate * 100).toFixed(2)}%`),
+        metric('Average RPS', locust.averageRps.toFixed(2),
+          'Includes one-Pod start and live scale-out'),
+        metric('Average response time', `${locust.averageResponseTimeMs.toFixed(2)} ms`),
+        metric('Median response time', `${locust.medianResponseTimeMs} ms`),
+        metric('p95 / p99 response time',
+          `${locust.p95ResponseTimeMs} / ${locust.p99ResponseTimeMs} ms`),
+        metric('Maximum response time', `${locust.maximumResponseTimeMs} ms`),
+        metric('Capture samples', evidence.integrity.sampleCount,
+          `${evidence.integrity.failedSampleCount} failed`),
+        metric('Final replicas', evidence.integrity.finalReadyReplicas,
+          `${evidence.integrity.finalDesiredReplicas} desired`),
+        metric('Simulator restarts', evidence.integrity.simulatorRestarts),
+      ].join('')}</div>` +
+      `<h3>Accepted configuration</h3><div class="table-wrap"><table><tbody>` +
+      `<tr><th>Simulator CPU</th><td>${escapeHtml(configuration.cpuRequest)} request / ` +
+      `${escapeHtml(configuration.cpuLimit)} limit</td></tr>` +
+      `<tr><th>Simulator memory</th><td>${escapeHtml(configuration.memoryRequest)} request / ` +
+      `${escapeHtml(configuration.memoryLimit)} limit</td></tr>` +
+      `<tr><th>HPA CPU target</th><td>${configuration.targetUtilization}%` +
+      (configuration.effectiveTargetMillicores === null
+        ? ''
+        : ` (approximately ${configuration.effectiveTargetMillicores}m per Pod)`) +
+      `</td></tr>` +
+      `<tr><th>Replica range</th><td>${configuration.minReplicas}–` +
+      `${configuration.maxReplicas}</td></tr>` +
+      `<tr><th>Stabilization</th><td>${configuration.scaleUpStabilizationSeconds}s up / ` +
+      `${configuration.scaleDownStabilizationSeconds}s down</td></tr>` +
+      `<tr><th>Locust profile</th><td>${configuration.locustUsers} users, ` +
+      `${configuration.locustSpawnRate}/s spawn rate, ` +
+      `${configuration.locustRunSeconds}s load</td></tr></tbody></table></div>` +
+      `<h3>Scaling timeline</h3><div class="table-wrap"><table><thead><tr>` +
+      `<th>Observed at</th><th>Desired</th><th>Ready at next Deployment sample</th>` +
+      `</tr></thead><tbody>${transitionRows}</tbody></table></div>` +
+      `<p>Offline aligned timeline from ${escapeHtml(evidence.source)}. Each chart ` +
+      `series uses its own normalized scale; the validated raw values remain embedded.</p>` +
+      `<canvas id="autoscaling-chart" width="1200" height="420" ` +
+      `aria-label="Phase 7 autoscaling timeline chart"></canvas>` +
+      `<div class="legend"><span class="replicas">Ready replicas</span>` +
+      `<span class="rate">Request rate</span><span class="latency">p95 latency</span>` +
+      `<span class="failures">Failures per second</span></div>` +
+      `<h3>Successful requests by simulator Pod</h3>` +
+      `<div class="table-wrap"><table><thead><tr><th>servedBy</th><th>Requests</th>` +
+      `</tr></thead><tbody>${distributionRows}` +
+      `<tr><th>Total</th><th>${locust.requests}</th></tr></tbody></table></div>` +
+      `<p>Every Ready backend served traffic. Distribution was uneven because the ` +
+      `Kubernetes Service routes connections rather than scheduling requests in strict ` +
+      `round-robin order. Average RPS includes the initial one-Pod period and live ` +
+      `scale-out, so it is not a six-Pod capacity measurement.</p>` +
+      `<div class="callout"><strong>Evidence boundary.</strong> The recorder intentionally ` +
+      `did not judge acceptance. This report validated the complete capture, zero failed ` +
+      `samples, zero Locust failures, zero simulator restarts, scale-out, Ready endpoint ` +
+      `membership, traffic across every replica, return to one, and final configuration ` +
+      `validation. This local single experiment does not establish production capacity, ` +
+      `availability, or statistical confidence.</div></section>`;
   }
   return `<section id="autoscaling"><h2>Autoscaling evidence</h2>` +
     `<p>Offline aligned timeline from ${escapeHtml(evidence.source)}. Each series uses its own normalized scale; raw values remain embedded in the report.</p>` +
@@ -314,7 +396,7 @@ function renderMetadata(data, generatedAt) {
 }
 
 const CSS = `
-:root{color-scheme:dark;--bg:#09111f;--panel:#111d30;--panel2:#16243a;--ink:#e8eef8;--muted:#9cadc4;--accent:#62d6c5;--gold:#f3c969;--line:#2a3b55;--danger:#ef7d8d}*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 15% 0,#18304d 0,transparent 35%),var(--bg);color:var(--ink);font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}header,main,footer{max-width:1440px;margin:auto;padding:24px}header{padding-top:54px}h1{font-size:clamp(2rem,5vw,4.5rem);line-height:1;margin:.2em 0}h1 span{color:var(--accent)}h2{margin:0 0 18px;font-size:1.65rem}h3{margin:22px 0 8px}p{color:var(--muted)}nav{display:flex;flex-wrap:wrap;gap:8px;margin-top:24px}nav a{color:var(--ink);text-decoration:none;background:var(--panel);border:1px solid var(--line);padding:7px 11px;border-radius:99px}section{background:rgba(17,29,48,.94);border:1px solid var(--line);border-radius:16px;padding:24px;margin:18px 0;box-shadow:0 16px 48px #0004}.metric-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px}.metric{background:var(--panel2);border-left:3px solid var(--accent);padding:13px;border-radius:8px;min-width:0}.metric span,.metric small{display:block;color:var(--muted)}.metric strong{display:block;font-size:1.08rem;overflow-wrap:anywhere}.metric small{font-size:.78rem}.callout,.placeholder{margin-top:18px;padding:16px;border-radius:9px;background:#0a1526;border:1px solid var(--line)}.placeholder{border-style:dashed;color:var(--muted)}code{font:12px ui-monospace,SFMono-Regular,Consolas,monospace;overflow-wrap:anywhere;color:#bbf4e9}.table-wrap{overflow:auto}table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}th,td{border-bottom:1px solid var(--line);padding:8px 10px;text-align:left;white-space:nowrap}th{color:var(--accent);position:sticky;top:0;background:var(--panel);z-index:1}tr.advancing{background:#163a37}.cutoff-row td{border-bottom:3px solid var(--gold)}details.series{background:#0c1728;border:1px solid var(--line);border-radius:9px;margin:8px 0;padding:10px}summary{cursor:pointer;display:grid;grid-template-columns:160px 1fr 1fr;gap:12px}summary strong{color:var(--gold)}.champion{display:flex;flex-direction:column;align-items:center;text-align:center;padding:24px;margin:10px 0 24px;background:linear-gradient(130deg,#473b17,#182943);border-radius:14px}.champion strong{font-size:2.4rem;color:var(--gold)}.champion small{color:var(--muted)}.split{display:grid;grid-template-columns:minmax(240px,1fr) minmax(0,2fr);gap:20px}.filters{display:flex;gap:12px;flex-wrap:wrap}.filters label{color:var(--muted)}input,select,button{display:block;margin-top:5px;background:#081321;color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:8px}th[data-sort]{cursor:pointer}.pager{display:flex;justify-content:center;align-items:center;gap:16px;margin-top:14px}.pager span{min-width:100px;text-align:center}.note{font-size:.85rem}dl{display:grid;grid-template-columns:180px 1fr;gap:8px 20px}dt{font-weight:700;color:var(--accent)}dd{margin:0;color:var(--muted)}canvas{width:100%;height:auto;background:#091525;border:1px solid var(--line);border-radius:8px}.legend{display:flex;gap:22px;flex-wrap:wrap;margin-top:10px}.legend span:before{content:"";display:inline-block;width:18px;height:3px;margin:0 6px 3px 0;background:currentColor}.replicas{color:#62d6c5}.rate{color:#f3c969}.latency{color:#9c8cff}.failures{color:#ef7d8d}footer{color:var(--muted);text-align:center}@media(max-width:760px){header,main{padding:16px}.split{grid-template-columns:1fr}summary{grid-template-columns:1fr}dl{grid-template-columns:1fr}section{padding:16px}}`;
+:root{color-scheme:dark;--bg:#09111f;--panel:#111d30;--panel2:#16243a;--ink:#e8eef8;--muted:#9cadc4;--accent:#62d6c5;--gold:#f3c969;--line:#2a3b55;--danger:#ef7d8d}*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 15% 0,#18304d 0,transparent 35%),var(--bg);color:var(--ink);font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}header,main,footer{max-width:1440px;margin:auto;padding:24px}header{padding-top:54px}h1{font-size:clamp(2rem,5vw,4.5rem);line-height:1;margin:.2em 0}h1 span{color:var(--accent)}h2{margin:0 0 18px;font-size:1.65rem}h3{margin:22px 0 8px}p{color:var(--muted)}nav{display:flex;flex-wrap:wrap;gap:8px;margin-top:24px}nav a{color:var(--ink);text-decoration:none;background:var(--panel);border:1px solid var(--line);padding:7px 11px;border-radius:99px}section{background:rgba(17,29,48,.94);border:1px solid var(--line);border-radius:16px;padding:24px;margin:18px 0;box-shadow:0 16px 48px #0004}.metric-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px}.metric{background:var(--panel2);border-left:3px solid var(--accent);padding:13px;border-radius:8px;min-width:0}.metric span,.metric small{display:block;color:var(--muted)}.metric strong{display:block;font-size:1.08rem;overflow-wrap:anywhere}.metric small{font-size:.78rem}.callout,.placeholder{margin-top:18px;padding:16px;border-radius:9px;background:#0a1526;border:1px solid var(--line)}.verdict-pass{border-color:var(--accent);background:#102b2a}.placeholder{border-style:dashed;color:var(--muted)}code{font:12px ui-monospace,SFMono-Regular,Consolas,monospace;overflow-wrap:anywhere;color:#bbf4e9}.table-wrap{overflow:auto}table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}th,td{border-bottom:1px solid var(--line);padding:8px 10px;text-align:left;white-space:nowrap}th{color:var(--accent);position:sticky;top:0;background:var(--panel);z-index:1}tr.advancing{background:#163a37}.cutoff-row td{border-bottom:3px solid var(--gold)}details.series{background:#0c1728;border:1px solid var(--line);border-radius:9px;margin:8px 0;padding:10px}summary{cursor:pointer;display:grid;grid-template-columns:160px 1fr 1fr;gap:12px}summary strong{color:var(--gold)}.champion{display:flex;flex-direction:column;align-items:center;text-align:center;padding:24px;margin:10px 0 24px;background:linear-gradient(130deg,#473b17,#182943);border-radius:14px}.champion strong{font-size:2.4rem;color:var(--gold)}.champion small{color:var(--muted)}.split{display:grid;grid-template-columns:minmax(240px,1fr) minmax(0,2fr);gap:20px}.filters{display:flex;gap:12px;flex-wrap:wrap}.filters label{color:var(--muted)}input,select,button{display:block;margin-top:5px;background:#081321;color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:8px}th[data-sort]{cursor:pointer}.pager{display:flex;justify-content:center;align-items:center;gap:16px;margin-top:14px}.pager span{min-width:100px;text-align:center}.note{font-size:.85rem}dl{display:grid;grid-template-columns:180px 1fr;gap:8px 20px}dt{font-weight:700;color:var(--accent)}dd{margin:0;color:var(--muted)}canvas{width:100%;height:auto;background:#091525;border:1px solid var(--line);border-radius:8px}.legend{display:flex;gap:22px;flex-wrap:wrap;margin-top:10px}.legend span:before{content:"";display:inline-block;width:18px;height:3px;margin:0 6px 3px 0;background:currentColor}.replicas{color:#62d6c5}.rate{color:#f3c969}.latency{color:#9c8cff}.failures{color:#ef7d8d}footer{color:var(--muted);text-align:center}@media(max-width:760px){header,main{padding:16px}.split{grid-template-columns:1fr}summary{grid-template-columns:1fr}dl{grid-template-columns:1fr}section{padding:16px}}`;
 
 const SCRIPT = `
 'use strict';

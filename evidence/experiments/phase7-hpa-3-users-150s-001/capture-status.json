@@ -1,0 +1,22 @@
+{
+  "schemaVersion": "1",
+  "experimentId": "phase7-hpa-3-users-150s-001",
+  "status": "complete",
+  "startedAt": "2026-09-13T15:51:26+00:00",
+  "endedAt": "2026-09-13T16:01:28+00:00",
+  "exitCode": 0,
+  "sampleCount": 40,
+  "successfulSampleCount": 40,
+  "failedSampleCount": 0,
+  "finalValidation": "ok",
+  "finalArtifactCollection": "ok",
+  "interruptionSignal": null,
+  "observations": {
+    "maximumDesiredReplicas": 6,
+    "maximumReadyReplicas": 6,
+    "finalReplicaCount": 1,
+    "finalDesiredReplicas": 1,
+    "experimentAcceptanceEvaluated": false,
+    "note": "Collection completion does not establish experiment acceptance. Evaluate scaling and service results separately."
+  }
+}

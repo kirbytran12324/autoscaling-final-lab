@@ -25,7 +25,8 @@ RPS (+156%), average latency fell from 49.3 to 19.2 ms (-61%), and p95 latency
 fell from 110 to 36 ms (-67%). Failures and restarts remained zero, peak memory
 stayed stable at 180Mi, and throttled periods fell from 98.3% to 17.0%. The
 remaining throttling confirms that one core is still a real ceiling; Phase 7
-will test HPA scale-out and scale-in from the `500m` request baseline.
+subsequently validated HPA scale-out and scale-in from the `500m` request
+baseline.
 
 Phase 6 evidence directories:
 
@@ -97,6 +98,15 @@ same container ID.
 
 ## Phase 7 HPA experiment captures
 
+Phase 7 is complete. The accepted
+[`phase7-hpa-3-users-150s-001` experiment](docs/phase7-hpa-autoscaling.md)
+used a 70% CPU target, a one-to-six replica range, and a 150-second scale-down
+stabilization window. Under three Locust users, the simulator followed
+`1 → 2 → 3 → 5 → 6 → 4 → 1`; all 13,033 requests succeeded, every Ready replica
+served traffic, no simulator container restarted, and the Deployment returned
+to one Ready replica. **Phase 7 HPA experiment: PASS.** Phases 8–10 remain
+pending.
+
 `scripts/capture-hpa-experiment.sh` records the simulator HPA, Deployment,
 Pods, CPU and memory samples, and Service EndpointSlices on a fixed schedule.
 It also saves configuration snapshots, events, and the Locust log. The script
@@ -106,18 +116,18 @@ labels for the intended manual UI settings; they do not control Locust.
 
 Acceptance captures require a clean, committed worktree and a unique output
 path that does not already exist. `ALLOW_DIRTY_WORKTREE=1` is available only
-for development smoke tests and is recorded. A typical capture that includes
-the five-minute HPA scale-down stabilization period is:
+for development smoke tests and is recorded. A future reproduction using the
+accepted 150-second scale-down configuration can use:
 
 ```sh
-EXPERIMENT_ID=phase7-hpa-3-users-001 \
+EXPERIMENT_ID=phase7-hpa-reproduction-001 \
 EVIDENCE_LOCUST_USERS=3 \
 EVIDENCE_LOCUST_SPAWN_RATE=1 \
 EVIDENCE_LOCUST_RUN_SECONDS=180 \
 CAPTURE_DURATION_SECONDS=600 \
 SAMPLE_INTERVAL_SECONDS=15 \
 ./scripts/capture-hpa-experiment.sh \
-  evidence/experiments/phase7-hpa-3-users-001
+  evidence/experiments/phase7-hpa-reproduction-001
 ```
 
 Run an experiment in this exact order:
@@ -172,10 +182,17 @@ npm run report
 ```
 
 Restart evidence must contain the current harness `summary.txt` and
-`checkpoint-before-interruption.json` for the selected run. Autoscaling
-evidence may contain a compatible `autoscaling-timeline.csv` with timestamp,
-replica, request-rate, p95-latency, and failure columns. When optional evidence
-is absent, the report shows explicit placeholders and does not invent values.
+`checkpoint-before-interruption.json` for the selected run. For the accepted
+Phase 7 view, set `REPORT_AUTOSCALING_EVIDENCE_DIR` to the recorder directory
+containing `capture-status.json`, `metadata.json`, the HPA/replica/Pod/endpoint
+and sample-status CSVs, `locust.log`, and the Locust HTML report. The report
+validates collection status, sample counts, scale-out and return to one,
+restart counts, Locust totals, and `servedBy` membership before rendering the
+accepted timeline and results. Incomplete or conflicting Phase 7 evidence is
+shown as incompatible rather than partially rendered. The earlier compatible
+`autoscaling-timeline.csv` format remains supported for generic timelines.
+When optional evidence is absent, the report shows explicit placeholders and
+does not invent values.
 
 The resulting HTML is self-contained and can be opened through `file://`; it
 uses no CDN, external font, stylesheet, script, framework, or network request.

@@ -1,0 +1,330 @@
+{
+    "apiVersion": "v1",
+    "items": [
+        {
+            "apiVersion": "v1",
+            "kind": "Pod",
+            "metadata": {
+                "creationTimestamp": "2026-09-13T10:25:10Z",
+                "generateName": "metronome-load-test-74c4fb6f68-",
+                "generation": 1,
+                "labels": {
+                    "app": "metronome-load-test",
+                    "pod-template-hash": "74c4fb6f68"
+                },
+                "name": "metronome-load-test-74c4fb6f68-47xbx",
+                "namespace": "load-testing",
+                "ownerReferences": [
+                    {
+                        "apiVersion": "apps/v1",
+                        "blockOwnerDeletion": true,
+                        "controller": true,
+                        "kind": "ReplicaSet",
+                        "name": "metronome-load-test-74c4fb6f68",
+                        "uid": "42285794-abb1-4b2e-a605-6f475aadb0fc"
+                    }
+                ],
+                "resourceVersion": "448855",
+                "uid": "93f322d0-9c0a-46e6-86f3-a384c3905ae8"
+            },
+            "spec": {
+                "containers": [
+                    {
+                        "args": [
+                            "-f",
+                            "/home/locust/locustfile.py",
+                            "--web-host",
+                            "0.0.0.0"
+                        ],
+                        "env": [
+                            {
+                                "name": "LOCUST_HOST",
+                                "value": "http://metronome-simulator.autoscaling-lab.svc.cluster.local"
+                            },
+                            {
+                                "name": "BATTLE_REQUEST_TIMEOUT_SECONDS",
+                                "value": "30"
+                            }
+                        ],
+                        "image": "metronome-load-test:0.1.2",
+                        "imagePullPolicy": "IfNotPresent",
+                        "livenessProbe": {
+                            "failureThreshold": 3,
+                            "httpGet": {
+                                "path": "/",
+                                "port": "web",
+                                "scheme": "HTTP"
+                            },
+                            "periodSeconds": 10,
+                            "successThreshold": 1,
+                            "timeoutSeconds": 1
+                        },
+                        "name": "locust",
+                        "ports": [
+                            {
+                                "containerPort": 8089,
+                                "name": "web",
+                                "protocol": "TCP"
+                            }
+                        ],
+                        "readinessProbe": {
+                            "failureThreshold": 3,
+                            "httpGet": {
+                                "path": "/",
+                                "port": "web",
+                                "scheme": "HTTP"
+                            },
+                            "periodSeconds": 10,
+                            "successThreshold": 1,
+                            "timeoutSeconds": 1
+                        },
+                        "resources": {
+                            "limits": {
+                                "cpu": "1",
+                                "memory": "512Mi"
+                            },
+                            "requests": {
+                                "cpu": "100m",
+                                "memory": "128Mi"
+                            }
+                        },
+                        "securityContext": {
+                            "allowPrivilegeEscalation": false,
+                            "capabilities": {
+                                "drop": [
+                                    "ALL"
+                                ]
+                            },
+                            "readOnlyRootFilesystem": true
+                        },
+                        "startupProbe": {
+                            "failureThreshold": 30,
+                            "httpGet": {
+                                "path": "/",
+                                "port": "web",
+                                "scheme": "HTTP"
+                            },
+                            "periodSeconds": 10,
+                            "successThreshold": 1,
+                            "timeoutSeconds": 1
+                        },
+                        "terminationMessagePath": "/dev/termination-log",
+                        "terminationMessagePolicy": "File",
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/tmp",
+                                "name": "tmp"
+                            },
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-w9ws2",
+                                "readOnly": true
+                            }
+                        ]
+                    }
+                ],
+                "dnsPolicy": "ClusterFirst",
+                "enableServiceLinks": true,
+                "nodeName": "desktop-worker3",
+                "preemptionPolicy": "PreemptLowerPriority",
+                "priority": 0,
+                "restartPolicy": "Always",
+                "schedulerName": "default-scheduler",
+                "securityContext": {
+                    "runAsGroup": 1000,
+                    "runAsNonRoot": true,
+                    "runAsUser": 1000,
+                    "seccompProfile": {
+                        "type": "RuntimeDefault"
+                    }
+                },
+                "serviceAccount": "default",
+                "serviceAccountName": "default",
+                "terminationGracePeriodSeconds": 30,
+                "tolerations": [
+                    {
+                        "effect": "NoExecute",
+                        "key": "node.kubernetes.io/not-ready",
+                        "operator": "Exists",
+                        "tolerationSeconds": 300
+                    },
+                    {
+                        "effect": "NoExecute",
+                        "key": "node.kubernetes.io/unreachable",
+                        "operator": "Exists",
+                        "tolerationSeconds": 300
+                    }
+                ],
+                "volumes": [
+                    {
+                        "emptyDir": {},
+                        "name": "tmp"
+                    },
+                    {
+                        "name": "kube-api-access-w9ws2",
+                        "projected": {
+                            "defaultMode": 420,
+                            "sources": [
+                                {
+                                    "serviceAccountToken": {
+                                        "expirationSeconds": 3607,
+                                        "path": "token"
+                                    }
+                                },
+                                {
+                                    "configMap": {
+                                        "items": [
+                                            {
+                                                "key": "ca.crt",
+                                                "path": "ca.crt"
+                                            }
+                                        ],
+                                        "name": "kube-root-ca.crt"
+                                    }
+                                },
+                                {
+                                    "downwardAPI": {
+                                        "items": [
+                                            {
+                                                "fieldRef": {
+                                                    "apiVersion": "v1",
+                                                    "fieldPath": "metadata.namespace"
+                                                },
+                                                "path": "namespace"
+                                            }
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ]
+            },
+            "status": {
+                "allocatedResources": {
+                    "cpu": "100m",
+                    "memory": "128Mi"
+                },
+                "conditions": [
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-09-13T10:25:11Z",
+                        "observedGeneration": 1,
+                        "status": "True",
+                        "type": "PodReadyToStartContainers"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-09-13T10:25:10Z",
+                        "observedGeneration": 1,
+                        "status": "True",
+                        "type": "Initialized"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-09-13T10:25:21Z",
+                        "observedGeneration": 1,
+                        "status": "True",
+                        "type": "Ready"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-09-13T10:25:21Z",
+                        "observedGeneration": 1,
+                        "status": "True",
+                        "type": "ContainersReady"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-09-13T10:25:10Z",
+                        "observedGeneration": 1,
+                        "status": "True",
+                        "type": "PodScheduled"
+                    }
+                ],
+                "containerStatuses": [
+                    {
+                        "allocatedResources": {
+                            "cpu": "100m",
+                            "memory": "128Mi"
+                        },
+                        "containerID": "containerd://ec6eff00daab6262d339a8dd72875a2be52b4b0cdc0d9f3db10099e0fb5db55a",
+                        "image": "docker.io/library/metronome-load-test:0.1.2",
+                        "imageID": "docker.io/library/metronome-load-test@sha256:28ba1e6fce82a7bf1f868b57948325b813c5c4b2a9ddee1c357a563609e14968",
+                        "lastState": {},
+                        "name": "locust",
+                        "ready": true,
+                        "resources": {
+                            "limits": {
+                                "cpu": "1",
+                                "memory": "512Mi"
+                            },
+                            "requests": {
+                                "cpu": "100m",
+                                "memory": "128Mi"
+                            }
+                        },
+                        "restartCount": 0,
+                        "started": true,
+                        "state": {
+                            "running": {
+                                "startedAt": "2026-09-13T10:25:11Z"
+                            }
+                        },
+                        "user": {
+                            "linux": {
+                                "gid": 1000,
+                                "supplementalGroups": [
+                                    1000
+                                ],
+                                "uid": 1000
+                            }
+                        },
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/tmp",
+                                "name": "tmp"
+                            },
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-w9ws2",
+                                "readOnly": true,
+                                "recursiveReadOnly": "Disabled"
+                            }
+                        ]
+                    }
+                ],
+                "hostIP": "172.19.0.8",
+                "hostIPs": [
+                    {
+                        "ip": "172.19.0.8"
+                    }
+                ],
+                "observedGeneration": 1,
+                "phase": "Running",
+                "podIP": "10.244.1.4",
+                "podIPs": [
+                    {
+                        "ip": "10.244.1.4"
+                    }
+                ],
+                "qosClass": "Burstable",
+                "resources": {
+                    "limits": {
+                        "cpu": "1",
+                        "memory": "512Mi"
+                    },
+                    "requests": {
+                        "cpu": "79m",
+                        "memory": "128Mi"
+                    }
+                },
+                "startTime": "2026-09-13T10:25:10Z"
+            }
+        }
+    ],
+    "kind": "List",
+    "metadata": {
+        "resourceVersion": ""
+    }
+}

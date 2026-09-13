@@ -122,18 +122,18 @@ selected configuration was approximately:
 909.5m ÷ 500m = 181.9% utilization
 ```
 
-If Phase 7 selects a 70% CPU target, the initial one-replica approximation
-would be:
+The 70% CPU target later accepted in Phase 7 gives this initial one-replica
+approximation:
 
 ```text
 ceil(181.9% ÷ 70%) = approximately 3 replicas
 ```
 
-The 70% value is only a Phase 7 candidate; it is not an accepted target. The
-`500m` request is likewise an HPA-oriented hypothesis. It does not match the
-saturated single-Pod consumption of approximately 910-955m. Phase 7 must
-validate that this denominator and the eventual target produce sensible
-scale-out and scale-in behaviour.
+At the end of Phase 6, the 70% value and `500m` request were an HPA-oriented
+hypothesis rather than an accepted control configuration. The request does not
+match saturated single-Pod consumption of approximately 910-955m. The later
+[Phase 7 acceptance run](phase7-hpa-autoscaling.md) validated this denominator
+and target with scale-out and scale-in evidence.
 
 ## Evidence integrity and limitations
 
@@ -235,5 +235,5 @@ HTML report.
 > The selected configuration removes the severe CPU restriction, increases
 > useful throughput by 156%, reduces p95 latency by 67%, and retains stable
 > memory and Pod health. The CPU limit and memory values are accepted. The
-> 500m CPU request is accepted as the starting HPA baseline and must be
-> validated through Phase 7 scale-out and scale-in testing.
+> 500m CPU request was accepted here as the starting HPA baseline and was
+> subsequently validated through Phase 7 scale-out and scale-in testing.

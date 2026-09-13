@@ -15,7 +15,7 @@ const {after, before, test} = require('node:test');
 
 const {generateReport, atomicWriteText} = require('../src/report');
 const {parseReportConfiguration, runCli} = require('../src/report-cli');
-const {loadRestartEvidence} = require('../src/report-evidence');
+const {loadAutoscalingEvidence, loadRestartEvidence} = require('../src/report-evidence');
 const {runTournament} = require('../src/runner');
 
 const RUN_ID = 'completed-report-fixture';
@@ -101,6 +101,156 @@ async function writeRestartEvidence(directory, summary, checkpoint) {
     JSON.stringify(checkpoint),
     'utf8'
   );
+}
+
+async function writePhase7Evidence(directory, overrides = {}) {
+  const experimentId = 'phase7-test';
+  const captureStatus = {
+    schemaVersion: '1',
+    experimentId,
+    status: 'complete',
+    sampleCount: 40,
+    successfulSampleCount: 40,
+    failedSampleCount: 0,
+    finalValidation: 'ok',
+    finalArtifactCollection: 'ok',
+    observations: {
+      maximumDesiredReplicas: 6,
+      maximumReadyReplicas: 6,
+      finalReplicaCount: 1,
+      finalDesiredReplicas: 1,
+      experimentAcceptanceEvaluated: false,
+    },
+    ...overrides.captureStatus,
+  };
+  const metadata = {
+    schemaVersion: '1',
+    experimentId,
+    inputs: {
+      captureDurationSeconds: 600,
+      sampleIntervalSeconds: 15,
+      evidenceLocustUsers: 3,
+      evidenceLocustSpawnRate: 1,
+      evidenceLocustRunSeconds: 180,
+    },
+    simulator: {
+      deployment: {
+        resourceSettings: {
+          requests: {cpu: '500m', memory: '192Mi'},
+          limits: {cpu: '1', memory: '256Mi'},
+        },
+      },
+      hpa: {startingConfiguration: {
+        scaleTargetRef: {kind: 'Deployment', name: 'metronome-simulator'},
+        minReplicas: 1,
+        maxReplicas: 6,
+        metrics: [{
+          type: 'Resource',
+          resource: {
+            name: 'cpu',
+            target: {type: 'Utilization', averageUtilization: 70},
+          },
+        }],
+        behavior: {
+          scaleUp: {stabilizationWindowSeconds: 0},
+          scaleDown: {stabilizationWindowSeconds: 150},
+        },
+      }},
+    },
+    locust: {
+      runtime: {podUid: 'locust-uid', containerId: 'containerd://locust', restartCount: 0},
+    },
+    ...overrides.metadata,
+  };
+  const timestamps = Array.from({length: 40}, (_, index) =>
+    new Date(Date.parse('2026-09-13T15:51:26Z') + index * 15_000).toISOString()
+  );
+  const desired = timestamps.map((_, index) => {
+    if (index < 4) return 1;
+    if (index === 4) return 2;
+    if (index < 7) return 3;
+    if (index < 10) return 5;
+    if (index < 25) return 6;
+    if (index === 25) return 4;
+    return 1;
+  });
+  const hpaRows = timestamps.map((timestamp, index) =>
+    `${timestamp},70,350m,70,${desired[index]},${desired[index]},ReadyForNewScale`
+  );
+  const replicaRows = timestamps.map((timestamp, index) =>
+    `${timestamp},${desired[index]},${desired[index]},${desired[index]},` +
+    `${desired[index]},${desired[index]},0`
+  );
+  const sampleRows = timestamps.map((timestamp, index) =>
+    `${timestamp},${timestamp},${timestamp},${index + 1},ok,ok,ok,ok,ok,ok`
+  );
+  const podNames = Array.from({length: 6}, (_, index) => `simulator-pod-${index + 1}`);
+  const podRows = podNames.map(pod =>
+    `2026-09-13T15:53:56Z,${pod},uid-${pod},worker,Running,,false,True,true,0,` +
+    `simulator:test,simulator:test,sha256:test,containerd://${pod},500m,180Mi`
+  );
+  const endpointRows = podNames.map((pod, index) =>
+    `2026-09-13T15:53:56Z,slice,10.0.0.${index + 1},${pod},true,true,false`
+  );
+  const distribution = podNames.map((pod, index) =>
+    `${pod}=${index === 0 ? 3 : 2}`
+  ).join(', ');
+  const locust = {
+    start_time: '2026-09-13T15:51:30Z',
+    end_time: '2026-09-13T15:54:30Z',
+    requests_statistics: [{
+      name: 'Aggregated',
+      num_requests: 13,
+      num_failures: 0,
+      total_rps: 72.42,
+      avg_response_time: 41.02,
+      median_response_time: 33,
+      'response_time_percentile_0.95': 95,
+      'response_time_percentile_0.99': 160,
+      max_response_time: 949,
+    }],
+    history: [{
+      time: '2026-09-13T15:53:00Z',
+      current_rps: ['2026-09-13T15:53:00Z', 75],
+      'response_time_percentile_0.95': ['2026-09-13T15:53:00Z', 95],
+      current_fail_per_sec: ['2026-09-13T15:53:00Z', 0],
+    }],
+  };
+  const files = {
+    'capture-status.json': `${JSON.stringify(captureStatus)}\n`,
+    'metadata.json': `${JSON.stringify(metadata)}\n`,
+    'hpa.csv': [
+      'timestamp,current_cpu_utilization,current_cpu_average_value,target_cpu_utilization,current_replicas,desired_replicas,condition_reasons',
+      ...hpaRows,
+      '',
+    ].join('\n'),
+    'replicas.csv': [
+      'timestamp,desired_replicas,current_replicas,updated_replicas,available_replicas,ready_replicas,unavailable_replicas',
+      ...replicaRows,
+      '',
+    ].join('\n'),
+    'pods.csv': [
+      'timestamp,pod_name,pod_uid,node,phase,deletion_timestamp,terminating,pod_ready,container_ready,restart_count,declared_image,runtime_image,runtime_image_id,container_id,cpu,memory',
+      ...podRows,
+      '',
+    ].join('\n'),
+    'endpoints.csv': [
+      'timestamp,endpointslice_name,address,target_pod,ready,serving,terminating',
+      ...endpointRows,
+      '',
+    ].join('\n'),
+    'sample-status.csv': [
+      'scheduled_at,sample_started_at,sample_completed_at,sample_number,status,hpa,deployment,pods,pod_metrics,endpointslices',
+      ...sampleRows,
+      '',
+    ].join('\n'),
+    'locust.log': `servedBy distribution: ${distribution}\n`,
+    'locust_report.html': `<script>window.templateArgs = ${JSON.stringify(locust)}\n` +
+      `window.theme = "dark"</script>`,
+  };
+  await Promise.all(Object.entries(files).map(([name, contents]) =>
+    writeFile(join(directory, name), contents, 'utf8')
+  ));
 }
 
 before(async () => {
@@ -222,7 +372,7 @@ test('absent optional evidence renders explicit placeholders', async t => {
   });
   const html = await readFile(outputPath, 'utf8');
   assert.match(html, /Restart\/resume evidence not supplied\./);
-  assert.match(html, /Pending Phase 7 — no HPA acceptance evidence was supplied/);
+  assert.match(html, /Phase 7 HPA evidence was not supplied/);
   assert.doesNotMatch(html, /id="autoscaling-chart"/);
 });
 
@@ -362,6 +512,80 @@ test('compatible autoscaling evidence renders an offline aligned chart', async t
   assert.doesNotMatch(html, /https?:\/\//);
   assert.match(html, /index\*\(1160\/\(rows\.length-1\|\|1\)\)/);
   assert.doesNotMatch(html, /Math\.max\(1,1160/);
+});
+
+test('complete Phase 7 recorder evidence renders validated HPA acceptance', async t => {
+  const stateRoot = await createFixtureRoot();
+  const evidence = await mkdtemp(join(tmpdir(), 'phase7-evidence-'));
+  t.after(() => Promise.all([
+    rm(stateRoot, {recursive: true, force: true}),
+    rm(evidence, {recursive: true, force: true}),
+  ]));
+  await writePhase7Evidence(evidence);
+
+  const loaded = await loadAutoscalingEvidence(evidence);
+  assert.equal(loaded.status, 'supplied');
+  assert.equal(loaded.verdict, 'PASS');
+  assert.deepEqual(
+    loaded.transitions.map(row => row.desiredReplicas),
+    [1, 2, 3, 5, 6, 4, 1]
+  );
+  assert.equal(loaded.locust.requests, 13);
+  assert.equal(loaded.distribution.length, 6);
+
+  const {outputPath} = await generateReport({
+    stateRoot,
+    runId: RUN_ID,
+    autoscalingEvidenceDirectory: evidence,
+    now: () => GENERATED_AT,
+  });
+  const html = await readFile(outputPath, 'utf8');
+  assert.match(html, /Phase 7 HPA experiment: PASS/);
+  assert.match(html, /1 → 2 → 3 → 5 → 6 → 4 → 1/);
+  assert.match(html, /72\.42/);
+  assert.match(html, /simulator-pod-6/);
+  assert.match(html, /approximately 350m per Pod/);
+  assert.match(html, /192Mi request \/ 256Mi limit/);
+  assert.match(html, /id="autoscaling-chart"/);
+  assert.doesNotMatch(html, /https?:\/\//);
+});
+
+test('incomplete or conflicting Phase 7 recorder evidence is incompatible', async t => {
+  await t.test('missing required artifact', async t => {
+    const evidence = await mkdtemp(join(tmpdir(), 'phase7-incomplete-'));
+    t.after(() => rm(evidence, {recursive: true, force: true}));
+    await writePhase7Evidence(evidence);
+    await rm(join(evidence, 'endpoints.csv'));
+    const loaded = await loadAutoscalingEvidence(evidence);
+    assert.equal(loaded.status, 'incompatible');
+    assert.match(loaded.reason, /endpoints\.csv is missing/);
+  });
+
+  await t.test('servedBy total mismatch', async t => {
+    const evidence = await mkdtemp(join(tmpdir(), 'phase7-conflict-'));
+    t.after(() => rm(evidence, {recursive: true, force: true}));
+    await writePhase7Evidence(evidence);
+    const logPath = join(evidence, 'locust.log');
+    const log = await readFile(logPath, 'utf8');
+    await writeFile(logPath, log.replace('simulator-pod-1=3', 'simulator-pod-1=4'));
+    const loaded = await loadAutoscalingEvidence(evidence);
+    assert.equal(loaded.status, 'incompatible');
+    assert.match(loaded.reason, /request total does not reconcile/);
+  });
+
+  await t.test('non-accepted HPA configuration', async t => {
+    const evidence = await mkdtemp(join(tmpdir(), 'phase7-wrong-config-'));
+    t.after(() => rm(evidence, {recursive: true, force: true}));
+    await writePhase7Evidence(evidence);
+    const metadataPath = join(evidence, 'metadata.json');
+    const metadata = JSON.parse(await readFile(metadataPath, 'utf8'));
+    metadata.simulator.hpa.startingConfiguration.behavior.scaleDown
+      .stabilizationWindowSeconds = 300;
+    await writeFile(metadataPath, `${JSON.stringify(metadata)}\n`);
+    const loaded = await loadAutoscalingEvidence(evidence);
+    assert.equal(loaded.status, 'incompatible');
+    assert.match(loaded.reason, /HPA configuration is incompatible/);
+  });
 });
 
 test('HTML escapes artifact strings, embeds no external resources, and bounds rows', async t => {

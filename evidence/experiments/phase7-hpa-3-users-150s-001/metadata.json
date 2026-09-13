@@ -1,0 +1,182 @@
+{
+  "schemaVersion": "1",
+  "experimentId": "phase7-hpa-3-users-150s-001",
+  "captureStartedAt": "2026-09-13T15:51:26+00:00",
+  "inputs": {
+    "captureDurationSeconds": 600,
+    "sampleIntervalSeconds": 15,
+    "evidenceLocustUsers": 3,
+    "evidenceLocustSpawnRate": 1,
+    "evidenceLocustRunSeconds": 180,
+    "locustValuesAreMetadataOnly": true,
+    "allowDirtyWorktree": false
+  },
+  "source": {
+    "gitRevision": "c0f0405e6b615e0c5bd86d323af669a24187d605",
+    "worktreeDirty": false,
+    "dirtyWorktreeOverride": false
+  },
+  "fingerprints": {
+    "simulatorDeploymentStableIdentitySpecSha256": "259e68ae8abb73e64dfdbaf8da3723518240e25cf524ab699a06b2d4d4a7db54",
+    "simulatorDeploymentExcludedDynamicFields": [
+      "spec.replicas",
+      "metadata.generation"
+    ],
+    "simulatorServiceIdentitySpecSha256": "c20a5ba878cb1c429be9d59cd72cab699d253e74901d368e03923ebb4ba664b9",
+    "simulatorHpaIdentitySpecSha256": "288b99dfa233587dc19f3abf17ed29fedc52c16563688ed1c23b3aff67b6c4a6",
+    "simulatorRuntimeImage": "docker.io/library/metronome-simulator:phase5",
+    "simulatorRuntimeImageId": "docker.io/library/metronome-simulator@sha256:6bbff8424cceed9e6879aa3c2f6e8840c104e8f5284494cbe938770ff15b37a9",
+    "locustDeploymentIdentitySpecSha256": "2068c7b33a77a7d320cb2e84b7b601216f7edca79f95bfaabc1cdc494b8f0c9c",
+    "locustRuntimeIdentity": {
+      "podUid": "93f322d0-9c0a-46e6-86f3-a384c3905ae8",
+      "containerId": "containerd://ec6eff00daab6262d339a8dd72875a2be52b4b0cdc0d9f3db10099e0fb5db55a",
+      "restartCount": 0,
+      "runtimeImage": "docker.io/library/metronome-load-test:0.1.2",
+      "runtimeImageId": "docker.io/library/metronome-load-test@sha256:28ba1e6fce82a7bf1f868b57948325b813c5c4b2a9ddee1c357a563609e14968"
+    }
+  },
+  "simulator": {
+    "namespace": "autoscaling-lab",
+    "deployment": {
+      "name": "metronome-simulator",
+      "uid": "c7846d60-3603-4085-9345-3916f54bcf97",
+      "stableIdentitySpecSha256": "259e68ae8abb73e64dfdbaf8da3723518240e25cf524ab699a06b2d4d4a7db54",
+      "resourceSettings": {
+        "limits": {
+          "cpu": "1",
+          "memory": "256Mi"
+        },
+        "requests": {
+          "cpu": "500m",
+          "memory": "192Mi"
+        }
+      },
+      "declaredImage": "metronome-simulator:phase5"
+    },
+    "service": {
+      "name": "metronome-simulator",
+      "uid": "dc5f4d5b-5236-4a61-b9e4-a5f452e5eea6",
+      "identitySpecSha256": "c20a5ba878cb1c429be9d59cd72cab699d253e74901d368e03923ebb4ba664b9",
+      "spec": {
+        "clusterIP": "10.96.6.139",
+        "clusterIPs": [
+          "10.96.6.139"
+        ],
+        "internalTrafficPolicy": "Cluster",
+        "ipFamilies": [
+          "IPv4"
+        ],
+        "ipFamilyPolicy": "SingleStack",
+        "ports": [
+          {
+            "port": 80,
+            "protocol": "TCP",
+            "targetPort": "http"
+          }
+        ],
+        "selector": {
+          "app": "metronome-simulator"
+        },
+        "sessionAffinity": "None",
+        "type": "ClusterIP"
+      }
+    },
+    "hpa": {
+      "name": "metronome-simulator",
+      "uid": "7708bea0-3c78-4add-9c01-a785952735c7",
+      "identitySpecSha256": "288b99dfa233587dc19f3abf17ed29fedc52c16563688ed1c23b3aff67b6c4a6",
+      "startingConfiguration": {
+        "behavior": {
+          "scaleDown": {
+            "policies": [
+              {
+                "periodSeconds": 15,
+                "type": "Percent",
+                "value": 100
+              }
+            ],
+            "selectPolicy": "Max",
+            "stabilizationWindowSeconds": 150
+          },
+          "scaleUp": {
+            "policies": [
+              {
+                "periodSeconds": 15,
+                "type": "Percent",
+                "value": 100
+              },
+              {
+                "periodSeconds": 15,
+                "type": "Pods",
+                "value": 4
+              }
+            ],
+            "selectPolicy": "Max",
+            "stabilizationWindowSeconds": 0
+          }
+        },
+        "maxReplicas": 6,
+        "metrics": [
+          {
+            "resource": {
+              "name": "cpu",
+              "target": {
+                "averageUtilization": 70,
+                "type": "Utilization"
+              }
+            },
+            "type": "Resource"
+          }
+        ],
+        "minReplicas": 1,
+        "scaleTargetRef": {
+          "apiVersion": "apps/v1",
+          "kind": "Deployment",
+          "name": "metronome-simulator"
+        }
+      }
+    },
+    "startingPod": {
+      "name": "metronome-simulator-58f995fbfb-7l7fz",
+      "uid": "fd09a451-5e3b-49f2-8703-b3359c003bf6",
+      "node": "desktop-worker2",
+      "containerId": "containerd://61b64bc136965ca9eab7eb670d7470a21cf3a7ecdad7866b95d7f352274858bd",
+      "runtimeImage": "docker.io/library/metronome-simulator:phase5",
+      "runtimeImageId": "docker.io/library/metronome-simulator@sha256:6bbff8424cceed9e6879aa3c2f6e8840c104e8f5284494cbe938770ff15b37a9",
+      "restartCount": 0
+    }
+  },
+  "locust": {
+    "namespace": "load-testing",
+    "deployment": {
+      "name": "metronome-load-test",
+      "uid": "565e5d18-f147-4d4e-9962-5f7d57cd1971",
+      "identitySpecSha256": "2068c7b33a77a7d320cb2e84b7b601216f7edca79f95bfaabc1cdc494b8f0c9c",
+      "resourceSettings": {
+        "limits": {
+          "cpu": "1",
+          "memory": "512Mi"
+        },
+        "requests": {
+          "cpu": "100m",
+          "memory": "128Mi"
+        }
+      },
+      "declaredImage": "metronome-load-test:0.1.2"
+    },
+    "runtime": {
+      "podName": "metronome-load-test-74c4fb6f68-47xbx",
+      "podUid": "93f322d0-9c0a-46e6-86f3-a384c3905ae8",
+      "containerId": "containerd://ec6eff00daab6262d339a8dd72875a2be52b4b0cdc0d9f3db10099e0fb5db55a",
+      "runtimeImage": "docker.io/library/metronome-load-test:0.1.2",
+      "runtimeImageId": "docker.io/library/metronome-load-test@sha256:28ba1e6fce82a7bf1f868b57948325b813c5c4b2a9ddee1c357a563609e14968",
+      "restartCount": 0
+    },
+    "uiLabels": {
+      "users": 3,
+      "spawnRate": 1,
+      "runSeconds": 180,
+      "metadataOnly": true
+    }
+  }
+}

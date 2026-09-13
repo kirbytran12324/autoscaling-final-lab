@@ -1,8 +1,8 @@
 # Metronome Tournament Autoscaling Lab — Technical Design
 
-Status: active implementation design, updated 2026-09-12.
-Phase 6 resource sizing is complete. HPA values, VPA comparison, and later
-acceptance results remain pending.
+Status: active implementation design, updated 2026-09-13.
+Phase 7 HPA acceptance is complete. VPA comparison, capacity diagnosis, the
+full tournament, and the final audit package remain pending.
 
 ## Environment
 
@@ -22,6 +22,12 @@ The system consists of:
 - a report command that generates a self-contained offline HTML report.
 
 Only the simulator Deployment is an HPA target. The runner is a single coordinator, and Locust keeps a fixed replica count. The core lab system does not require a database, message queue, or external Pokémon Showdown server.
+
+The accepted HPA uses a 70% CPU-utilization target against the simulator's
+`500m` request, one minimum replica, six maximum replicas, no scale-up
+stabilization, and a 150-second scale-down stabilization window. The canonical
+[Phase 7 record](phase7-hpa-autoscaling.md) contains the acceptance evidence
+and limitations.
 
 A read-only Pokémon Showdown replay viewer is an optional personal-interest extension after the 32-species sample tournament is complete. It does not change the lab acceptance criteria or autoscaling boundary, and it must not delay the runner, restart/resume, report, resource-sizing, HPA, VPA, or capacity evidence.
 
@@ -249,7 +255,7 @@ The runner owns tournament execution state and writes these machine-readable art
   game retains its game number, match ID, participants, seed, outcome and
   winner, turns, termination, and protocol hash.
 
-The separate [resource-capture script](../scripts/capture-resource-usage.sh), not the runner, owns experiment observations. For each never-before-used experiment directory, it records immutable metadata, simulator and Locust resources, simulator replica and per-Pod health data, cumulative per-container CPU-throttling counters when the runtime exposes them, and explicit per-sample and final capture status. Acceptance capture starts only from a clean Git worktree and settled one-replica Deployments, records their actual runtime image IDs, and succeeds only if their identities, complete specs, runtime images, settled status, and no-HPA assumption still match at the end. The Locust Pod UID, container ID, and restart count must also remain unchanged because replacement or restart loses its in-memory run state; simulator restarts remain measured evidence. Each measurement has its own collection timestamp; sample start/end and fixed scheduled deadlines expose collection drift without adding collection time to each interval. After the last scheduled sample, capture waits until its nominal duration ends before final validation. Throttling counters reset when a container restarts, so analysis calculates deltas only within one recorded container ID. The acceptance-evidence workflow later combines these raw observations with exported Locust results into `autoscaling-timeline.csv`; that timeline is derived rather than authoritative evidence. These observations are collected only during dedicated sizing or Locust/HPA runs. A normal tournament run does not implicitly run a load experiment.
+The separate [resource-capture script](../scripts/capture-resource-usage.sh), not the runner, owns experiment observations. For each never-before-used experiment directory, it records immutable metadata, simulator and Locust resources, simulator replica and per-Pod health data, cumulative per-container CPU-throttling counters when the runtime exposes them, and explicit per-sample and final capture status. Acceptance capture starts only from a clean Git worktree and settled one-replica Deployments, records their actual runtime image IDs, and succeeds only if their identities, complete specs, runtime images, settled status, and no-HPA assumption still match at the end. The Locust Pod UID, container ID, and restart count must also remain unchanged because replacement or restart loses its in-memory run state; simulator restarts remain measured evidence. Each measurement has its own collection timestamp; sample start/end and fixed scheduled deadlines expose collection drift without adding collection time to each interval. After the last scheduled sample, capture waits until its nominal duration ends before final validation. Throttling counters reset when a container restarts, so analysis calculates deltas only within one recorded container ID. Phase 7 uses its focused HPA recorder, and the report loads that recorder directory and exported Locust result directly. The legacy `autoscaling-timeline.csv` remains a compatible generic report input but is derived rather than authoritative evidence. These observations are collected only during dedicated sizing or Locust/HPA runs. A normal tournament run does not implicitly run a load experiment.
 
 For a Locust run, its per-run HTML report is sufficient evidence when it
 contains request totals, RPS, failures, latency percentiles, user history, and
@@ -278,9 +284,13 @@ The simulation explorer keeps the full accepted result set in escaped embedded
 JSON but creates at most 100 table rows in the document at once. Search,
 filters, sorting, and pagination run locally. Restart evidence is displayed
 only when compatible current-harness artifacts for the same run are supplied;
-Pod identities are never inferred. Autoscaling charts are displayed only for a
-compatible supplied `autoscaling-timeline.csv`; absence retains the explicit
-Phase 7 placeholder rather than presenting empty measurements as evidence.
+Pod identities are never inferred. Autoscaling charts are displayed for either
+a compatible generic `autoscaling-timeline.csv` or a complete Phase 7 recorder
+directory. Recorder input is accepted only after its sample counts, final
+validation, HPA configuration, replica lifecycle, restart counts, Locust
+totals, and `servedBy` Pod/Ready-endpoint membership reconcile. Absent evidence
+retains an explicit placeholder; incompatible evidence is rejected without a
+partial chart.
 
 `results.jsonl` remains authoritative for accepted simulations. After a
 restart, the runner recomputes standings from those results rather than
@@ -339,18 +349,18 @@ The simulator image and Pod implement the following controls:
 Before every acceptance run, validate that every lab-owned regular and init
 container declares CPU and memory requests and limits. The simulator's accepted
 Phase 6 values are a `500m` CPU request, `1` CPU limit, `192Mi` memory request,
-and `256Mi` memory limit. The CPU request is the starting HPA baseline and
-remains subject to Phase 7 control-behaviour validation.
+and `256Mi` memory limit. Phase 7 subsequently validated the `500m` CPU request
+as the utilization denominator for the accepted 70% CPU HPA target.
 
 ## Probe behaviour and acceptance risk
 
 Exploratory tests show that battle processing can saturate the Node.js process and delay HTTP probe responses. Under saturation, the current HTTP liveness probe can restart a busy but still living simulator Pod. Readiness correctly removes an unresponsive endpoint, but liveness-triggered restarts can amplify the failure by reducing serving capacity and repeating startup work.
 
 The selected-configuration one-user validation completed with the simulator
-Running and Ready and no restarts. That result does not validate probe
-behaviour during a heavy HPA spike. The final liveness behaviour must therefore
-be revised and validated before HPA acceptance testing; this probe risk remains
-open.
+Running and Ready and no restarts. Phase 7 then exercised scale-out to six
+Ready replicas under a three-user load and recorded no simulator restart.
+That closes this risk for the accepted lab profile, but it does not prove probe
+behaviour under heavier or production load.
 
 ## In-cluster Locust design
 
@@ -433,20 +443,18 @@ Loaded mean CPU under the selected configuration was approximately:
 909.5m ÷ 500m = 181.9% utilization
 ```
 
-If Phase 7 selects a 70% target, the initial approximation from one replica is:
+The accepted 70% target gives this initial approximation from one replica:
 
 ```text
 ceil(181.9% ÷ 70%) = approximately 3 replicas
 ```
 
-The 70% target is a Phase 7 candidate, not an accepted value. The `500m`
-request is an HPA-oriented hypothesis rather than a claim that it matches the
-saturated single-Pod CPU consumption of approximately 910-955m. Phase 7 must
-validate that the request and selected target produce sensible scale-out and
-scale-in behaviour. HPA target, minimum replica count, and maximum replica
-count remain unselected.
+The `500m` request does not claim to match saturated single-Pod consumption of
+approximately 910-955m. Instead, the accepted control configuration targets
+approximately `350m` per Pod, permits one to six replicas, uses zero seconds of
+scale-up stabilization, and uses 150 seconds of scale-down stabilization.
 
-The final choices follow these measurements and constraints:
+These choices follow the measured constraints:
 
 - establish sustainable per-Pod load before selecting CPU requests;
 - define healthy operation using latency, failure rate, readiness, and restart behaviour, not CPU alone;
@@ -455,12 +463,21 @@ The final choices follow these measurements and constraints:
 - set maximum replicas from cluster allocatable capacity and measured healthy per-Pod throughput; and
 - continue the recovery observation beyond the configured scale-down stabilization window to demonstrate delayed scale-in and a stable return to minimum capacity.
 
-Phase 6 completed the one-Pod idle, steady, and increasing-load measurements
-and the matched one-user validation used to choose resources. Phase 7 will
-compare a fixed one-Pod baseline with an HPA run using the same image, requests
-and limits, deterministic request corpus, client concurrency, and duration.
+The accepted `phase7-hpa-3-users-150s-001` run recorded the desired sequence
+`1 → 2 → 3 → 5 → 6 → 4 → 1`. Six Ready replicas were observed approximately
+127 seconds after load began. First scale-in occurred approximately 171
+seconds after load stopped, and the Deployment returned to one Ready replica
+after approximately 187 seconds. The previous 300-second-window experiment
+first scaled in after approximately 313 seconds, so the accepted window
+reduced the observed delay by approximately 142 seconds, about 45%.
 
-Acceptance evidence must show more than a replica-count change: requests must reach new Ready Pods, useful throughput or latency must improve or remain healthy, failures and restarts must remain acceptable, and replicas must scale down after load ends. Aggregate the response `servedBy` values by time bucket and correlate them with EndpointSlices, Deployment and HPA events, Pod placement, and per-Pod CPU.
+All 13,033 Locust requests succeeded. The six `servedBy` identities reconciled
+with the request total and with Pods observed in both the Pod and Ready
+EndpointSlice timelines. No simulator container restarted. The 72.42 average
+RPS includes the one-Pod opening period and live scale-out and is not a
+six-Pod steady-capacity result. See the canonical
+[Phase 7 analysis](phase7-hpa-autoscaling.md) for configuration, timelines,
+traffic distribution, earlier experiments, and limitations.
 
 ## Metrics Server
 
@@ -513,11 +530,11 @@ Compare cost with throughput, p95 latency, failure rate, and availability. Addit
 
 The final audit package is complete only when it contains all of the following:
 
-- [ ] an HPA manifest plus observed scale-out and scale-in evidence;
+- [x] an HPA manifest plus observed scale-out and scale-in evidence;
 - [ ] a VPA Off-mode manifest plus captured recommendation evidence;
-- [ ] the in-cluster Locust workload plus exported acceptance-test results;
+- [x] the in-cluster Locust workload plus exported acceptance-test results;
 - [ ] a capacity demonstration with a scheduler-level Pending Pod and `Insufficient cpu` diagnosis;
-- [ ] the final offline report interface combining tournament results and separately captured experiment evidence; and
+- [x] the offline report interface combining tournament results and separately captured experiment evidence;
 - [ ] a README explaining resource sizing, HPA/VPA interaction, capacity diagnosis, approximate monthly cost, and complete reproduction instructions.
 
 ## Current risks and validation gates
@@ -527,7 +544,7 @@ The final audit package is complete only when it contains all of the following:
 | Pinned stream assumptions drift | Incorrect result parsing or request routing | Exact dependency and lockfile; deterministic replay and contract tests |
 | Pinned engine has vulnerable or deprecated transitive packages | Known dependency findings remain in the runtime dependency tree | Keep the engine version pinned for reproducibility, save the current 11-finding audit output, limit container exposure and privileges, and evaluate upgrades separately; do not apply `npm audit fix --force` because forced changes could alter behaviour and reproducibility |
 | Full group stage contains 130,816 battles | Runtime and evidence volume can obscure infrastructure work | Validate the same pipeline with the accepted 32-species mode, then run all 1,025 species |
-| CPU-bound processing delays probes | Busy but living Pods restart and reduce serving capacity | Revise and test liveness behaviour before HPA acceptance |
+| CPU-bound processing delays probes | Busy but living Pods restart and reduce serving capacity | Readiness-gated routing and Phase 7 acceptance with zero simulator restarts |
 | Keep-alive skews Service distribution | One Pod may be hot while others are underused | Use independent connections and analyze `servedBy` distribution |
 | A wall timeout changes outcomes under load | Identical deterministic input could appear inconsistent | Treat timeouts as retryable operational failures; only turn count determines a capped draw |
 | Startup work distorts samples | Sizing and HPA choices include non-steady behaviour | Gate traffic on readiness and separate warm-up from measurement |
@@ -547,9 +564,12 @@ The current implementation state is:
   locally offline;
 - phase 6 complete: fixed-replica measurements and matched validation selected
   the simulator's CPU and memory requests and limits;
+- phase 7 complete: the accepted HPA scaled from one to six Ready replicas,
+  routed successful traffic to every replica, and returned to one with the
+  150-second scale-down stabilization window;
 - further report UI polish and the replay-viewer spike deferred as optional
   work; and
-- phases 7–10 pending.
+- phases 8–10 pending.
 
 The remaining phase gates are:
 
@@ -565,9 +585,11 @@ The remaining phase gates are:
    matched one-user validation selected a `500m` CPU request, `1` CPU limit,
    `192Mi` memory request, and `256Mi` memory limit. The detailed evidence and
    limitations are in the [Phase 6 resource-sizing record](phase6-resource-sizing.md).
-7. **HPA acceptance evidence — next; Metrics Server and exploratory comparison
-   completed early.** Select the HPA target and replica bounds, then capture
-   steady load, scale-out, service health, and recovery through scale-down.
+7. **HPA acceptance evidence — complete.** The accepted three-user run used a
+   70% CPU target, one-to-six replica range, and 150-second scale-down window.
+   It recorded scale-out to six Ready Pods, successful traffic through every
+   backend, zero failures and restarts, and recovery to one replica. See the
+   [Phase 7 record](phase7-hpa-autoscaling.md).
 8. **VPA recommendation comparison — pending.** Collect and compare Off-mode recommendations.
 9. **Capacity and scheduler diagnosis — pending.** Produce a scheduler-level `Insufficient cpu` Pending Pod using calculated requests.
 10. **Final run and audit package — pending.** Run all 1,025 species and assemble the final manifests, evidence, cost comparison, report, and reproducibility instructions.

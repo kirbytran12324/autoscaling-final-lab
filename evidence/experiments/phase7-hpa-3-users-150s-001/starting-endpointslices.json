@@ -1,0 +1,66 @@
+{
+    "apiVersion": "v1",
+    "items": [
+        {
+            "addressType": "IPv4",
+            "apiVersion": "discovery.k8s.io/v1",
+            "endpoints": [
+                {
+                    "addresses": [
+                        "10.244.2.9"
+                    ],
+                    "conditions": {
+                        "ready": true,
+                        "serving": true,
+                        "terminating": false
+                    },
+                    "nodeName": "desktop-worker2",
+                    "targetRef": {
+                        "kind": "Pod",
+                        "name": "metronome-simulator-58f995fbfb-7l7fz",
+                        "namespace": "autoscaling-lab",
+                        "uid": "fd09a451-5e3b-49f2-8703-b3359c003bf6"
+                    }
+                }
+            ],
+            "kind": "EndpointSlice",
+            "metadata": {
+                "annotations": {
+                    "endpoints.kubernetes.io/last-change-trigger-time": "2026-09-13T15:21:08Z"
+                },
+                "creationTimestamp": "2026-09-04T04:15:39Z",
+                "generateName": "metronome-simulator-",
+                "generation": 136,
+                "labels": {
+                    "endpointslice.kubernetes.io/managed-by": "endpointslice-controller.k8s.io",
+                    "kubernetes.io/service-name": "metronome-simulator"
+                },
+                "name": "metronome-simulator-ktmct",
+                "namespace": "autoscaling-lab",
+                "ownerReferences": [
+                    {
+                        "apiVersion": "v1",
+                        "blockOwnerDeletion": true,
+                        "controller": true,
+                        "kind": "Service",
+                        "name": "metronome-simulator",
+                        "uid": "dc5f4d5b-5236-4a61-b9e4-a5f452e5eea6"
+                    }
+                ],
+                "resourceVersion": "444528",
+                "uid": "05bb6a6a-82f4-446d-bed2-68ab9849ff96"
+            },
+            "ports": [
+                {
+                    "name": "",
+                    "port": 3000,
+                    "protocol": "TCP"
+                }
+            ]
+        }
+    ],
+    "kind": "List",
+    "metadata": {
+        "resourceVersion": ""
+    }
+}

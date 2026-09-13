@@ -1,0 +1,302 @@
+{
+    "apiVersion": "v1",
+    "items": [
+        {
+            "apiVersion": "v1",
+            "kind": "Pod",
+            "metadata": {
+                "creationTimestamp": "2026-09-13T15:05:32Z",
+                "generateName": "metronome-simulator-58f995fbfb-",
+                "generation": 1,
+                "labels": {
+                    "app": "metronome-simulator",
+                    "pod-template-hash": "58f995fbfb"
+                },
+                "name": "metronome-simulator-58f995fbfb-7l7fz",
+                "namespace": "autoscaling-lab",
+                "ownerReferences": [
+                    {
+                        "apiVersion": "apps/v1",
+                        "blockOwnerDeletion": true,
+                        "controller": true,
+                        "kind": "ReplicaSet",
+                        "name": "metronome-simulator-58f995fbfb",
+                        "uid": "f23b6aa8-4b60-4d24-a976-45ea5460239b"
+                    }
+                ],
+                "resourceVersion": "449664",
+                "uid": "fd09a451-5e3b-49f2-8703-b3359c003bf6"
+            },
+            "spec": {
+                "containers": [
+                    {
+                        "image": "metronome-simulator:phase5",
+                        "imagePullPolicy": "IfNotPresent",
+                        "livenessProbe": {
+                            "failureThreshold": 3,
+                            "httpGet": {
+                                "path": "/health/live",
+                                "port": "http",
+                                "scheme": "HTTP"
+                            },
+                            "periodSeconds": 10,
+                            "successThreshold": 1,
+                            "timeoutSeconds": 1
+                        },
+                        "name": "simulator",
+                        "ports": [
+                            {
+                                "containerPort": 3000,
+                                "name": "http",
+                                "protocol": "TCP"
+                            }
+                        ],
+                        "readinessProbe": {
+                            "failureThreshold": 3,
+                            "httpGet": {
+                                "path": "/health/ready",
+                                "port": "http",
+                                "scheme": "HTTP"
+                            },
+                            "periodSeconds": 10,
+                            "successThreshold": 1,
+                            "timeoutSeconds": 1
+                        },
+                        "resources": {
+                            "limits": {
+                                "cpu": "1",
+                                "memory": "256Mi"
+                            },
+                            "requests": {
+                                "cpu": "500m",
+                                "memory": "192Mi"
+                            }
+                        },
+                        "securityContext": {
+                            "allowPrivilegeEscalation": false,
+                            "capabilities": {
+                                "drop": [
+                                    "ALL"
+                                ]
+                            },
+                            "readOnlyRootFilesystem": true
+                        },
+                        "startupProbe": {
+                            "failureThreshold": 30,
+                            "httpGet": {
+                                "path": "/health/ready",
+                                "port": "http",
+                                "scheme": "HTTP"
+                            },
+                            "periodSeconds": 10,
+                            "successThreshold": 1,
+                            "timeoutSeconds": 1
+                        },
+                        "terminationMessagePath": "/dev/termination-log",
+                        "terminationMessagePolicy": "File",
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-vrvhf",
+                                "readOnly": true
+                            }
+                        ]
+                    }
+                ],
+                "dnsPolicy": "ClusterFirst",
+                "enableServiceLinks": true,
+                "nodeName": "desktop-worker2",
+                "preemptionPolicy": "PreemptLowerPriority",
+                "priority": 0,
+                "restartPolicy": "Always",
+                "schedulerName": "default-scheduler",
+                "securityContext": {
+                    "runAsGroup": 1000,
+                    "runAsNonRoot": true,
+                    "runAsUser": 1000,
+                    "seccompProfile": {
+                        "type": "RuntimeDefault"
+                    }
+                },
+                "serviceAccount": "default",
+                "serviceAccountName": "default",
+                "terminationGracePeriodSeconds": 30,
+                "tolerations": [
+                    {
+                        "effect": "NoExecute",
+                        "key": "node.kubernetes.io/not-ready",
+                        "operator": "Exists",
+                        "tolerationSeconds": 300
+                    },
+                    {
+                        "effect": "NoExecute",
+                        "key": "node.kubernetes.io/unreachable",
+                        "operator": "Exists",
+                        "tolerationSeconds": 300
+                    }
+                ],
+                "volumes": [
+                    {
+                        "name": "kube-api-access-vrvhf",
+                        "projected": {
+                            "defaultMode": 420,
+                            "sources": [
+                                {
+                                    "serviceAccountToken": {
+                                        "expirationSeconds": 3607,
+                                        "path": "token"
+                                    }
+                                },
+                                {
+                                    "configMap": {
+                                        "items": [
+                                            {
+                                                "key": "ca.crt",
+                                                "path": "ca.crt"
+                                            }
+                                        ],
+                                        "name": "kube-root-ca.crt"
+                                    }
+                                },
+                                {
+                                    "downwardAPI": {
+                                        "items": [
+                                            {
+                                                "fieldRef": {
+                                                    "apiVersion": "v1",
+                                                    "fieldPath": "metadata.namespace"
+                                                },
+                                                "path": "namespace"
+                                            }
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ]
+            },
+            "status": {
+                "allocatedResources": {
+                    "cpu": "500m",
+                    "memory": "192Mi"
+                },
+                "conditions": [
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-09-13T15:05:33Z",
+                        "observedGeneration": 1,
+                        "status": "True",
+                        "type": "PodReadyToStartContainers"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-09-13T15:05:32Z",
+                        "observedGeneration": 1,
+                        "status": "True",
+                        "type": "Initialized"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-09-13T15:05:43Z",
+                        "observedGeneration": 1,
+                        "status": "True",
+                        "type": "Ready"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-09-13T15:05:43Z",
+                        "observedGeneration": 1,
+                        "status": "True",
+                        "type": "ContainersReady"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-09-13T15:05:32Z",
+                        "observedGeneration": 1,
+                        "status": "True",
+                        "type": "PodScheduled"
+                    }
+                ],
+                "containerStatuses": [
+                    {
+                        "allocatedResources": {
+                            "cpu": "500m",
+                            "memory": "192Mi"
+                        },
+                        "containerID": "containerd://61b64bc136965ca9eab7eb670d7470a21cf3a7ecdad7866b95d7f352274858bd",
+                        "image": "docker.io/library/metronome-simulator:phase5",
+                        "imageID": "docker.io/library/metronome-simulator@sha256:6bbff8424cceed9e6879aa3c2f6e8840c104e8f5284494cbe938770ff15b37a9",
+                        "lastState": {},
+                        "name": "simulator",
+                        "ready": true,
+                        "resources": {
+                            "limits": {
+                                "cpu": "1",
+                                "memory": "256Mi"
+                            },
+                            "requests": {
+                                "cpu": "500m",
+                                "memory": "192Mi"
+                            }
+                        },
+                        "restartCount": 0,
+                        "started": true,
+                        "state": {
+                            "running": {
+                                "startedAt": "2026-09-13T15:05:33Z"
+                            }
+                        },
+                        "user": {
+                            "linux": {
+                                "gid": 1000,
+                                "supplementalGroups": [
+                                    1000
+                                ],
+                                "uid": 1000
+                            }
+                        },
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-vrvhf",
+                                "readOnly": true,
+                                "recursiveReadOnly": "Disabled"
+                            }
+                        ]
+                    }
+                ],
+                "hostIP": "172.19.0.3",
+                "hostIPs": [
+                    {
+                        "ip": "172.19.0.3"
+                    }
+                ],
+                "observedGeneration": 1,
+                "phase": "Running",
+                "podIP": "10.244.2.9",
+                "podIPs": [
+                    {
+                        "ip": "10.244.2.9"
+                    }
+                ],
+                "qosClass": "Burstable",
+                "resources": {
+                    "limits": {
+                        "cpu": "1",
+                        "memory": "256Mi"
+                    },
+                    "requests": {
+                        "cpu": "489m",
+                        "memory": "192Mi"
+                    }
+                },
+                "startTime": "2026-09-13T15:05:32Z"
+            }
+        }
+    ],
+    "kind": "List",
+    "metadata": {
+        "resourceVersion": ""
+    }
+}

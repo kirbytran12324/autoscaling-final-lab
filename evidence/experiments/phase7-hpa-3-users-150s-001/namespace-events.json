@@ -1,0 +1,2790 @@
+{
+    "apiVersion": "v1",
+    "items": [
+        {
+            "apiVersion": "v1",
+            "count": 1,
+            "eventTime": null,
+            "firstTimestamp": "2026-09-13T15:05:32Z",
+            "involvedObject": {
+                "apiVersion": "v1",
+                "kind": "Pod",
+                "name": "metronome-simulator-58f995fbfb-7l7fz",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "442456",
+                "uid": "fd09a451-5e3b-49f2-8703-b3359c003bf6"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-09-13T15:05:32Z",
+            "message": "Successfully assigned autoscaling-lab/metronome-simulator-58f995fbfb-7l7fz to desktop-worker2",
+            "metadata": {
+                "creationTimestamp": "2026-09-13T15:05:32Z",
+                "name": "metronome-simulator-58f995fbfb-7l7fz.18d4e9b908392dd0",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "442461",
+                "uid": "390dc80f-14dd-4c92-8cd1-c587031b2ca9"
+            },
+            "reason": "Scheduled",
+            "reportingComponent": "default-scheduler",
+            "reportingInstance": "",
+            "source": {
+                "component": "default-scheduler"
+            },
+            "type": "Normal"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 1,
+            "eventTime": null,
+            "firstTimestamp": "2026-09-13T15:05:33Z",
+            "involvedObject": {
+                "apiVersion": "v1",
+                "fieldPath": "spec.containers{simulator}",
+                "kind": "Pod",
+                "name": "metronome-simulator-58f995fbfb-7l7fz",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "442458",
+                "uid": "fd09a451-5e3b-49f2-8703-b3359c003bf6"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-09-13T15:05:33Z",
+            "message": "Container image \"metronome-simulator:phase5\" already present on machine and can be accessed by the pod",
+            "metadata": {
+                "creationTimestamp": "2026-09-13T15:05:33Z",
+                "name": "metronome-simulator-58f995fbfb-7l7fz.18d4e9b92c098463",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "442473",
+                "uid": "d53bb048-f7ca-4957-b046-b1843741ea00"
+            },
+            "reason": "Pulled",
+            "reportingComponent": "kubelet",
+            "reportingInstance": "desktop-worker2",
+            "source": {
+                "component": "kubelet",
+                "host": "desktop-worker2"
+            },
+            "type": "Normal"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 1,
+            "eventTime": null,
+            "firstTimestamp": "2026-09-13T15:05:33Z",
+            "involvedObject": {
+                "apiVersion": "v1",
+                "fieldPath": "spec.containers{simulator}",
+                "kind": "Pod",
+                "name": "metronome-simulator-58f995fbfb-7l7fz",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "442458",
+                "uid": "fd09a451-5e3b-49f2-8703-b3359c003bf6"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-09-13T15:05:33Z",
+            "message": "Container created",
+            "metadata": {
+                "creationTimestamp": "2026-09-13T15:05:33Z",
+                "name": "metronome-simulator-58f995fbfb-7l7fz.18d4e9b92f7173ff",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "442475",
+                "uid": "4bc78463-8148-43fc-a3bb-4392f6ecfe49"
+            },
+            "reason": "Created",
+            "reportingComponent": "kubelet",
+            "reportingInstance": "desktop-worker2",
+            "source": {
+                "component": "kubelet",
+                "host": "desktop-worker2"
+            },
+            "type": "Normal"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 1,
+            "eventTime": null,
+            "firstTimestamp": "2026-09-13T15:05:33Z",
+            "involvedObject": {
+                "apiVersion": "v1",
+                "fieldPath": "spec.containers{simulator}",
+                "kind": "Pod",
+                "name": "metronome-simulator-58f995fbfb-7l7fz",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "442458",
+                "uid": "fd09a451-5e3b-49f2-8703-b3359c003bf6"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-09-13T15:05:33Z",
+            "message": "Container started",
+            "metadata": {
+                "creationTimestamp": "2026-09-13T15:05:33Z",
+                "name": "metronome-simulator-58f995fbfb-7l7fz.18d4e9b939a4a5d9",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "442479",
+                "uid": "8b0d3f0c-8b9a-4208-9507-4790ffb39202"
+            },
+            "reason": "Started",
+            "reportingComponent": "kubelet",
+            "reportingInstance": "desktop-worker2",
+            "source": {
+                "component": "kubelet",
+                "host": "desktop-worker2"
+            },
+            "type": "Normal"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 1,
+            "eventTime": null,
+            "firstTimestamp": "2026-09-13T15:15:14Z",
+            "involvedObject": {
+                "apiVersion": "v1",
+                "fieldPath": "spec.containers{simulator}",
+                "kind": "Pod",
+                "name": "metronome-simulator-58f995fbfb-7l7fz",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "442458",
+                "uid": "fd09a451-5e3b-49f2-8703-b3359c003bf6"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-09-13T15:15:14Z",
+            "message": "Readiness probe failed: Get \"http://10.244.2.9:3000/health/ready\": context deadline exceeded (Client.Timeout exceeded while awaiting headers)",
+            "metadata": {
+                "creationTimestamp": "2026-09-13T15:15:15Z",
+                "name": "metronome-simulator-58f995fbfb-7l7fz.18d4ea4083a9508b",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "443724",
+                "uid": "3413c5e1-e342-46a5-9ab7-6154542b5d23"
+            },
+            "reason": "Unhealthy",
+            "reportingComponent": "kubelet",
+            "reportingInstance": "desktop-worker2",
+            "source": {
+                "component": "kubelet",
+                "host": "desktop-worker2"
+            },
+            "type": "Warning"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 1,
+            "eventTime": null,
+            "firstTimestamp": "2026-09-13T15:52:59Z",
+            "involvedObject": {
+                "apiVersion": "v1",
+                "kind": "Pod",
+                "name": "metronome-simulator-58f995fbfb-cbq76",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "448535",
+                "uid": "37773ad7-94d6-4d7b-902d-ec1f93fbbbe0"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-09-13T15:52:59Z",
+            "message": "Successfully assigned autoscaling-lab/metronome-simulator-58f995fbfb-cbq76 to desktop-worker2",
+            "metadata": {
+                "creationTimestamp": "2026-09-13T15:52:59Z",
+                "name": "metronome-simulator-58f995fbfb-cbq76.18d4ec4fd399e719",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "448543",
+                "uid": "2a698a97-a44d-4e84-8af4-2080efaea56d"
+            },
+            "reason": "Scheduled",
+            "reportingComponent": "default-scheduler",
+            "reportingInstance": "",
+            "source": {
+                "component": "default-scheduler"
+            },
+            "type": "Normal"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 1,
+            "eventTime": null,
+            "firstTimestamp": "2026-09-13T15:53:00Z",
+            "involvedObject": {
+                "apiVersion": "v1",
+                "fieldPath": "spec.containers{simulator}",
+                "kind": "Pod",
+                "name": "metronome-simulator-58f995fbfb-cbq76",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "448540",
+                "uid": "37773ad7-94d6-4d7b-902d-ec1f93fbbbe0"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-09-13T15:53:00Z",
+            "message": "Container image \"metronome-simulator:phase5\" already present on machine and can be accessed by the pod",
+            "metadata": {
+                "creationTimestamp": "2026-09-13T15:53:00Z",
+                "name": "metronome-simulator-58f995fbfb-cbq76.18d4ec500089486a",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "448551",
+                "uid": "cf399cc4-27d9-41f6-8958-b2572ad4a1a7"
+            },
+            "reason": "Pulled",
+            "reportingComponent": "kubelet",
+            "reportingInstance": "desktop-worker2",
+            "source": {
+                "component": "kubelet",
+                "host": "desktop-worker2"
+            },
+            "type": "Normal"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 1,
+            "eventTime": null,
+            "firstTimestamp": "2026-09-13T15:53:00Z",
+            "involvedObject": {
+                "apiVersion": "v1",
+                "fieldPath": "spec.containers{simulator}",
+                "kind": "Pod",
+                "name": "metronome-simulator-58f995fbfb-cbq76",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "448540",
+                "uid": "37773ad7-94d6-4d7b-902d-ec1f93fbbbe0"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-09-13T15:53:00Z",
+            "message": "Container created",
+            "metadata": {
+                "creationTimestamp": "2026-09-13T15:53:00Z",
+                "name": "metronome-simulator-58f995fbfb-cbq76.18d4ec5005b429c5",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "448556",
+                "uid": "cf2b62a2-3fe4-4144-b928-1cfe2fd7d155"
+            },
+            "reason": "Created",
+            "reportingComponent": "kubelet",
+            "reportingInstance": "desktop-worker2",
+            "source": {
+                "component": "kubelet",
+                "host": "desktop-worker2"
+            },
+            "type": "Normal"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 1,
+            "eventTime": null,
+            "firstTimestamp": "2026-09-13T15:53:00Z",
+            "involvedObject": {
+                "apiVersion": "v1",
+                "fieldPath": "spec.containers{simulator}",
+                "kind": "Pod",
+                "name": "metronome-simulator-58f995fbfb-cbq76",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "448540",
+                "uid": "37773ad7-94d6-4d7b-902d-ec1f93fbbbe0"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-09-13T15:53:00Z",
+            "message": "Container started",
+            "metadata": {
+                "creationTimestamp": "2026-09-13T15:53:00Z",
+                "name": "metronome-simulator-58f995fbfb-cbq76.18d4ec500f38b921",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "448557",
+                "uid": "5532c75f-18cd-4fd7-be10-5b02f007132a"
+            },
+            "reason": "Started",
+            "reportingComponent": "kubelet",
+            "reportingInstance": "desktop-worker2",
+            "source": {
+                "component": "kubelet",
+                "host": "desktop-worker2"
+            },
+            "type": "Normal"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 1,
+            "eventTime": null,
+            "firstTimestamp": "2026-09-13T15:57:29Z",
+            "involvedObject": {
+                "apiVersion": "v1",
+                "fieldPath": "spec.containers{simulator}",
+                "kind": "Pod",
+                "name": "metronome-simulator-58f995fbfb-cbq76",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "448540",
+                "uid": "37773ad7-94d6-4d7b-902d-ec1f93fbbbe0"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-09-13T15:57:29Z",
+            "message": "Stopping container simulator",
+            "metadata": {
+                "creationTimestamp": "2026-09-13T15:57:29Z",
+                "name": "metronome-simulator-58f995fbfb-cbq76.18d4ec8ec4b6f3b6",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "449190",
+                "uid": "90ef2061-7240-424c-a2b9-14c289f6c9c6"
+            },
+            "reason": "Killing",
+            "reportingComponent": "kubelet",
+            "reportingInstance": "desktop-worker2",
+            "source": {
+                "component": "kubelet",
+                "host": "desktop-worker2"
+            },
+            "type": "Normal"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 1,
+            "eventTime": null,
+            "firstTimestamp": "2026-09-13T15:52:29Z",
+            "involvedObject": {
+                "apiVersion": "v1",
+                "kind": "Pod",
+                "name": "metronome-simulator-58f995fbfb-d7tpc",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "448441",
+                "uid": "baf3045b-948a-4056-b85f-e2bee2f7d165"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-09-13T15:52:29Z",
+            "message": "Successfully assigned autoscaling-lab/metronome-simulator-58f995fbfb-d7tpc to desktop-worker",
+            "metadata": {
+                "creationTimestamp": "2026-09-13T15:52:29Z",
+                "name": "metronome-simulator-58f995fbfb-d7tpc.18d4ec48ce129aee",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "448447",
+                "uid": "4f72621e-c4e6-43bc-9531-5813c71017b7"
+            },
+            "reason": "Scheduled",
+            "reportingComponent": "default-scheduler",
+            "reportingInstance": "",
+            "source": {
+                "component": "default-scheduler"
+            },
+            "type": "Normal"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 1,
+            "eventTime": null,
+            "firstTimestamp": "2026-09-13T15:52:30Z",
+            "involvedObject": {
+                "apiVersion": "v1",
+                "fieldPath": "spec.containers{simulator}",
+                "kind": "Pod",
+                "name": "metronome-simulator-58f995fbfb-d7tpc",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "448444",
+                "uid": "baf3045b-948a-4056-b85f-e2bee2f7d165"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-09-13T15:52:30Z",
+            "message": "Container image \"metronome-simulator:phase5\" already present on machine and can be accessed by the pod",
+            "metadata": {
+                "creationTimestamp": "2026-09-13T15:52:30Z",
+                "name": "metronome-simulator-58f995fbfb-d7tpc.18d4ec48fbcdf227",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "448453",
+                "uid": "82b15313-614f-4ac7-badb-7caa07fbadd9"
+            },
+            "reason": "Pulled",
+            "reportingComponent": "kubelet",
+            "reportingInstance": "desktop-worker",
+            "source": {
+                "component": "kubelet",
+                "host": "desktop-worker"
+            },
+            "type": "Normal"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 1,
+            "eventTime": null,
+            "firstTimestamp": "2026-09-13T15:52:30Z",
+            "involvedObject": {
+                "apiVersion": "v1",
+                "fieldPath": "spec.containers{simulator}",
+                "kind": "Pod",
+                "name": "metronome-simulator-58f995fbfb-d7tpc",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "448444",
+                "uid": "baf3045b-948a-4056-b85f-e2bee2f7d165"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-09-13T15:52:30Z",
+            "message": "Container created",
+            "metadata": {
+                "creationTimestamp": "2026-09-13T15:52:30Z",
+                "name": "metronome-simulator-58f995fbfb-d7tpc.18d4ec49007017a2",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "448455",
+                "uid": "6e807bc2-4b60-4902-95bd-363ec1345c02"
+            },
+            "reason": "Created",
+            "reportingComponent": "kubelet",
+            "reportingInstance": "desktop-worker",
+            "source": {
+                "component": "kubelet",
+                "host": "desktop-worker"
+            },
+            "type": "Normal"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 1,
+            "eventTime": null,
+            "firstTimestamp": "2026-09-13T15:52:30Z",
+            "involvedObject": {
+                "apiVersion": "v1",
+                "fieldPath": "spec.containers{simulator}",
+                "kind": "Pod",
+                "name": "metronome-simulator-58f995fbfb-d7tpc",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "448444",
+                "uid": "baf3045b-948a-4056-b85f-e2bee2f7d165"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-09-13T15:52:30Z",
+            "message": "Container started",
+            "metadata": {
+                "creationTimestamp": "2026-09-13T15:52:30Z",
+                "name": "metronome-simulator-58f995fbfb-d7tpc.18d4ec490bd005b2",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "448456",
+                "uid": "fd3ba811-d453-4c69-acac-2230671819c4"
+            },
+            "reason": "Started",
+            "reportingComponent": "kubelet",
+            "reportingInstance": "desktop-worker",
+            "source": {
+                "component": "kubelet",
+                "host": "desktop-worker"
+            },
+            "type": "Normal"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 1,
+            "eventTime": null,
+            "firstTimestamp": "2026-09-13T15:57:44Z",
+            "involvedObject": {
+                "apiVersion": "v1",
+                "fieldPath": "spec.containers{simulator}",
+                "kind": "Pod",
+                "name": "metronome-simulator-58f995fbfb-d7tpc",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "448444",
+                "uid": "baf3045b-948a-4056-b85f-e2bee2f7d165"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-09-13T15:57:44Z",
+            "message": "Stopping container simulator",
+            "metadata": {
+                "creationTimestamp": "2026-09-13T15:57:44Z",
+                "name": "metronome-simulator-58f995fbfb-d7tpc.18d4ec923f686817",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "449240",
+                "uid": "d456850d-7acb-4994-8a9d-dbaf3260fad8"
+            },
+            "reason": "Killing",
+            "reportingComponent": "kubelet",
+            "reportingInstance": "desktop-worker",
+            "source": {
+                "component": "kubelet",
+                "host": "desktop-worker"
+            },
+            "type": "Normal"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 1,
+            "eventTime": null,
+            "firstTimestamp": "2026-09-13T15:05:47Z",
+            "involvedObject": {
+                "apiVersion": "v1",
+                "kind": "Pod",
+                "name": "metronome-simulator-58f995fbfb-g4hcm",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "442529",
+                "uid": "bd9223e0-7eb4-4998-b692-a375895528ac"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-09-13T15:05:47Z",
+            "message": "Successfully assigned autoscaling-lab/metronome-simulator-58f995fbfb-g4hcm to desktop-worker3",
+            "metadata": {
+                "creationTimestamp": "2026-09-13T15:05:47Z",
+                "name": "metronome-simulator-58f995fbfb-g4hcm.18d4e9bc89ab214b",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "442535",
+                "uid": "d6665c79-a3c1-47b1-a02a-9ae70d817cf4"
+            },
+            "reason": "Scheduled",
+            "reportingComponent": "default-scheduler",
+            "reportingInstance": "",
+            "source": {
+                "component": "default-scheduler"
+            },
+            "type": "Normal"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 1,
+            "eventTime": null,
+            "firstTimestamp": "2026-09-13T15:05:48Z",
+            "involvedObject": {
+                "apiVersion": "v1",
+                "fieldPath": "spec.containers{simulator}",
+                "kind": "Pod",
+                "name": "metronome-simulator-58f995fbfb-g4hcm",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "442532",
+                "uid": "bd9223e0-7eb4-4998-b692-a375895528ac"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-09-13T15:05:48Z",
+            "message": "Container image \"metronome-simulator:phase5\" already present on machine and can be accessed by the pod",
+            "metadata": {
+                "creationTimestamp": "2026-09-13T15:05:48Z",
+                "name": "metronome-simulator-58f995fbfb-g4hcm.18d4e9bcbad33b81",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "442540",
+                "uid": "83aaf22d-ddc3-4c48-99a0-56f16aa88a66"
+            },
+            "reason": "Pulled",
+            "reportingComponent": "kubelet",
+            "reportingInstance": "desktop-worker3",
+            "source": {
+                "component": "kubelet",
+                "host": "desktop-worker3"
+            },
+            "type": "Normal"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 1,
+            "eventTime": null,
+            "firstTimestamp": "2026-09-13T15:05:48Z",
+            "involvedObject": {
+                "apiVersion": "v1",
+                "fieldPath": "spec.containers{simulator}",
+                "kind": "Pod",
+                "name": "metronome-simulator-58f995fbfb-g4hcm",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "442532",
+                "uid": "bd9223e0-7eb4-4998-b692-a375895528ac"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-09-13T15:05:48Z",
+            "message": "Container created",
+            "metadata": {
+                "creationTimestamp": "2026-09-13T15:05:48Z",
+                "name": "metronome-simulator-58f995fbfb-g4hcm.18d4e9bcbe15b4c6",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "442542",
+                "uid": "a0bd2f9d-3aeb-41c9-9d58-017832d792b5"
+            },
+            "reason": "Created",
+            "reportingComponent": "kubelet",
+            "reportingInstance": "desktop-worker3",
+            "source": {
+                "component": "kubelet",
+                "host": "desktop-worker3"
+            },
+            "type": "Normal"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 1,
+            "eventTime": null,
+            "firstTimestamp": "2026-09-13T15:05:49Z",
+            "involvedObject": {
+                "apiVersion": "v1",
+                "fieldPath": "spec.containers{simulator}",
+                "kind": "Pod",
+                "name": "metronome-simulator-58f995fbfb-g4hcm",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "442532",
+                "uid": "bd9223e0-7eb4-4998-b692-a375895528ac"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-09-13T15:05:49Z",
+            "message": "Container started",
+            "metadata": {
+                "creationTimestamp": "2026-09-13T15:05:49Z",
+                "name": "metronome-simulator-58f995fbfb-g4hcm.18d4e9bcd15b6f21",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "442544",
+                "uid": "369bf4fb-f4bc-4b8c-84fc-bf146acc09b8"
+            },
+            "reason": "Started",
+            "reportingComponent": "kubelet",
+            "reportingInstance": "desktop-worker3",
+            "source": {
+                "component": "kubelet",
+                "host": "desktop-worker3"
+            },
+            "type": "Normal"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 1,
+            "eventTime": null,
+            "firstTimestamp": "2026-09-13T15:18:52Z",
+            "involvedObject": {
+                "apiVersion": "v1",
+                "fieldPath": "spec.containers{simulator}",
+                "kind": "Pod",
+                "name": "metronome-simulator-58f995fbfb-g4hcm",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "442532",
+                "uid": "bd9223e0-7eb4-4998-b692-a375895528ac"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-09-13T15:18:52Z",
+            "message": "Stopping container simulator",
+            "metadata": {
+                "creationTimestamp": "2026-09-13T15:18:52Z",
+                "name": "metronome-simulator-58f995fbfb-g4hcm.18d4ea733901dece",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "444189",
+                "uid": "31f67f55-038b-44e2-95b8-d0c814602ea4"
+            },
+            "reason": "Killing",
+            "reportingComponent": "kubelet",
+            "reportingInstance": "desktop-worker3",
+            "source": {
+                "component": "kubelet",
+                "host": "desktop-worker3"
+            },
+            "type": "Normal"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 1,
+            "eventTime": null,
+            "firstTimestamp": "2026-09-13T15:52:59Z",
+            "involvedObject": {
+                "apiVersion": "v1",
+                "kind": "Pod",
+                "name": "metronome-simulator-58f995fbfb-lnl6n",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "448537",
+                "uid": "64685235-1229-436c-9829-bb071002d727"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-09-13T15:52:59Z",
+            "message": "Successfully assigned autoscaling-lab/metronome-simulator-58f995fbfb-lnl6n to desktop-worker3",
+            "metadata": {
+                "creationTimestamp": "2026-09-13T15:52:59Z",
+                "name": "metronome-simulator-58f995fbfb-lnl6n.18d4ec4fd41d02c4",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "448544",
+                "uid": "0c74d98d-e9d1-48f1-961f-c05e306fc34b"
+            },
+            "reason": "Scheduled",
+            "reportingComponent": "default-scheduler",
+            "reportingInstance": "",
+            "source": {
+                "component": "default-scheduler"
+            },
+            "type": "Normal"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 1,
+            "eventTime": null,
+            "firstTimestamp": "2026-09-13T15:53:00Z",
+            "involvedObject": {
+                "apiVersion": "v1",
+                "fieldPath": "spec.containers{simulator}",
+                "kind": "Pod",
+                "name": "metronome-simulator-58f995fbfb-lnl6n",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "448542",
+                "uid": "64685235-1229-436c-9829-bb071002d727"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-09-13T15:53:00Z",
+            "message": "Container image \"metronome-simulator:phase5\" already present on machine and can be accessed by the pod",
+            "metadata": {
+                "creationTimestamp": "2026-09-13T15:53:00Z",
+                "name": "metronome-simulator-58f995fbfb-lnl6n.18d4ec5000895b99",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "448552",
+                "uid": "f2a96bf3-e82e-498e-87a7-f85c493c341c"
+            },
+            "reason": "Pulled",
+            "reportingComponent": "kubelet",
+            "reportingInstance": "desktop-worker3",
+            "source": {
+                "component": "kubelet",
+                "host": "desktop-worker3"
+            },
+            "type": "Normal"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 1,
+            "eventTime": null,
+            "firstTimestamp": "2026-09-13T15:53:00Z",
+            "involvedObject": {
+                "apiVersion": "v1",
+                "fieldPath": "spec.containers{simulator}",
+                "kind": "Pod",
+                "name": "metronome-simulator-58f995fbfb-lnl6n",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "448542",
+                "uid": "64685235-1229-436c-9829-bb071002d727"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-09-13T15:53:00Z",
+            "message": "Container created",
+            "metadata": {
+                "creationTimestamp": "2026-09-13T15:53:00Z",
+                "name": "metronome-simulator-58f995fbfb-lnl6n.18d4ec500496f263",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "448555",
+                "uid": "44ebce4d-701a-4413-843c-a080403a6676"
+            },
+            "reason": "Created",
+            "reportingComponent": "kubelet",
+            "reportingInstance": "desktop-worker3",
+            "source": {
+                "component": "kubelet",
+                "host": "desktop-worker3"
+            },
+            "type": "Normal"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 1,
+            "eventTime": null,
+            "firstTimestamp": "2026-09-13T15:53:00Z",
+            "involvedObject": {
+                "apiVersion": "v1",
+                "fieldPath": "spec.containers{simulator}",
+                "kind": "Pod",
+                "name": "metronome-simulator-58f995fbfb-lnl6n",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "448542",
+                "uid": "64685235-1229-436c-9829-bb071002d727"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-09-13T15:53:00Z",
+            "message": "Container started",
+            "metadata": {
+                "creationTimestamp": "2026-09-13T15:53:00Z",
+                "name": "metronome-simulator-58f995fbfb-lnl6n.18d4ec500f3b9eaf",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "448558",
+                "uid": "2a4e6e86-c241-4ad3-99b5-4d8f4137ed7f"
+            },
+            "reason": "Started",
+            "reportingComponent": "kubelet",
+            "reportingInstance": "desktop-worker3",
+            "source": {
+                "component": "kubelet",
+                "host": "desktop-worker3"
+            },
+            "type": "Normal"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 1,
+            "eventTime": null,
+            "firstTimestamp": "2026-09-13T15:57:29Z",
+            "involvedObject": {
+                "apiVersion": "v1",
+                "fieldPath": "spec.containers{simulator}",
+                "kind": "Pod",
+                "name": "metronome-simulator-58f995fbfb-lnl6n",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "448542",
+                "uid": "64685235-1229-436c-9829-bb071002d727"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-09-13T15:57:29Z",
+            "message": "Stopping container simulator",
+            "metadata": {
+                "creationTimestamp": "2026-09-13T15:57:29Z",
+                "name": "metronome-simulator-58f995fbfb-lnl6n.18d4ec8ec4902cf3",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "449193",
+                "uid": "c9ce38e4-316c-4246-9439-0b5e006ea69e"
+            },
+            "reason": "Killing",
+            "reportingComponent": "kubelet",
+            "reportingInstance": "desktop-worker3",
+            "source": {
+                "component": "kubelet",
+                "host": "desktop-worker3"
+            },
+            "type": "Normal"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 1,
+            "eventTime": null,
+            "firstTimestamp": "2026-09-13T15:53:44Z",
+            "involvedObject": {
+                "apiVersion": "v1",
+                "kind": "Pod",
+                "name": "metronome-simulator-58f995fbfb-lttjx",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "448672",
+                "uid": "c6f6513d-0bff-45bf-b32b-5ea3feb882a2"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-09-13T15:53:44Z",
+            "message": "Successfully assigned autoscaling-lab/metronome-simulator-58f995fbfb-lttjx to desktop-worker",
+            "metadata": {
+                "creationTimestamp": "2026-09-13T15:53:44Z",
+                "name": "metronome-simulator-58f995fbfb-lttjx.18d4ec5a5867d41d",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "448679",
+                "uid": "22df987f-5bf1-44a7-bd11-742c5029c226"
+            },
+            "reason": "Scheduled",
+            "reportingComponent": "default-scheduler",
+            "reportingInstance": "",
+            "source": {
+                "component": "default-scheduler"
+            },
+            "type": "Normal"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 1,
+            "eventTime": null,
+            "firstTimestamp": "2026-09-13T15:53:45Z",
+            "involvedObject": {
+                "apiVersion": "v1",
+                "fieldPath": "spec.containers{simulator}",
+                "kind": "Pod",
+                "name": "metronome-simulator-58f995fbfb-lttjx",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "448677",
+                "uid": "c6f6513d-0bff-45bf-b32b-5ea3feb882a2"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-09-13T15:53:45Z",
+            "message": "Container image \"metronome-simulator:phase5\" already present on machine and can be accessed by the pod",
+            "metadata": {
+                "creationTimestamp": "2026-09-13T15:53:45Z",
+                "name": "metronome-simulator-58f995fbfb-lttjx.18d4ec5a8f0beb56",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "448687",
+                "uid": "e8518691-12f3-49e0-ac23-40b242e95a0e"
+            },
+            "reason": "Pulled",
+            "reportingComponent": "kubelet",
+            "reportingInstance": "desktop-worker",
+            "source": {
+                "component": "kubelet",
+                "host": "desktop-worker"
+            },
+            "type": "Normal"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 1,
+            "eventTime": null,
+            "firstTimestamp": "2026-09-13T15:53:45Z",
+            "involvedObject": {
+                "apiVersion": "v1",
+                "fieldPath": "spec.containers{simulator}",
+                "kind": "Pod",
+                "name": "metronome-simulator-58f995fbfb-lttjx",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "448677",
+                "uid": "c6f6513d-0bff-45bf-b32b-5ea3feb882a2"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-09-13T15:53:45Z",
+            "message": "Container created",
+            "metadata": {
+                "creationTimestamp": "2026-09-13T15:53:45Z",
+                "name": "metronome-simulator-58f995fbfb-lttjx.18d4ec5a95558146",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "448689",
+                "uid": "c5982858-6563-4fab-acf6-5ff42df77a38"
+            },
+            "reason": "Created",
+            "reportingComponent": "kubelet",
+            "reportingInstance": "desktop-worker",
+            "source": {
+                "component": "kubelet",
+                "host": "desktop-worker"
+            },
+            "type": "Normal"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 1,
+            "eventTime": null,
+            "firstTimestamp": "2026-09-13T15:53:46Z",
+            "involvedObject": {
+                "apiVersion": "v1",
+                "fieldPath": "spec.containers{simulator}",
+                "kind": "Pod",
+                "name": "metronome-simulator-58f995fbfb-lttjx",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "448677",
+                "uid": "c6f6513d-0bff-45bf-b32b-5ea3feb882a2"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-09-13T15:53:46Z",
+            "message": "Container started",
+            "metadata": {
+                "creationTimestamp": "2026-09-13T15:53:46Z",
+                "name": "metronome-simulator-58f995fbfb-lttjx.18d4ec5aa59d4206",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "448691",
+                "uid": "0826d972-d899-4d45-86fb-d5ae1366cdba"
+            },
+            "reason": "Started",
+            "reportingComponent": "kubelet",
+            "reportingInstance": "desktop-worker",
+            "source": {
+                "component": "kubelet",
+                "host": "desktop-worker"
+            },
+            "type": "Normal"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 1,
+            "eventTime": null,
+            "firstTimestamp": "2026-09-13T15:57:44Z",
+            "involvedObject": {
+                "apiVersion": "v1",
+                "fieldPath": "spec.containers{simulator}",
+                "kind": "Pod",
+                "name": "metronome-simulator-58f995fbfb-lttjx",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "448677",
+                "uid": "c6f6513d-0bff-45bf-b32b-5ea3feb882a2"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-09-13T15:57:44Z",
+            "message": "Stopping container simulator",
+            "metadata": {
+                "creationTimestamp": "2026-09-13T15:57:44Z",
+                "name": "metronome-simulator-58f995fbfb-lttjx.18d4ec923f849cfd",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "449246",
+                "uid": "e1c7b804-99e7-427f-b33a-2a58d2124c3b"
+            },
+            "reason": "Killing",
+            "reportingComponent": "kubelet",
+            "reportingInstance": "desktop-worker",
+            "source": {
+                "component": "kubelet",
+                "host": "desktop-worker"
+            },
+            "type": "Normal"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 1,
+            "eventTime": null,
+            "firstTimestamp": "2026-09-13T15:05:32Z",
+            "involvedObject": {
+                "apiVersion": "v1",
+                "kind": "Pod",
+                "name": "metronome-simulator-58f995fbfb-npl86",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "442460",
+                "uid": "0942e5df-6708-4909-a5b2-3fb1be580327"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-09-13T15:05:32Z",
+            "message": "Successfully assigned autoscaling-lab/metronome-simulator-58f995fbfb-npl86 to desktop-worker",
+            "metadata": {
+                "creationTimestamp": "2026-09-13T15:05:32Z",
+                "name": "metronome-simulator-58f995fbfb-npl86.18d4e9b90a2bd9ef",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "442467",
+                "uid": "06e010d1-444c-4f20-81ea-aca9b0c1fde8"
+            },
+            "reason": "Scheduled",
+            "reportingComponent": "default-scheduler",
+            "reportingInstance": "",
+            "source": {
+                "component": "default-scheduler"
+            },
+            "type": "Normal"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 1,
+            "eventTime": null,
+            "firstTimestamp": "2026-09-13T15:05:33Z",
+            "involvedObject": {
+                "apiVersion": "v1",
+                "fieldPath": "spec.containers{simulator}",
+                "kind": "Pod",
+                "name": "metronome-simulator-58f995fbfb-npl86",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "442463",
+                "uid": "0942e5df-6708-4909-a5b2-3fb1be580327"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-09-13T15:05:33Z",
+            "message": "Container image \"metronome-simulator:phase5\" already present on machine and can be accessed by the pod",
+            "metadata": {
+                "creationTimestamp": "2026-09-13T15:05:33Z",
+                "name": "metronome-simulator-58f995fbfb-npl86.18d4e9b933b91073",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "442476",
+                "uid": "480de3ae-be9c-4bba-9fc8-0505cd4ef1d4"
+            },
+            "reason": "Pulled",
+            "reportingComponent": "kubelet",
+            "reportingInstance": "desktop-worker",
+            "source": {
+                "component": "kubelet",
+                "host": "desktop-worker"
+            },
+            "type": "Normal"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 1,
+            "eventTime": null,
+            "firstTimestamp": "2026-09-13T15:05:33Z",
+            "involvedObject": {
+                "apiVersion": "v1",
+                "fieldPath": "spec.containers{simulator}",
+                "kind": "Pod",
+                "name": "metronome-simulator-58f995fbfb-npl86",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "442463",
+                "uid": "0942e5df-6708-4909-a5b2-3fb1be580327"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-09-13T15:05:33Z",
+            "message": "Container created",
+            "metadata": {
+                "creationTimestamp": "2026-09-13T15:05:33Z",
+                "name": "metronome-simulator-58f995fbfb-npl86.18d4e9b937ef3517",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "442478",
+                "uid": "c1f31657-1768-4901-b3f4-6aee665aae3b"
+            },
+            "reason": "Created",
+            "reportingComponent": "kubelet",
+            "reportingInstance": "desktop-worker",
+            "source": {
+                "component": "kubelet",
+                "host": "desktop-worker"
+            },
+            "type": "Normal"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 1,
+            "eventTime": null,
+            "firstTimestamp": "2026-09-13T15:05:33Z",
+            "involvedObject": {
+                "apiVersion": "v1",
+                "fieldPath": "spec.containers{simulator}",
+                "kind": "Pod",
+                "name": "metronome-simulator-58f995fbfb-npl86",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "442463",
+                "uid": "0942e5df-6708-4909-a5b2-3fb1be580327"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-09-13T15:05:33Z",
+            "message": "Container started",
+            "metadata": {
+                "creationTimestamp": "2026-09-13T15:05:33Z",
+                "name": "metronome-simulator-58f995fbfb-npl86.18d4e9b944436515",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "442483",
+                "uid": "a6f4c3b5-d0d8-4c66-87de-0dff59a8da82"
+            },
+            "reason": "Started",
+            "reportingComponent": "kubelet",
+            "reportingInstance": "desktop-worker",
+            "source": {
+                "component": "kubelet",
+                "host": "desktop-worker"
+            },
+            "type": "Normal"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 1,
+            "eventTime": null,
+            "firstTimestamp": "2026-09-13T15:20:37Z",
+            "involvedObject": {
+                "apiVersion": "v1",
+                "fieldPath": "spec.containers{simulator}",
+                "kind": "Pod",
+                "name": "metronome-simulator-58f995fbfb-npl86",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "442463",
+                "uid": "0942e5df-6708-4909-a5b2-3fb1be580327"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-09-13T15:20:37Z",
+            "message": "Stopping container simulator",
+            "metadata": {
+                "creationTimestamp": "2026-09-13T15:20:37Z",
+                "name": "metronome-simulator-58f995fbfb-npl86.18d4ea8bb96f4a6a",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "444447",
+                "uid": "d4e52383-4575-46b8-b099-9e313b037746"
+            },
+            "reason": "Killing",
+            "reportingComponent": "kubelet",
+            "reportingInstance": "desktop-worker",
+            "source": {
+                "component": "kubelet",
+                "host": "desktop-worker"
+            },
+            "type": "Normal"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 1,
+            "eventTime": null,
+            "firstTimestamp": "2026-09-13T15:05:02Z",
+            "involvedObject": {
+                "apiVersion": "v1",
+                "kind": "Pod",
+                "name": "metronome-simulator-58f995fbfb-nqpvn",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "442361",
+                "uid": "28182aff-ab4e-436c-aae1-e6f1b21ef11d"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-09-13T15:05:02Z",
+            "message": "Successfully assigned autoscaling-lab/metronome-simulator-58f995fbfb-nqpvn to desktop-worker2",
+            "metadata": {
+                "creationTimestamp": "2026-09-13T15:05:02Z",
+                "name": "metronome-simulator-58f995fbfb-nqpvn.18d4e9b208240264",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "442367",
+                "uid": "cd62df0c-734e-481d-8f03-6cededd3be6c"
+            },
+            "reason": "Scheduled",
+            "reportingComponent": "default-scheduler",
+            "reportingInstance": "",
+            "source": {
+                "component": "default-scheduler"
+            },
+            "type": "Normal"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 1,
+            "eventTime": null,
+            "firstTimestamp": "2026-09-13T15:05:03Z",
+            "involvedObject": {
+                "apiVersion": "v1",
+                "fieldPath": "spec.containers{simulator}",
+                "kind": "Pod",
+                "name": "metronome-simulator-58f995fbfb-nqpvn",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "442364",
+                "uid": "28182aff-ab4e-436c-aae1-e6f1b21ef11d"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-09-13T15:05:03Z",
+            "message": "Container image \"metronome-simulator:phase5\" already present on machine and can be accessed by the pod",
+            "metadata": {
+                "creationTimestamp": "2026-09-13T15:05:03Z",
+                "name": "metronome-simulator-58f995fbfb-nqpvn.18d4e9b23c9bcb71",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "442373",
+                "uid": "07a485fa-612f-4f0e-9a17-4657c10e687c"
+            },
+            "reason": "Pulled",
+            "reportingComponent": "kubelet",
+            "reportingInstance": "desktop-worker2",
+            "source": {
+                "component": "kubelet",
+                "host": "desktop-worker2"
+            },
+            "type": "Normal"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 1,
+            "eventTime": null,
+            "firstTimestamp": "2026-09-13T15:05:03Z",
+            "involvedObject": {
+                "apiVersion": "v1",
+                "fieldPath": "spec.containers{simulator}",
+                "kind": "Pod",
+                "name": "metronome-simulator-58f995fbfb-nqpvn",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "442364",
+                "uid": "28182aff-ab4e-436c-aae1-e6f1b21ef11d"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-09-13T15:05:03Z",
+            "message": "Container created",
+            "metadata": {
+                "creationTimestamp": "2026-09-13T15:05:03Z",
+                "name": "metronome-simulator-58f995fbfb-nqpvn.18d4e9b24299614b",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "442375",
+                "uid": "6a9f018d-9d61-469b-a22a-49199b3a9b73"
+            },
+            "reason": "Created",
+            "reportingComponent": "kubelet",
+            "reportingInstance": "desktop-worker2",
+            "source": {
+                "component": "kubelet",
+                "host": "desktop-worker2"
+            },
+            "type": "Normal"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 1,
+            "eventTime": null,
+            "firstTimestamp": "2026-09-13T15:05:04Z",
+            "involvedObject": {
+                "apiVersion": "v1",
+                "fieldPath": "spec.containers{simulator}",
+                "kind": "Pod",
+                "name": "metronome-simulator-58f995fbfb-nqpvn",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "442364",
+                "uid": "28182aff-ab4e-436c-aae1-e6f1b21ef11d"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-09-13T15:05:04Z",
+            "message": "Container started",
+            "metadata": {
+                "creationTimestamp": "2026-09-13T15:05:04Z",
+                "name": "metronome-simulator-58f995fbfb-nqpvn.18d4e9b250cf2778",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "442376",
+                "uid": "09d57429-d220-4f44-b1c1-041e74cf653a"
+            },
+            "reason": "Started",
+            "reportingComponent": "kubelet",
+            "reportingInstance": "desktop-worker2",
+            "source": {
+                "component": "kubelet",
+                "host": "desktop-worker2"
+            },
+            "type": "Normal"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 1,
+            "eventTime": null,
+            "firstTimestamp": "2026-09-13T15:18:52Z",
+            "involvedObject": {
+                "apiVersion": "v1",
+                "fieldPath": "spec.containers{simulator}",
+                "kind": "Pod",
+                "name": "metronome-simulator-58f995fbfb-nqpvn",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "442364",
+                "uid": "28182aff-ab4e-436c-aae1-e6f1b21ef11d"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-09-13T15:18:52Z",
+            "message": "Stopping container simulator",
+            "metadata": {
+                "creationTimestamp": "2026-09-13T15:18:52Z",
+                "name": "metronome-simulator-58f995fbfb-nqpvn.18d4ea733901e4e3",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "444187",
+                "uid": "9eed1d4e-2e80-4c39-95dd-0de420a4dadc"
+            },
+            "reason": "Killing",
+            "reportingComponent": "kubelet",
+            "reportingInstance": "desktop-worker2",
+            "source": {
+                "component": "kubelet",
+                "host": "desktop-worker2"
+            },
+            "type": "Normal"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 1,
+            "eventTime": null,
+            "firstTimestamp": "2026-09-13T15:19:23Z",
+            "involvedObject": {
+                "apiVersion": "v1",
+                "fieldPath": "spec.containers{simulator}",
+                "kind": "Pod",
+                "name": "metronome-simulator-58f995fbfb-nqpvn",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "442364",
+                "uid": "28182aff-ab4e-436c-aae1-e6f1b21ef11d"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-09-13T15:19:23Z",
+            "message": "Readiness probe failed: Get \"http://10.244.2.8:3000/health/ready\": dial tcp 10.244.2.8:3000: connect: connection refused",
+            "metadata": {
+                "creationTimestamp": "2026-09-13T15:19:23Z",
+                "name": "metronome-simulator-58f995fbfb-nqpvn.18d4ea7a69b00e99",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "444261",
+                "uid": "ba2c7e63-3183-4b83-b9a0-c8882fc92dca"
+            },
+            "reason": "Unhealthy",
+            "reportingComponent": "kubelet",
+            "reportingInstance": "desktop-worker2",
+            "source": {
+                "component": "kubelet",
+                "host": "desktop-worker2"
+            },
+            "type": "Warning"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 1,
+            "eventTime": null,
+            "firstTimestamp": "2026-09-13T15:52:14Z",
+            "involvedObject": {
+                "apiVersion": "v1",
+                "kind": "Pod",
+                "name": "metronome-simulator-58f995fbfb-r7nlc",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "448379",
+                "uid": "a7241f38-a64f-4b7d-9898-9781a94546ac"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-09-13T15:52:14Z",
+            "message": "Successfully assigned autoscaling-lab/metronome-simulator-58f995fbfb-r7nlc to desktop-worker3",
+            "metadata": {
+                "creationTimestamp": "2026-09-13T15:52:14Z",
+                "name": "metronome-simulator-58f995fbfb-r7nlc.18d4ec454eef8d9b",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "448385",
+                "uid": "05594b48-3595-4186-9eef-2c873aae93ec"
+            },
+            "reason": "Scheduled",
+            "reportingComponent": "default-scheduler",
+            "reportingInstance": "",
+            "source": {
+                "component": "default-scheduler"
+            },
+            "type": "Normal"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 1,
+            "eventTime": null,
+            "firstTimestamp": "2026-09-13T15:52:15Z",
+            "involvedObject": {
+                "apiVersion": "v1",
+                "fieldPath": "spec.containers{simulator}",
+                "kind": "Pod",
+                "name": "metronome-simulator-58f995fbfb-r7nlc",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "448383",
+                "uid": "a7241f38-a64f-4b7d-9898-9781a94546ac"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-09-13T15:52:15Z",
+            "message": "Container image \"metronome-simulator:phase5\" already present on machine and can be accessed by the pod",
+            "metadata": {
+                "creationTimestamp": "2026-09-13T15:52:15Z",
+                "name": "metronome-simulator-58f995fbfb-r7nlc.18d4ec459d4e467b",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "448391",
+                "uid": "88632b40-5cfa-45ba-8670-e033b5f95f24"
+            },
+            "reason": "Pulled",
+            "reportingComponent": "kubelet",
+            "reportingInstance": "desktop-worker3",
+            "source": {
+                "component": "kubelet",
+                "host": "desktop-worker3"
+            },
+            "type": "Normal"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 1,
+            "eventTime": null,
+            "firstTimestamp": "2026-09-13T15:52:15Z",
+            "involvedObject": {
+                "apiVersion": "v1",
+                "fieldPath": "spec.containers{simulator}",
+                "kind": "Pod",
+                "name": "metronome-simulator-58f995fbfb-r7nlc",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "448383",
+                "uid": "a7241f38-a64f-4b7d-9898-9781a94546ac"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-09-13T15:52:15Z",
+            "message": "Container created",
+            "metadata": {
+                "creationTimestamp": "2026-09-13T15:52:15Z",
+                "name": "metronome-simulator-58f995fbfb-r7nlc.18d4ec45a4928262",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "448393",
+                "uid": "9dbc0b6f-71c1-464e-ad45-9fb0bbf5a31a"
+            },
+            "reason": "Created",
+            "reportingComponent": "kubelet",
+            "reportingInstance": "desktop-worker3",
+            "source": {
+                "component": "kubelet",
+                "host": "desktop-worker3"
+            },
+            "type": "Normal"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 1,
+            "eventTime": null,
+            "firstTimestamp": "2026-09-13T15:52:16Z",
+            "involvedObject": {
+                "apiVersion": "v1",
+                "fieldPath": "spec.containers{simulator}",
+                "kind": "Pod",
+                "name": "metronome-simulator-58f995fbfb-r7nlc",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "448383",
+                "uid": "a7241f38-a64f-4b7d-9898-9781a94546ac"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-09-13T15:52:16Z",
+            "message": "Container started",
+            "metadata": {
+                "creationTimestamp": "2026-09-13T15:52:16Z",
+                "name": "metronome-simulator-58f995fbfb-r7nlc.18d4ec45b4dad9dc",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "448394",
+                "uid": "b6630723-1b55-4912-b4e4-662ac4b240a7"
+            },
+            "reason": "Started",
+            "reportingComponent": "kubelet",
+            "reportingInstance": "desktop-worker3",
+            "source": {
+                "component": "kubelet",
+                "host": "desktop-worker3"
+            },
+            "type": "Normal"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 1,
+            "eventTime": null,
+            "firstTimestamp": "2026-09-13T15:57:44Z",
+            "involvedObject": {
+                "apiVersion": "v1",
+                "fieldPath": "spec.containers{simulator}",
+                "kind": "Pod",
+                "name": "metronome-simulator-58f995fbfb-r7nlc",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "448383",
+                "uid": "a7241f38-a64f-4b7d-9898-9781a94546ac"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-09-13T15:57:44Z",
+            "message": "Stopping container simulator",
+            "metadata": {
+                "creationTimestamp": "2026-09-13T15:57:44Z",
+                "name": "metronome-simulator-58f995fbfb-r7nlc.18d4ec923f51c4d1",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "449237",
+                "uid": "d157d178-dd22-4210-8202-582406ec3e15"
+            },
+            "reason": "Killing",
+            "reportingComponent": "kubelet",
+            "reportingInstance": "desktop-worker3",
+            "source": {
+                "component": "kubelet",
+                "host": "desktop-worker3"
+            },
+            "type": "Normal"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 1,
+            "eventTime": null,
+            "firstTimestamp": "2026-09-13T15:20:37Z",
+            "involvedObject": {
+                "apiVersion": "v1",
+                "fieldPath": "spec.containers{simulator}",
+                "kind": "Pod",
+                "name": "metronome-simulator-58f995fbfb-r9sjf",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "401120",
+                "uid": "99c20397-aa58-4b8e-ba79-fcd9ebec5add"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-09-13T15:20:37Z",
+            "message": "Stopping container simulator",
+            "metadata": {
+                "creationTimestamp": "2026-09-13T15:20:37Z",
+                "name": "metronome-simulator-58f995fbfb-r9sjf.18d4ea8bb97e0480",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "444452",
+                "uid": "fe5b621c-64a0-4fb7-9fa3-f7be3d34f9f0"
+            },
+            "reason": "Killing",
+            "reportingComponent": "kubelet",
+            "reportingInstance": "desktop-worker",
+            "source": {
+                "component": "kubelet",
+                "host": "desktop-worker"
+            },
+            "type": "Normal"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 1,
+            "eventTime": null,
+            "firstTimestamp": "2026-09-13T15:04:47Z",
+            "involvedObject": {
+                "apiVersion": "v1",
+                "kind": "Pod",
+                "name": "metronome-simulator-58f995fbfb-tgk4n",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "442299",
+                "uid": "84f592ba-c582-4bfc-9ac0-f03fef814fc9"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-09-13T15:04:47Z",
+            "message": "Successfully assigned autoscaling-lab/metronome-simulator-58f995fbfb-tgk4n to desktop-worker3",
+            "metadata": {
+                "creationTimestamp": "2026-09-13T15:04:47Z",
+                "name": "metronome-simulator-58f995fbfb-tgk4n.18d4e9ae8c3d8420",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "442306",
+                "uid": "e8983359-7201-43a7-8f3b-dd9e56027948"
+            },
+            "reason": "Scheduled",
+            "reportingComponent": "default-scheduler",
+            "reportingInstance": "",
+            "source": {
+                "component": "default-scheduler"
+            },
+            "type": "Normal"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 1,
+            "eventTime": null,
+            "firstTimestamp": "2026-09-13T15:04:49Z",
+            "involvedObject": {
+                "apiVersion": "v1",
+                "fieldPath": "spec.containers{simulator}",
+                "kind": "Pod",
+                "name": "metronome-simulator-58f995fbfb-tgk4n",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "442304",
+                "uid": "84f592ba-c582-4bfc-9ac0-f03fef814fc9"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-09-13T15:04:49Z",
+            "message": "Container image \"metronome-simulator:phase5\" already present on machine and can be accessed by the pod",
+            "metadata": {
+                "creationTimestamp": "2026-09-13T15:04:49Z",
+                "name": "metronome-simulator-58f995fbfb-tgk4n.18d4e9aed86b61bc",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "442310",
+                "uid": "5ec7ef98-f521-4c77-b686-a403cb1b7846"
+            },
+            "reason": "Pulled",
+            "reportingComponent": "kubelet",
+            "reportingInstance": "desktop-worker3",
+            "source": {
+                "component": "kubelet",
+                "host": "desktop-worker3"
+            },
+            "type": "Normal"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 1,
+            "eventTime": null,
+            "firstTimestamp": "2026-09-13T15:04:49Z",
+            "involvedObject": {
+                "apiVersion": "v1",
+                "fieldPath": "spec.containers{simulator}",
+                "kind": "Pod",
+                "name": "metronome-simulator-58f995fbfb-tgk4n",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "442304",
+                "uid": "84f592ba-c582-4bfc-9ac0-f03fef814fc9"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-09-13T15:04:49Z",
+            "message": "Container created",
+            "metadata": {
+                "creationTimestamp": "2026-09-13T15:04:49Z",
+                "name": "metronome-simulator-58f995fbfb-tgk4n.18d4e9aee2548e2a",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "442314",
+                "uid": "33389eb2-095f-4dba-80e8-b62bb13c5679"
+            },
+            "reason": "Created",
+            "reportingComponent": "kubelet",
+            "reportingInstance": "desktop-worker3",
+            "source": {
+                "component": "kubelet",
+                "host": "desktop-worker3"
+            },
+            "type": "Normal"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 1,
+            "eventTime": null,
+            "firstTimestamp": "2026-09-13T15:04:49Z",
+            "involvedObject": {
+                "apiVersion": "v1",
+                "fieldPath": "spec.containers{simulator}",
+                "kind": "Pod",
+                "name": "metronome-simulator-58f995fbfb-tgk4n",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "442304",
+                "uid": "84f592ba-c582-4bfc-9ac0-f03fef814fc9"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-09-13T15:04:49Z",
+            "message": "Container started",
+            "metadata": {
+                "creationTimestamp": "2026-09-13T15:04:49Z",
+                "name": "metronome-simulator-58f995fbfb-tgk4n.18d4e9af0838758c",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "442315",
+                "uid": "73265c4d-46e1-4b16-8a2a-b712f31dcfd5"
+            },
+            "reason": "Started",
+            "reportingComponent": "kubelet",
+            "reportingInstance": "desktop-worker3",
+            "source": {
+                "component": "kubelet",
+                "host": "desktop-worker3"
+            },
+            "type": "Normal"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 1,
+            "eventTime": null,
+            "firstTimestamp": "2026-09-13T15:18:52Z",
+            "involvedObject": {
+                "apiVersion": "v1",
+                "fieldPath": "spec.containers{simulator}",
+                "kind": "Pod",
+                "name": "metronome-simulator-58f995fbfb-tgk4n",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "442304",
+                "uid": "84f592ba-c582-4bfc-9ac0-f03fef814fc9"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-09-13T15:18:52Z",
+            "message": "Stopping container simulator",
+            "metadata": {
+                "creationTimestamp": "2026-09-13T15:18:52Z",
+                "name": "metronome-simulator-58f995fbfb-tgk4n.18d4ea733901ed21",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "444184",
+                "uid": "db27af75-d84c-4b1c-aa48-81dc93cfefef"
+            },
+            "reason": "Killing",
+            "reportingComponent": "kubelet",
+            "reportingInstance": "desktop-worker3",
+            "source": {
+                "component": "kubelet",
+                "host": "desktop-worker3"
+            },
+            "type": "Normal"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 1,
+            "eventTime": null,
+            "firstTimestamp": "2026-09-13T15:04:47Z",
+            "involvedObject": {
+                "apiVersion": "apps/v1",
+                "kind": "ReplicaSet",
+                "name": "metronome-simulator-58f995fbfb",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "442296",
+                "uid": "f23b6aa8-4b60-4d24-a976-45ea5460239b"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-09-13T15:04:47Z",
+            "message": "Created pod: metronome-simulator-58f995fbfb-tgk4n",
+            "metadata": {
+                "creationTimestamp": "2026-09-13T15:04:47Z",
+                "name": "metronome-simulator-58f995fbfb.18d4e9ae87e50c52",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "442301",
+                "uid": "fb43a9a9-6e56-4949-a99e-73b56bfce8c9"
+            },
+            "reason": "SuccessfulCreate",
+            "reportingComponent": "replicaset-controller",
+            "reportingInstance": "",
+            "source": {
+                "component": "replicaset-controller"
+            },
+            "type": "Normal"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 1,
+            "eventTime": null,
+            "firstTimestamp": "2026-09-13T15:05:02Z",
+            "involvedObject": {
+                "apiVersion": "apps/v1",
+                "kind": "ReplicaSet",
+                "name": "metronome-simulator-58f995fbfb",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "442359",
+                "uid": "f23b6aa8-4b60-4d24-a976-45ea5460239b"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-09-13T15:05:02Z",
+            "message": "Created pod: metronome-simulator-58f995fbfb-nqpvn",
+            "metadata": {
+                "creationTimestamp": "2026-09-13T15:05:02Z",
+                "name": "metronome-simulator-58f995fbfb.18d4e9b206d166ff",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "442363",
+                "uid": "5ccd1e49-bd33-42b9-9d79-667f0771a573"
+            },
+            "reason": "SuccessfulCreate",
+            "reportingComponent": "replicaset-controller",
+            "reportingInstance": "",
+            "source": {
+                "component": "replicaset-controller"
+            },
+            "type": "Normal"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 1,
+            "eventTime": null,
+            "firstTimestamp": "2026-09-13T15:05:32Z",
+            "involvedObject": {
+                "apiVersion": "apps/v1",
+                "kind": "ReplicaSet",
+                "name": "metronome-simulator-58f995fbfb",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "442454",
+                "uid": "f23b6aa8-4b60-4d24-a976-45ea5460239b"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-09-13T15:05:32Z",
+            "message": "Created pod: metronome-simulator-58f995fbfb-7l7fz",
+            "metadata": {
+                "creationTimestamp": "2026-09-13T15:05:32Z",
+                "name": "metronome-simulator-58f995fbfb.18d4e9b9071bcdc6",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "442459",
+                "uid": "60d6cdbc-f1ef-4387-805d-b596e2cba6ee"
+            },
+            "reason": "SuccessfulCreate",
+            "reportingComponent": "replicaset-controller",
+            "reportingInstance": "",
+            "source": {
+                "component": "replicaset-controller"
+            },
+            "type": "Normal"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 1,
+            "eventTime": null,
+            "firstTimestamp": "2026-09-13T15:05:32Z",
+            "involvedObject": {
+                "apiVersion": "apps/v1",
+                "kind": "ReplicaSet",
+                "name": "metronome-simulator-58f995fbfb",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "442454",
+                "uid": "f23b6aa8-4b60-4d24-a976-45ea5460239b"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-09-13T15:05:32Z",
+            "message": "Created pod: metronome-simulator-58f995fbfb-npl86",
+            "metadata": {
+                "creationTimestamp": "2026-09-13T15:05:32Z",
+                "name": "metronome-simulator-58f995fbfb.18d4e9b908908c05",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "442462",
+                "uid": "7b2808ec-b96a-4eef-9906-168105aac20d"
+            },
+            "reason": "SuccessfulCreate",
+            "reportingComponent": "replicaset-controller",
+            "reportingInstance": "",
+            "source": {
+                "component": "replicaset-controller"
+            },
+            "type": "Normal"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 1,
+            "eventTime": null,
+            "firstTimestamp": "2026-09-13T15:05:47Z",
+            "involvedObject": {
+                "apiVersion": "apps/v1",
+                "kind": "ReplicaSet",
+                "name": "metronome-simulator-58f995fbfb",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "442528",
+                "uid": "f23b6aa8-4b60-4d24-a976-45ea5460239b"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-09-13T15:05:47Z",
+            "message": "Created pod: metronome-simulator-58f995fbfb-g4hcm",
+            "metadata": {
+                "creationTimestamp": "2026-09-13T15:05:47Z",
+                "name": "metronome-simulator-58f995fbfb.18d4e9bc888fe22f",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "442531",
+                "uid": "7fc72af2-cdc1-4dcb-b282-d855c4d915a8"
+            },
+            "reason": "SuccessfulCreate",
+            "reportingComponent": "replicaset-controller",
+            "reportingInstance": "",
+            "source": {
+                "component": "replicaset-controller"
+            },
+            "type": "Normal"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 1,
+            "eventTime": null,
+            "firstTimestamp": "2026-09-13T15:18:52Z",
+            "involvedObject": {
+                "apiVersion": "apps/v1",
+                "kind": "ReplicaSet",
+                "name": "metronome-simulator-58f995fbfb",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "444176",
+                "uid": "f23b6aa8-4b60-4d24-a976-45ea5460239b"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-09-13T15:18:52Z",
+            "message": "Deleted pod: metronome-simulator-58f995fbfb-g4hcm",
+            "metadata": {
+                "creationTimestamp": "2026-09-13T15:18:52Z",
+                "name": "metronome-simulator-58f995fbfb.18d4ea733813a289",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "444182",
+                "uid": "4b8af59c-e9b2-4123-b98c-b4b3cbc66fa5"
+            },
+            "reason": "SuccessfulDelete",
+            "reportingComponent": "replicaset-controller",
+            "reportingInstance": "",
+            "source": {
+                "component": "replicaset-controller"
+            },
+            "type": "Normal"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 1,
+            "eventTime": null,
+            "firstTimestamp": "2026-09-13T15:18:52Z",
+            "involvedObject": {
+                "apiVersion": "apps/v1",
+                "kind": "ReplicaSet",
+                "name": "metronome-simulator-58f995fbfb",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "444176",
+                "uid": "f23b6aa8-4b60-4d24-a976-45ea5460239b"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-09-13T15:18:52Z",
+            "message": "Deleted pod: metronome-simulator-58f995fbfb-nqpvn",
+            "metadata": {
+                "creationTimestamp": "2026-09-13T15:18:52Z",
+                "name": "metronome-simulator-58f995fbfb.18d4ea7338585b47",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "444183",
+                "uid": "9f0c5428-abdf-426a-b465-b460af4e905c"
+            },
+            "reason": "SuccessfulDelete",
+            "reportingComponent": "replicaset-controller",
+            "reportingInstance": "",
+            "source": {
+                "component": "replicaset-controller"
+            },
+            "type": "Normal"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 1,
+            "eventTime": null,
+            "firstTimestamp": "2026-09-13T15:18:52Z",
+            "involvedObject": {
+                "apiVersion": "apps/v1",
+                "kind": "ReplicaSet",
+                "name": "metronome-simulator-58f995fbfb",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "444176",
+                "uid": "f23b6aa8-4b60-4d24-a976-45ea5460239b"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-09-13T15:18:52Z",
+            "message": "Deleted pod: metronome-simulator-58f995fbfb-tgk4n",
+            "metadata": {
+                "creationTimestamp": "2026-09-13T15:18:52Z",
+                "name": "metronome-simulator-58f995fbfb.18d4ea7338747657",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "444188",
+                "uid": "042ddebc-9611-425d-9275-4a1d13cba824"
+            },
+            "reason": "SuccessfulDelete",
+            "reportingComponent": "replicaset-controller",
+            "reportingInstance": "",
+            "source": {
+                "component": "replicaset-controller"
+            },
+            "type": "Normal"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 1,
+            "eventTime": null,
+            "firstTimestamp": "2026-09-13T15:20:37Z",
+            "involvedObject": {
+                "apiVersion": "apps/v1",
+                "kind": "ReplicaSet",
+                "name": "metronome-simulator-58f995fbfb",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "444440",
+                "uid": "f23b6aa8-4b60-4d24-a976-45ea5460239b"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-09-13T15:20:37Z",
+            "message": "Deleted pod: metronome-simulator-58f995fbfb-npl86",
+            "metadata": {
+                "creationTimestamp": "2026-09-13T15:20:37Z",
+                "name": "metronome-simulator-58f995fbfb.18d4ea8bb92eb664",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "444446",
+                "uid": "24ab75b1-3e40-4ac6-96d5-2a6f68d4ad0c"
+            },
+            "reason": "SuccessfulDelete",
+            "reportingComponent": "replicaset-controller",
+            "reportingInstance": "",
+            "source": {
+                "component": "replicaset-controller"
+            },
+            "type": "Normal"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 1,
+            "eventTime": null,
+            "firstTimestamp": "2026-09-13T15:20:37Z",
+            "involvedObject": {
+                "apiVersion": "apps/v1",
+                "kind": "ReplicaSet",
+                "name": "metronome-simulator-58f995fbfb",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "444440",
+                "uid": "f23b6aa8-4b60-4d24-a976-45ea5460239b"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-09-13T15:20:37Z",
+            "message": "Deleted pod: metronome-simulator-58f995fbfb-r9sjf",
+            "metadata": {
+                "creationTimestamp": "2026-09-13T15:20:37Z",
+                "name": "metronome-simulator-58f995fbfb.18d4ea8bb930cc0b",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "444448",
+                "uid": "4e81843c-a61c-4c7a-805b-76c94492d3dc"
+            },
+            "reason": "SuccessfulDelete",
+            "reportingComponent": "replicaset-controller",
+            "reportingInstance": "",
+            "source": {
+                "component": "replicaset-controller"
+            },
+            "type": "Normal"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 1,
+            "eventTime": null,
+            "firstTimestamp": "2026-09-13T15:52:14Z",
+            "involvedObject": {
+                "apiVersion": "apps/v1",
+                "kind": "ReplicaSet",
+                "name": "metronome-simulator-58f995fbfb",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "448375",
+                "uid": "f23b6aa8-4b60-4d24-a976-45ea5460239b"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-09-13T15:52:14Z",
+            "message": "Created pod: metronome-simulator-58f995fbfb-r7nlc",
+            "metadata": {
+                "creationTimestamp": "2026-09-13T15:52:14Z",
+                "name": "metronome-simulator-58f995fbfb.18d4ec454ac73057",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "448380",
+                "uid": "bda3a8bc-a2a5-4cda-bee0-a146c237cbb5"
+            },
+            "reason": "SuccessfulCreate",
+            "reportingComponent": "replicaset-controller",
+            "reportingInstance": "",
+            "source": {
+                "component": "replicaset-controller"
+            },
+            "type": "Normal"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 1,
+            "eventTime": null,
+            "firstTimestamp": "2026-09-13T15:52:29Z",
+            "involvedObject": {
+                "apiVersion": "apps/v1",
+                "kind": "ReplicaSet",
+                "name": "metronome-simulator-58f995fbfb",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "448440",
+                "uid": "f23b6aa8-4b60-4d24-a976-45ea5460239b"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-09-13T15:52:29Z",
+            "message": "Created pod: metronome-simulator-58f995fbfb-d7tpc",
+            "metadata": {
+                "creationTimestamp": "2026-09-13T15:52:29Z",
+                "name": "metronome-simulator-58f995fbfb.18d4ec48cb51f9c4",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "448443",
+                "uid": "c68d2885-3ff2-44ff-84f4-5ce3d10f6d4f"
+            },
+            "reason": "SuccessfulCreate",
+            "reportingComponent": "replicaset-controller",
+            "reportingInstance": "",
+            "source": {
+                "component": "replicaset-controller"
+            },
+            "type": "Normal"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 1,
+            "eventTime": null,
+            "firstTimestamp": "2026-09-13T15:52:59Z",
+            "involvedObject": {
+                "apiVersion": "apps/v1",
+                "kind": "ReplicaSet",
+                "name": "metronome-simulator-58f995fbfb",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "448531",
+                "uid": "f23b6aa8-4b60-4d24-a976-45ea5460239b"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-09-13T15:52:59Z",
+            "message": "Created pod: metronome-simulator-58f995fbfb-cbq76",
+            "metadata": {
+                "creationTimestamp": "2026-09-13T15:52:59Z",
+                "name": "metronome-simulator-58f995fbfb.18d4ec4fd1c1c7cb",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "448536",
+                "uid": "7d93146d-7bb9-4509-8688-4c9df6f55e6f"
+            },
+            "reason": "SuccessfulCreate",
+            "reportingComponent": "replicaset-controller",
+            "reportingInstance": "",
+            "source": {
+                "component": "replicaset-controller"
+            },
+            "type": "Normal"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 1,
+            "eventTime": null,
+            "firstTimestamp": "2026-09-13T15:52:59Z",
+            "involvedObject": {
+                "apiVersion": "apps/v1",
+                "kind": "ReplicaSet",
+                "name": "metronome-simulator-58f995fbfb",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "448531",
+                "uid": "f23b6aa8-4b60-4d24-a976-45ea5460239b"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-09-13T15:52:59Z",
+            "message": "Created pod: metronome-simulator-58f995fbfb-lnl6n",
+            "metadata": {
+                "creationTimestamp": "2026-09-13T15:52:59Z",
+                "name": "metronome-simulator-58f995fbfb.18d4ec4fd2ae9c9f",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "448539",
+                "uid": "31847116-f36c-4904-8138-6a6396261d23"
+            },
+            "reason": "SuccessfulCreate",
+            "reportingComponent": "replicaset-controller",
+            "reportingInstance": "",
+            "source": {
+                "component": "replicaset-controller"
+            },
+            "type": "Normal"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 1,
+            "eventTime": null,
+            "firstTimestamp": "2026-09-13T15:53:44Z",
+            "involvedObject": {
+                "apiVersion": "apps/v1",
+                "kind": "ReplicaSet",
+                "name": "metronome-simulator-58f995fbfb",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "448670",
+                "uid": "f23b6aa8-4b60-4d24-a976-45ea5460239b"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-09-13T15:53:44Z",
+            "message": "Created pod: metronome-simulator-58f995fbfb-lttjx",
+            "metadata": {
+                "creationTimestamp": "2026-09-13T15:53:44Z",
+                "name": "metronome-simulator-58f995fbfb.18d4ec5a54b89ec0",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "448674",
+                "uid": "3d863a20-7cb3-49d4-a621-c7e2fcd90750"
+            },
+            "reason": "SuccessfulCreate",
+            "reportingComponent": "replicaset-controller",
+            "reportingInstance": "",
+            "source": {
+                "component": "replicaset-controller"
+            },
+            "type": "Normal"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 1,
+            "eventTime": null,
+            "firstTimestamp": "2026-09-13T15:57:29Z",
+            "involvedObject": {
+                "apiVersion": "apps/v1",
+                "kind": "ReplicaSet",
+                "name": "metronome-simulator-58f995fbfb",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "449183",
+                "uid": "f23b6aa8-4b60-4d24-a976-45ea5460239b"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-09-13T15:57:29Z",
+            "message": "Deleted pod: metronome-simulator-58f995fbfb-lnl6n",
+            "metadata": {
+                "creationTimestamp": "2026-09-13T15:57:29Z",
+                "name": "metronome-simulator-58f995fbfb.18d4ec8ec439946e",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "449188",
+                "uid": "32a0b7ac-5069-48e6-920b-44f2d571a6b7"
+            },
+            "reason": "SuccessfulDelete",
+            "reportingComponent": "replicaset-controller",
+            "reportingInstance": "",
+            "source": {
+                "component": "replicaset-controller"
+            },
+            "type": "Normal"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 1,
+            "eventTime": null,
+            "firstTimestamp": "2026-09-13T15:57:29Z",
+            "involvedObject": {
+                "apiVersion": "apps/v1",
+                "kind": "ReplicaSet",
+                "name": "metronome-simulator-58f995fbfb",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "449183",
+                "uid": "f23b6aa8-4b60-4d24-a976-45ea5460239b"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-09-13T15:57:29Z",
+            "message": "Deleted pod: metronome-simulator-58f995fbfb-cbq76",
+            "metadata": {
+                "creationTimestamp": "2026-09-13T15:57:29Z",
+                "name": "metronome-simulator-58f995fbfb.18d4ec8ec48deb10",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "449192",
+                "uid": "83e42ca9-f729-4762-977f-5bf3954beaad"
+            },
+            "reason": "SuccessfulDelete",
+            "reportingComponent": "replicaset-controller",
+            "reportingInstance": "",
+            "source": {
+                "component": "replicaset-controller"
+            },
+            "type": "Normal"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 1,
+            "eventTime": null,
+            "firstTimestamp": "2026-09-13T15:57:44Z",
+            "involvedObject": {
+                "apiVersion": "apps/v1",
+                "kind": "ReplicaSet",
+                "name": "metronome-simulator-58f995fbfb",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "449230",
+                "uid": "f23b6aa8-4b60-4d24-a976-45ea5460239b"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-09-13T15:57:44Z",
+            "message": "Deleted pod: metronome-simulator-58f995fbfb-lttjx",
+            "metadata": {
+                "creationTimestamp": "2026-09-13T15:57:44Z",
+                "name": "metronome-simulator-58f995fbfb.18d4ec923f3d7646",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "449236",
+                "uid": "89a2383e-6a6e-454a-bd11-48b74762d672"
+            },
+            "reason": "SuccessfulDelete",
+            "reportingComponent": "replicaset-controller",
+            "reportingInstance": "",
+            "source": {
+                "component": "replicaset-controller"
+            },
+            "type": "Normal"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 1,
+            "eventTime": null,
+            "firstTimestamp": "2026-09-13T15:57:44Z",
+            "involvedObject": {
+                "apiVersion": "apps/v1",
+                "kind": "ReplicaSet",
+                "name": "metronome-simulator-58f995fbfb",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "449230",
+                "uid": "f23b6aa8-4b60-4d24-a976-45ea5460239b"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-09-13T15:57:44Z",
+            "message": "Deleted pod: metronome-simulator-58f995fbfb-d7tpc",
+            "metadata": {
+                "creationTimestamp": "2026-09-13T15:57:44Z",
+                "name": "metronome-simulator-58f995fbfb.18d4ec923f4fc688",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "449247",
+                "uid": "7577fd11-c9ec-4dc7-be43-11620f2ee2d6"
+            },
+            "reason": "SuccessfulDelete",
+            "reportingComponent": "replicaset-controller",
+            "reportingInstance": "",
+            "source": {
+                "component": "replicaset-controller"
+            },
+            "type": "Normal"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 1,
+            "eventTime": null,
+            "firstTimestamp": "2026-09-13T15:57:44Z",
+            "involvedObject": {
+                "apiVersion": "apps/v1",
+                "kind": "ReplicaSet",
+                "name": "metronome-simulator-58f995fbfb",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "449230",
+                "uid": "f23b6aa8-4b60-4d24-a976-45ea5460239b"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-09-13T15:57:44Z",
+            "message": "Deleted pod: metronome-simulator-58f995fbfb-r7nlc",
+            "metadata": {
+                "creationTimestamp": "2026-09-13T15:57:44Z",
+                "name": "metronome-simulator-58f995fbfb.18d4ec923f7fff51",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "449242",
+                "uid": "9f7d2447-661f-4c2f-b18e-679a368ed12e"
+            },
+            "reason": "SuccessfulDelete",
+            "reportingComponent": "replicaset-controller",
+            "reportingInstance": "",
+            "source": {
+                "component": "replicaset-controller"
+            },
+            "type": "Normal"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 5,
+            "eventTime": null,
+            "firstTimestamp": "2026-09-13T09:31:45Z",
+            "involvedObject": {
+                "apiVersion": "autoscaling/v2",
+                "kind": "HorizontalPodAutoscaler",
+                "name": "metronome-simulator",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "439096",
+                "uid": "7708bea0-3c78-4add-9c01-a785952735c7"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-09-13T15:52:29Z",
+            "message": "New size: 3; reason: cpu resource utilization (percentage of request) above target",
+            "metadata": {
+                "creationTimestamp": "2026-09-13T14:40:40Z",
+                "name": "metronome-simulator.18d4d781efd4f935",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "448438",
+                "uid": "e5742c3b-4472-43d0-9ac8-92d01be13dae"
+            },
+            "reason": "SuccessfulRescale",
+            "reportingComponent": "horizontal-pod-autoscaler",
+            "reportingInstance": "",
+            "source": {
+                "component": "horizontal-pod-autoscaler"
+            },
+            "type": "Normal"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 5,
+            "eventTime": null,
+            "firstTimestamp": "2026-09-13T09:41:31Z",
+            "involvedObject": {
+                "apiVersion": "autoscaling/v2",
+                "kind": "HorizontalPodAutoscaler",
+                "name": "metronome-simulator",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "440427",
+                "uid": "7708bea0-3c78-4add-9c01-a785952735c7"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-09-13T15:57:44Z",
+            "message": "New size: 1; reason: All metrics below target",
+            "metadata": {
+                "creationTimestamp": "2026-09-13T14:49:58Z",
+                "name": "metronome-simulator.18d4d80a7a1c1ccf",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "449229",
+                "uid": "3a67412f-5d3f-4ebf-8a7f-e107324a5048"
+            },
+            "reason": "SuccessfulRescale",
+            "reportingComponent": "horizontal-pod-autoscaler",
+            "reportingInstance": "",
+            "source": {
+                "component": "horizontal-pod-autoscaler"
+            },
+            "type": "Normal"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 4,
+            "eventTime": null,
+            "firstTimestamp": "2026-09-13T10:27:20Z",
+            "involvedObject": {
+                "apiVersion": "autoscaling/v2",
+                "kind": "HorizontalPodAutoscaler",
+                "name": "metronome-simulator",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "439157",
+                "uid": "7708bea0-3c78-4add-9c01-a785952735c7"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-09-13T15:52:59Z",
+            "message": "New size: 5; reason: cpu resource utilization (percentage of request) above target",
+            "metadata": {
+                "creationTimestamp": "2026-09-13T14:40:56Z",
+                "name": "metronome-simulator.18d4da8a989a4cc2",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "448532",
+                "uid": "38983bd8-ea3b-478f-b6b9-ef27cb009d3d"
+            },
+            "reason": "SuccessfulRescale",
+            "reportingComponent": "horizontal-pod-autoscaler",
+            "reportingInstance": "",
+            "source": {
+                "component": "horizontal-pod-autoscaler"
+            },
+            "type": "Normal"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 4,
+            "eventTime": null,
+            "firstTimestamp": "2026-09-13T10:27:20Z",
+            "involvedObject": {
+                "apiVersion": "apps/v1",
+                "kind": "Deployment",
+                "name": "metronome-simulator",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "439216",
+                "uid": "c7846d60-3603-4085-9345-3916f54bcf97"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-09-13T15:52:59Z",
+            "message": "Scaled up replica set metronome-simulator-58f995fbfb from 3 to 5",
+            "metadata": {
+                "creationTimestamp": "2026-09-13T14:40:56Z",
+                "name": "metronome-simulator.18d4da8a9c519101",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "448533",
+                "uid": "d27abca9-dcb6-406f-baee-3704e2fa41e7"
+            },
+            "reason": "ScalingReplicaSet",
+            "reportingComponent": "deployment-controller",
+            "reportingInstance": "",
+            "source": {
+                "component": "deployment-controller"
+            },
+            "type": "Normal"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 4,
+            "eventTime": null,
+            "firstTimestamp": "2026-09-13T10:27:35Z",
+            "involvedObject": {
+                "apiVersion": "autoscaling/v2",
+                "kind": "HorizontalPodAutoscaler",
+                "name": "metronome-simulator",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "439299",
+                "uid": "7708bea0-3c78-4add-9c01-a785952735c7"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-09-13T15:53:44Z",
+            "message": "New size: 6; reason: cpu resource utilization (percentage of request) above target",
+            "metadata": {
+                "creationTimestamp": "2026-09-13T14:41:26Z",
+                "name": "metronome-simulator.18d4da8e2065cd8e",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "448669",
+                "uid": "db76dc66-4e4a-4167-a1a1-5bbc2c57a6ca"
+            },
+            "reason": "SuccessfulRescale",
+            "reportingComponent": "horizontal-pod-autoscaler",
+            "reportingInstance": "",
+            "source": {
+                "component": "horizontal-pod-autoscaler"
+            },
+            "type": "Normal"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 4,
+            "eventTime": null,
+            "firstTimestamp": "2026-09-13T10:27:35Z",
+            "involvedObject": {
+                "apiVersion": "apps/v1",
+                "kind": "Deployment",
+                "name": "metronome-simulator",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "439327",
+                "uid": "c7846d60-3603-4085-9345-3916f54bcf97"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-09-13T15:53:44Z",
+            "message": "Scaled up replica set metronome-simulator-58f995fbfb from 5 to 6",
+            "metadata": {
+                "creationTimestamp": "2026-09-13T14:41:26Z",
+                "name": "metronome-simulator.18d4da8e227e9059",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "448671",
+                "uid": "963bcbaa-899a-4093-8615-b6f174c11c74"
+            },
+            "reason": "ScalingReplicaSet",
+            "reportingComponent": "deployment-controller",
+            "reportingInstance": "",
+            "source": {
+                "component": "deployment-controller"
+            },
+            "type": "Normal"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 3,
+            "eventTime": null,
+            "firstTimestamp": "2026-09-13T14:40:25Z",
+            "involvedObject": {
+                "apiVersion": "autoscaling/v2",
+                "kind": "HorizontalPodAutoscaler",
+                "name": "metronome-simulator",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "439002",
+                "uid": "7708bea0-3c78-4add-9c01-a785952735c7"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-09-13T15:52:14Z",
+            "message": "New size: 2; reason: cpu resource utilization (percentage of request) above target",
+            "metadata": {
+                "creationTimestamp": "2026-09-13T14:40:25Z",
+                "name": "metronome-simulator.18d4e859f5ac9306",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "448374",
+                "uid": "18f39903-7d97-498c-8852-257fc41eb017"
+            },
+            "reason": "SuccessfulRescale",
+            "reportingComponent": "horizontal-pod-autoscaler",
+            "reportingInstance": "",
+            "source": {
+                "component": "horizontal-pod-autoscaler"
+            },
+            "type": "Normal"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 3,
+            "eventTime": null,
+            "firstTimestamp": "2026-09-13T14:40:25Z",
+            "involvedObject": {
+                "apiVersion": "apps/v1",
+                "kind": "Deployment",
+                "name": "metronome-simulator",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "439095",
+                "uid": "c7846d60-3603-4085-9345-3916f54bcf97"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-09-13T15:52:14Z",
+            "message": "Scaled up replica set metronome-simulator-58f995fbfb from 1 to 2",
+            "metadata": {
+                "creationTimestamp": "2026-09-13T14:40:25Z",
+                "name": "metronome-simulator.18d4e859fbc6e661",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "448376",
+                "uid": "a9597dd7-fe79-4f29-8112-0ff05b6a8f05"
+            },
+            "reason": "ScalingReplicaSet",
+            "reportingComponent": "deployment-controller",
+            "reportingInstance": "",
+            "source": {
+                "component": "deployment-controller"
+            },
+            "type": "Normal"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 3,
+            "eventTime": null,
+            "firstTimestamp": "2026-09-13T14:40:40Z",
+            "involvedObject": {
+                "apiVersion": "apps/v1",
+                "kind": "Deployment",
+                "name": "metronome-simulator",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "439156",
+                "uid": "c7846d60-3603-4085-9345-3916f54bcf97"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-09-13T15:52:29Z",
+            "message": "Scaled up replica set metronome-simulator-58f995fbfb from 2 to 3",
+            "metadata": {
+                "creationTimestamp": "2026-09-13T14:40:40Z",
+                "name": "metronome-simulator.18d4e85d7ff53d71",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "448442",
+                "uid": "84ae091d-3a92-4fe5-aed7-236770058da4"
+            },
+            "reason": "ScalingReplicaSet",
+            "reportingComponent": "deployment-controller",
+            "reportingInstance": "",
+            "source": {
+                "component": "deployment-controller"
+            },
+            "type": "Normal"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 1,
+            "eventTime": null,
+            "firstTimestamp": "2026-09-13T15:18:52Z",
+            "involvedObject": {
+                "apiVersion": "autoscaling/v2",
+                "kind": "HorizontalPodAutoscaler",
+                "name": "metronome-simulator",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "444050",
+                "uid": "7708bea0-3c78-4add-9c01-a785952735c7"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-09-13T15:18:52Z",
+            "message": "New size: 3; reason: All metrics below target",
+            "metadata": {
+                "creationTimestamp": "2026-09-13T15:18:52Z",
+                "name": "metronome-simulator.18d4ea7333f40690",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "444175",
+                "uid": "c242d061-9138-4c09-b0c8-329d6db64402"
+            },
+            "reason": "SuccessfulRescale",
+            "reportingComponent": "horizontal-pod-autoscaler",
+            "reportingInstance": "",
+            "source": {
+                "component": "horizontal-pod-autoscaler"
+            },
+            "type": "Normal"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 1,
+            "eventTime": null,
+            "firstTimestamp": "2026-09-13T15:18:52Z",
+            "involvedObject": {
+                "apiVersion": "apps/v1",
+                "kind": "Deployment",
+                "name": "metronome-simulator",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "444173",
+                "uid": "c7846d60-3603-4085-9345-3916f54bcf97"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-09-13T15:18:52Z",
+            "message": "Scaled down replica set metronome-simulator-58f995fbfb from 6 to 3",
+            "metadata": {
+                "creationTimestamp": "2026-09-13T15:18:52Z",
+                "name": "metronome-simulator.18d4ea7336741dfb",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "444177",
+                "uid": "d1b1ce7d-0e17-4609-b2f1-33368b93614a"
+            },
+            "reason": "ScalingReplicaSet",
+            "reportingComponent": "deployment-controller",
+            "reportingInstance": "",
+            "source": {
+                "component": "deployment-controller"
+            },
+            "type": "Normal"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 1,
+            "eventTime": null,
+            "firstTimestamp": "2026-09-13T15:20:37Z",
+            "involvedObject": {
+                "apiVersion": "apps/v1",
+                "kind": "Deployment",
+                "name": "metronome-simulator",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "444438",
+                "uid": "c7846d60-3603-4085-9345-3916f54bcf97"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-09-13T15:20:37Z",
+            "message": "Scaled down replica set metronome-simulator-58f995fbfb from 3 to 1",
+            "metadata": {
+                "creationTimestamp": "2026-09-13T15:20:37Z",
+                "name": "metronome-simulator.18d4ea8bb824c751",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "444442",
+                "uid": "6caccb63-b26f-4904-99ba-69d82e566fa2"
+            },
+            "reason": "ScalingReplicaSet",
+            "reportingComponent": "deployment-controller",
+            "reportingInstance": "",
+            "source": {
+                "component": "deployment-controller"
+            },
+            "type": "Normal"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 1,
+            "eventTime": null,
+            "firstTimestamp": "2026-09-13T15:57:29Z",
+            "involvedObject": {
+                "apiVersion": "autoscaling/v2",
+                "kind": "HorizontalPodAutoscaler",
+                "name": "metronome-simulator",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "449142",
+                "uid": "7708bea0-3c78-4add-9c01-a785952735c7"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-09-13T15:57:29Z",
+            "message": "New size: 4; reason: All metrics below target",
+            "metadata": {
+                "creationTimestamp": "2026-09-13T15:57:29Z",
+                "name": "metronome-simulator.18d4ec8ec1348668",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "449182",
+                "uid": "55e4b57d-5169-4d93-9634-f6b772bcb16f"
+            },
+            "reason": "SuccessfulRescale",
+            "reportingComponent": "horizontal-pod-autoscaler",
+            "reportingInstance": "",
+            "source": {
+                "component": "horizontal-pod-autoscaler"
+            },
+            "type": "Normal"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 1,
+            "eventTime": null,
+            "firstTimestamp": "2026-09-13T15:57:29Z",
+            "involvedObject": {
+                "apiVersion": "apps/v1",
+                "kind": "Deployment",
+                "name": "metronome-simulator",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "449180",
+                "uid": "c7846d60-3603-4085-9345-3916f54bcf97"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-09-13T15:57:29Z",
+            "message": "Scaled down replica set metronome-simulator-58f995fbfb from 6 to 4",
+            "metadata": {
+                "creationTimestamp": "2026-09-13T15:57:29Z",
+                "name": "metronome-simulator.18d4ec8ec279d88f",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "449184",
+                "uid": "bbd11137-e7a7-4ee9-81de-36c54b9fb052"
+            },
+            "reason": "ScalingReplicaSet",
+            "reportingComponent": "deployment-controller",
+            "reportingInstance": "",
+            "source": {
+                "component": "deployment-controller"
+            },
+            "type": "Normal"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 1,
+            "eventTime": null,
+            "firstTimestamp": "2026-09-13T15:57:44Z",
+            "involvedObject": {
+                "apiVersion": "apps/v1",
+                "kind": "Deployment",
+                "name": "metronome-simulator",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "449227",
+                "uid": "c7846d60-3603-4085-9345-3916f54bcf97"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-09-13T15:57:44Z",
+            "message": "Scaled down replica set metronome-simulator-58f995fbfb from 4 to 1",
+            "metadata": {
+                "creationTimestamp": "2026-09-13T15:57:44Z",
+                "name": "metronome-simulator.18d4ec923e8dfc1f",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "449231",
+                "uid": "8e28a31e-0063-4532-b9ee-85fa5340d0fc"
+            },
+            "reason": "ScalingReplicaSet",
+            "reportingComponent": "deployment-controller",
+            "reportingInstance": "",
+            "source": {
+                "component": "deployment-controller"
+            },
+            "type": "Normal"
+        }
+    ],
+    "kind": "List",
+    "metadata": {
+        "resourceVersion": ""
+    }
+}
