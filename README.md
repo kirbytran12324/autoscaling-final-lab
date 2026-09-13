@@ -110,14 +110,14 @@ for development smoke tests and is recorded. A typical capture that includes
 the five-minute HPA scale-down stabilization period is:
 
 ```sh
-EXPERIMENT_ID=phase7-hpa-50-users-001 \
+EXPERIMENT_ID=phase7-hpa-3-users-001 \
 EVIDENCE_LOCUST_USERS=3 \
 EVIDENCE_LOCUST_SPAWN_RATE=1 \
 EVIDENCE_LOCUST_RUN_SECONDS=180 \
 CAPTURE_DURATION_SECONDS=600 \
 SAMPLE_INTERVAL_SECONDS=15 \
 ./scripts/capture-hpa-experiment.sh \
-  evidence/experiments/phase7-hpa-50-users-001
+  evidence/experiments/phase7-hpa-3-users-001
 ```
 
 Run an experiment in this exact order:

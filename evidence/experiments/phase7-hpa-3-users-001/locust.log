@@ -1,0 +1,3 @@
+2026-09-13T14:40:01.982415405Z [2026-09-13 14:40:01,966] metronome-load-test-74c4fb6f68-47xbx/INFO/locust.runners: Ramping to 3 users at a rate of 1.00 per second
+2026-09-13T14:40:03.996866828Z [2026-09-13 14:40:03,996] metronome-load-test-74c4fb6f68-47xbx/INFO/locust.runners: All users spawned: {"BattleUser": 3} (3 total users)
+2026-09-13T14:43:01.984030958Z [2026-09-13 14:43:01,976] metronome-load-test-74c4fb6f68-47xbx/INFO/root: servedBy distribution: metronome-simulator-58f995fbfb-59jkp=1780, metronome-simulator-58f995fbfb-9vct6=1331, metronome-simulator-58f995fbfb-kv4nn=1504, metronome-simulator-58f995fbfb-mztkx=1046, metronome-simulator-58f995fbfb-r9sjf=3101, metronome-simulator-58f995fbfb-wmhfh=1295

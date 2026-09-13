@@ -1,0 +1,164 @@
+{
+    "apiVersion": "v1",
+    "items": [
+        {
+            "apiVersion": "v1",
+            "count": 3,
+            "eventTime": null,
+            "firstTimestamp": "2026-09-13T09:31:45Z",
+            "involvedObject": {
+                "apiVersion": "autoscaling/v2",
+                "kind": "HorizontalPodAutoscaler",
+                "name": "metronome-simulator",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "439096",
+                "uid": "7708bea0-3c78-4add-9c01-a785952735c7"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-09-13T14:40:40Z",
+            "message": "New size: 3; reason: cpu resource utilization (percentage of request) above target",
+            "metadata": {
+                "creationTimestamp": "2026-09-13T14:40:40Z",
+                "name": "metronome-simulator.18d4d781efd4f935",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "439159",
+                "uid": "e5742c3b-4472-43d0-9ac8-92d01be13dae"
+            },
+            "reason": "SuccessfulRescale",
+            "reportingComponent": "horizontal-pod-autoscaler",
+            "reportingInstance": "",
+            "source": {
+                "component": "horizontal-pod-autoscaler"
+            },
+            "type": "Normal"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 2,
+            "eventTime": null,
+            "firstTimestamp": "2026-09-13T09:41:16Z",
+            "involvedObject": {
+                "apiVersion": "autoscaling/v2",
+                "kind": "HorizontalPodAutoscaler",
+                "name": "metronome-simulator",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "440130",
+                "uid": "7708bea0-3c78-4add-9c01-a785952735c7"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-09-13T14:48:12Z",
+            "message": "New size: 2; reason: All metrics below target",
+            "metadata": {
+                "creationTimestamp": "2026-09-13T14:48:12Z",
+                "name": "metronome-simulator.18d4d806fa0c0fda",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "440193",
+                "uid": "c9923ea1-7c4c-45cb-bc97-aba974d2edd8"
+            },
+            "reason": "SuccessfulRescale",
+            "reportingComponent": "horizontal-pod-autoscaler",
+            "reportingInstance": "",
+            "source": {
+                "component": "horizontal-pod-autoscaler"
+            },
+            "type": "Normal"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 2,
+            "eventTime": null,
+            "firstTimestamp": "2026-09-13T10:27:20Z",
+            "involvedObject": {
+                "apiVersion": "autoscaling/v2",
+                "kind": "HorizontalPodAutoscaler",
+                "name": "metronome-simulator",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "439157",
+                "uid": "7708bea0-3c78-4add-9c01-a785952735c7"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-09-13T14:40:55Z",
+            "message": "New size: 5; reason: cpu resource utilization (percentage of request) above target",
+            "metadata": {
+                "creationTimestamp": "2026-09-13T14:40:56Z",
+                "name": "metronome-simulator.18d4da8a989a4cc2",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "439219",
+                "uid": "38983bd8-ea3b-478f-b6b9-ef27cb009d3d"
+            },
+            "reason": "SuccessfulRescale",
+            "reportingComponent": "horizontal-pod-autoscaler",
+            "reportingInstance": "",
+            "source": {
+                "component": "horizontal-pod-autoscaler"
+            },
+            "type": "Normal"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 2,
+            "eventTime": null,
+            "firstTimestamp": "2026-09-13T10:27:35Z",
+            "involvedObject": {
+                "apiVersion": "autoscaling/v2",
+                "kind": "HorizontalPodAutoscaler",
+                "name": "metronome-simulator",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "439299",
+                "uid": "7708bea0-3c78-4add-9c01-a785952735c7"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-09-13T14:41:26Z",
+            "message": "New size: 6; reason: cpu resource utilization (percentage of request) above target",
+            "metadata": {
+                "creationTimestamp": "2026-09-13T14:41:26Z",
+                "name": "metronome-simulator.18d4da8e2065cd8e",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "439330",
+                "uid": "db76dc66-4e4a-4167-a1a1-5bbc2c57a6ca"
+            },
+            "reason": "SuccessfulRescale",
+            "reportingComponent": "horizontal-pod-autoscaler",
+            "reportingInstance": "",
+            "source": {
+                "component": "horizontal-pod-autoscaler"
+            },
+            "type": "Normal"
+        },
+        {
+            "apiVersion": "v1",
+            "count": 1,
+            "eventTime": null,
+            "firstTimestamp": "2026-09-13T14:40:25Z",
+            "involvedObject": {
+                "apiVersion": "autoscaling/v2",
+                "kind": "HorizontalPodAutoscaler",
+                "name": "metronome-simulator",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "439002",
+                "uid": "7708bea0-3c78-4add-9c01-a785952735c7"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2026-09-13T14:40:25Z",
+            "message": "New size: 2; reason: cpu resource utilization (percentage of request) above target",
+            "metadata": {
+                "creationTimestamp": "2026-09-13T14:40:25Z",
+                "name": "metronome-simulator.18d4e859f5ac9306",
+                "namespace": "autoscaling-lab",
+                "resourceVersion": "439097",
+                "uid": "18f39903-7d97-498c-8852-257fc41eb017"
+            },
+            "reason": "SuccessfulRescale",
+            "reportingComponent": "horizontal-pod-autoscaler",
+            "reportingInstance": "",
+            "source": {
+                "component": "horizontal-pod-autoscaler"
+            },
+            "type": "Normal"
+        }
+    ],
+    "kind": "List",
+    "metadata": {
+        "resourceVersion": ""
+    }
+}
