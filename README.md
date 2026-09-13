@@ -95,6 +95,55 @@ appends to prior evidence. For each experiment:
 CPU-throttling counters are cumulative and must only be differenced within the
 same container ID.
 
+## Phase 7 HPA experiment captures
+
+`scripts/capture-hpa-experiment.sh` records the simulator HPA, Deployment,
+Pods, CPU and memory samples, and Service EndpointSlices on a fixed schedule.
+It also saves configuration snapshots, events, and the Locust log. The script
+uses read-only Kubernetes commands: it does not apply manifests, change
+replicas, or start or stop Locust. The `EVIDENCE_LOCUST_*` values are metadata
+labels for the intended manual UI settings; they do not control Locust.
+
+Acceptance captures require a clean, committed worktree and a unique output
+path that does not already exist. `ALLOW_DIRTY_WORKTREE=1` is available only
+for development smoke tests and is recorded. A typical capture that includes
+the five-minute HPA scale-down stabilization period is:
+
+```sh
+EXPERIMENT_ID=phase7-hpa-50-users-001 \
+EVIDENCE_LOCUST_USERS=3 \
+EVIDENCE_LOCUST_SPAWN_RATE=1 \
+EVIDENCE_LOCUST_RUN_SECONDS=180 \
+CAPTURE_DURATION_SECONDS=600 \
+SAMPLE_INTERVAL_SECONDS=15 \
+./scripts/capture-hpa-experiment.sh \
+  evidence/experiments/phase7-hpa-50-users-001
+```
+
+Run an experiment in this exact order:
+
+1. From a clean worktree, run `kubectl apply -k k8s/load-test` and then
+   `kubectl apply -k k8s/hpa`. Wait until the simulator and Locust are each
+   settled at one Ready Pod. Do not start Locust yet.
+2. Start a port-forward with
+   `kubectl -n load-testing port-forward service/metronome-load-test 8089:8089`
+   and open `http://127.0.0.1:8089`.
+3. Start the capture command with labels matching the user count, spawn rate,
+   and run time you will enter in the Locust UI.
+4. Start Locust manually in the UI. Hold the configured load for the labelled
+   duration, then stop it manually so Locust emits the final
+   `servedBy distribution:` line.
+5. Leave the recorder running after load stops so it can observe scale-in. Do
+   not change the Deployment, Service, HPA, images, or Locust Pod during the
+   capture.
+6. After the recorder exits, confirm `capture-status.json` has `"status":
+   "complete"`, `"finalValidation": "ok"`, and zero failed samples. Then
+   export the per-run Locust HTML report into the new evidence directory.
+7. Evaluate experiment acceptance separately using the replica timeline,
+   EndpointSlices, `servedBy` distribution, and Locust performance report.
+   `complete` means collection and configuration validation succeeded; it does
+   not claim that scale-out, recovery, or service-level acceptance passed.
+
 ## Generate an offline tournament report
 
 Use an already completed run. From `simulator/`:
