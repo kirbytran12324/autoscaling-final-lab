@@ -1,0 +1,47 @@
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"autoscaling.k8s.io/v1","kind":"VerticalPodAutoscaler","metadata":{"annotations":{},"name":"metronome-simulator","namespace":"autoscaling-lab"},"spec":{"resourcePolicy":{"containerPolicies":[{"containerName":"simulator","controlledResources":["cpu","memory"],"controlledValues":"RequestsOnly"}]},"targetRef":{"apiVersion":"apps/v1","kind":"Deployment","name":"metronome-simulator"},"updatePolicy":{"updateMode":"Off"}}}
+  creationTimestamp: "2026-09-14T02:35:44Z"
+  generation: 1
+  name: metronome-simulator
+  namespace: autoscaling-lab
+  resourceVersion: "469424"
+  uid: aef3a531-8d14-495e-b566-d8ead8ea2cb9
+spec:
+  resourcePolicy:
+    containerPolicies:
+    - containerName: simulator
+      controlledResources:
+      - cpu
+      - memory
+      controlledValues: RequestsOnly
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: metronome-simulator
+  updatePolicy:
+    updateMode: "Off"
+status:
+  conditions:
+  - lastTransitionTime: "2026-09-14T02:36:25Z"
+    status: "True"
+    type: RecommendationProvided
+  observedGeneration: 1
+  recommendation:
+    containerRecommendations:
+    - containerName: simulator
+      lowerBound:
+        cpu: 410m
+        memory: 250Mi
+      target:
+        cpu: 511m
+        memory: 250Mi
+      uncappedTarget:
+        cpu: 511m
+        memory: 250Mi
+      upperBound:
+        cpu: 19849m
+        memory: "8755038485"

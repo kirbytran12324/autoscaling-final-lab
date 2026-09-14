@@ -1,0 +1,255 @@
+kirbymoto@Kirbymoto:~/projects/autoscaling-final-lab$ date --iso-8601=seconds
+
+kubectl -n autoscaling-lab describe vpa metronome-simulator
+
+kubectl -n autoscaling-lab top pods \
+  -l app=metronome-simulator
+
+kubectl -n autoscaling-lab get hpa metronome-simulator
+2026-09-14T09:42:38+07:00
+Name:         metronome-simulator
+Namespace:    autoscaling-lab
+Labels:       <none>
+Annotations:  <none>
+API Version:  autoscaling.k8s.io/v1
+Kind:         VerticalPodAutoscaler
+Metadata:
+  Creation Timestamp:  2026-09-14T02:35:44Z
+  Generation:          1
+  Resource Version:    465258
+  UID:                 aef3a531-8d14-495e-b566-d8ead8ea2cb9
+Spec:
+  Resource Policy:
+    Container Policies:
+      Container Name:  simulator
+      Controlled Resources:
+        cpu
+        memory
+      Controlled Values:  RequestsOnly
+  Target Ref:
+    API Version:  apps/v1
+    Kind:         Deployment
+    Name:         metronome-simulator
+  Update Policy:
+    Update Mode:  Off
+Status:
+  Conditions:
+    Last Transition Time:  2026-09-14T02:36:25Z
+    Status:                True
+    Type:                  RecommendationProvided
+  Observed Generation:     1
+  Recommendation:
+    Container Recommendations:
+      Container Name:  simulator
+      Lower Bound:
+        Cpu:     25m
+        Memory:  250Mi
+      Target:
+        Cpu:     25m
+        Memory:  250Mi
+      Uncapped Target:
+        Cpu:     25m
+        Memory:  250Mi
+      Upper Bound:
+        Cpu:     2007m
+        Memory:  26399675013
+Events:          <none>
+NAME                                   CPU(cores)   MEMORY(bytes)  
+metronome-simulator-58f995fbfb-7l7fz   1m           117Mi  
+NAME                  REFERENCE                        TARGETS   MINPODS   MAXPODS   REPLICAS   AGE
+metronome-simulator   Deployment/metronome-simulator   cpu: 0%/70%   1         6         1          17h
+kirbymoto@Kirbymoto:~/projects/autoscaling-final-lab$ date --iso-8601=seconds
+
+kubectl -n autoscaling-lab describe vpa metronome-simulator
+
+kubectl -n autoscaling-lab top pods \
+  -l app=metronome-simulator
+
+kubectl -n autoscaling-lab get hpa metronome-simulator
+2026-09-14T09:48:12+07:00
+Name:         metronome-simulator
+Namespace:    autoscaling-lab
+Labels:       <none>
+Annotations:  <none>
+API Version:  autoscaling.k8s.io/v1
+Kind:         VerticalPodAutoscaler
+Metadata:
+  Creation Timestamp:  2026-09-14T02:35:44Z
+  Generation:          1
+  Resource Version:    466050
+  UID:                 aef3a531-8d14-495e-b566-d8ead8ea2cb9
+Spec:
+  Resource Policy:
+    Container Policies:
+      Container Name:  simulator
+      Controlled Resources:
+        cpu
+        memory
+      Controlled Values:  RequestsOnly
+  Target Ref:
+    API Version:  apps/v1
+    Kind:         Deployment
+    Name:         metronome-simulator
+  Update Policy:
+    Update Mode:  Off
+Status:
+  Conditions:
+    Last Transition Time:  2026-09-14T02:36:25Z
+    Status:                True
+    Type:                  RecommendationProvided
+  Observed Generation:     1
+  Recommendation:
+    Container Recommendations:
+      Container Name:  simulator
+      Lower Bound:
+        Cpu:     386m
+        Memory:  250Mi
+      Target:
+        Cpu:     548m
+        Memory:  250Mi
+      Uncapped Target:
+        Cpu:     548m
+        Memory:  250Mi
+      Upper Bound:
+        Cpu:     84421m
+        Memory:  24937567746
+Events:          <none>
+NAME                                   CPU(cores)   MEMORY(bytes)  
+metronome-simulator-58f995fbfb-7l7fz   371m         167Mi  
+metronome-simulator-58f995fbfb-8gvzt   407m         152Mi  
+metronome-simulator-58f995fbfb-dxsfx   371m         184Mi  
+metronome-simulator-58f995fbfb-jp6xw   396m         163Mi  
+metronome-simulator-58f995fbfb-l98f6   389m         148Mi  
+metronome-simulator-58f995fbfb-mhps4   361m         143Mi  
+NAME                  REFERENCE                        TARGETS    MINPODS   MAXPODS   REPLICAS   AGE
+metronome-simulator   Deployment/metronome-simulator   cpu: 76%/70%   1         6         6          17h
+kirbymoto@Kirbymoto:~/projects/autoscaling-final-lab$ date --iso-8601=seconds
+
+kubectl -n autoscaling-lab describe vpa metronome-simulator
+
+kubectl -n autoscaling-lab top pods \
+  -l app=metronome-simulator
+
+kubectl -n autoscaling-lab get hpa metronome-simulator
+2026-09-14T09:53:59+07:00
+Name:         metronome-simulator
+Namespace:    autoscaling-lab
+Labels:       <none>
+Annotations:  <none>
+API Version:  autoscaling.k8s.io/v1
+Kind:         VerticalPodAutoscaler
+Metadata:
+  Creation Timestamp:  2026-09-14T02:35:44Z
+  Generation:          1
+  Resource Version:    466850
+  UID:                 aef3a531-8d14-495e-b566-d8ead8ea2cb9
+Spec:
+  Resource Policy:
+    Container Policies:
+      Container Name:  simulator
+      Controlled Resources:
+        cpu
+        memory
+      Controlled Values:  RequestsOnly
+  Target Ref:
+    API Version:  apps/v1
+    Kind:         Deployment
+    Name:         metronome-simulator
+  Update Policy:
+    Update Mode:  Off
+Status:
+  Conditions:
+    Last Transition Time:  2026-09-14T02:36:25Z
+    Status:                True
+    Type:                  RecommendationProvided
+  Observed Generation:     1
+  Recommendation:
+    Container Recommendations:
+      Container Name:  simulator
+      Lower Bound:
+        Cpu:     411m
+        Memory:  250Mi
+      Target:
+        Cpu:     511m
+        Memory:  250Mi
+      Uncapped Target:
+        Cpu:     511m
+        Memory:  250Mi
+      Upper Bound:
+        Cpu:     41683m
+        Memory:  17143890419
+Events:          <none>
+NAME                                   CPU(cores)   MEMORY(bytes)  
+metronome-simulator-58f995fbfb-7l7fz   420m         169Mi  
+metronome-simulator-58f995fbfb-8gvzt   420m         153Mi  
+metronome-simulator-58f995fbfb-dxsfx   376m         184Mi  
+metronome-simulator-58f995fbfb-jp6xw   402m         166Mi  
+metronome-simulator-58f995fbfb-l98f6   397m         152Mi  
+metronome-simulator-58f995fbfb-mhps4   389m         146Mi  
+NAME                  REFERENCE                        TARGETS    MINPODS   MAXPODS   REPLICAS   AGE
+metronome-simulator   Deployment/metronome-simulator   cpu: 79%/70%   1         6         6          17h
+kirbymoto@Kirbymoto:~/projects/autoscaling-final-lab$ date --iso-8601=seconds
+
+kubectl -n autoscaling-lab describe vpa metronome-simulator
+
+kubectl -n autoscaling-lab top pods \
+  -l app=metronome-simulator
+
+kubectl -n autoscaling-lab get hpa metronome-simulator
+2026-09-14T09:58:03+07:00
+Name:         metronome-simulator
+Namespace:    autoscaling-lab
+Labels:       <none>
+Annotations:  <none>
+API Version:  autoscaling.k8s.io/v1
+Kind:         VerticalPodAutoscaler
+Metadata:
+  Creation Timestamp:  2026-09-14T02:35:44Z
+  Generation:          1
+  Resource Version:    467394
+  UID:                 aef3a531-8d14-495e-b566-d8ead8ea2cb9
+Spec:
+  Resource Policy:
+    Container Policies:
+      Container Name:  simulator
+      Controlled Resources:
+        cpu
+        memory
+      Controlled Values:  RequestsOnly
+  Target Ref:
+    API Version:  apps/v1
+    Kind:         Deployment
+    Name:         metronome-simulator
+  Update Policy:
+    Update Mode:  Off
+Status:
+  Conditions:
+    Last Transition Time:  2026-09-14T02:36:25Z
+    Status:                True
+    Type:                  RecommendationProvided
+  Observed Generation:     1
+  Recommendation:
+    Container Recommendations:
+      Container Name:  simulator
+      Lower Bound:
+        Cpu:     421m
+        Memory:  250Mi
+      Target:
+        Cpu:     511m
+        Memory:  250Mi
+      Uncapped Target:
+        Cpu:     511m
+        Memory:  250Mi
+      Upper Bound:
+        Cpu:     34586m
+        Memory:  14224809558
+Events:          <none>
+NAME                                   CPU(cores)   MEMORY(bytes)  
+metronome-simulator-58f995fbfb-7l7fz   416m         169Mi  
+metronome-simulator-58f995fbfb-8gvzt   393m         153Mi  
+metronome-simulator-58f995fbfb-dxsfx   419m         181Mi  
+metronome-simulator-58f995fbfb-jp6xw   383m         165Mi  
+metronome-simulator-58f995fbfb-l98f6   366m         153Mi  
+metronome-simulator-58f995fbfb-mhps4   399m         148Mi  
+NAME                  REFERENCE                        TARGETS    MINPODS   MAXPODS   REPLICAS   AGE
+metronome-simulator   Deployment/metronome-simulator   cpu: 79%/70%   1         6         6          17h

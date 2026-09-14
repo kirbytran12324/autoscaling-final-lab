@@ -1,0 +1,2 @@
+NAME                                   CPU(cores)   MEMORY(bytes)   
+metronome-simulator-58f995fbfb-7l7fz   1m           138Mi           

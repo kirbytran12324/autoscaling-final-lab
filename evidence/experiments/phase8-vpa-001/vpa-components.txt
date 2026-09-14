@@ -1,0 +1,4 @@
+NAME                       READY   UP-TO-DATE   AVAILABLE   AGE   CONTAINERS             IMAGES                                                       SELECTOR
+vpa-recommender            1/1     1            1           35m   recommender            registry.k8s.io/autoscaling/vpa-recommender:1.7.1            app=vpa-recommender
+vpa-updater                1/1     1            1           35m   updater                registry.k8s.io/autoscaling/vpa-updater:1.7.1                app=vpa-updater
+vpa-admission-controller   1/1     1            1           35m   admission-controller   registry.k8s.io/autoscaling/vpa-admission-controller:1.7.1   app=vpa-admission-controller

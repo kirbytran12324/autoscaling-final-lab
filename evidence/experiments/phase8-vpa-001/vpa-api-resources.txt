@@ -1,0 +1,3 @@
+NAME                               SHORTNAMES      APIVERSION              NAMESPACED   KIND
+verticalpodautoscalercheckpoints   vpacheckpoint   autoscaling.k8s.io/v1   true         VerticalPodAutoscalerCheckpoint
+verticalpodautoscalers             vpa             autoscaling.k8s.io/v1   true         VerticalPodAutoscaler

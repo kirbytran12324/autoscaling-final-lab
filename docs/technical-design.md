@@ -1,8 +1,8 @@
 # Metronome Tournament Autoscaling Lab — Technical Design
 
-Status: active implementation design, updated 2026-09-13.
-Phase 7 HPA acceptance is complete. VPA comparison, capacity diagnosis, the
-full tournament, and the final audit package remain pending.
+Status: active implementation design, updated 2026-09-14.
+Phase 8 VPA comparison is complete. Capacity diagnosis, the full tournament,
+and the final audit package remain pending.
 
 ## Environment
 
@@ -29,6 +29,12 @@ stabilization, and a 150-second scale-down stabilization window. The canonical
 [Phase 7 record](phase7-hpa-autoscaling.md) contains the acceptance evidence
 and limitations.
 
+The accepted VPA `v1.7.1` comparison uses `updateMode: "Off"` and
+`controlledValues: RequestsOnly` for CPU and memory. Its settled `511m` CPU
+target is 11m (2.2%) above the manual `500m` request, independently supporting
+that choice without changing it. The canonical [Phase 8 record](phase8-vpa-autoscaling.md)
+contains the evidence, memory-floor caveat, and limitations.
+
 A read-only Pokémon Showdown replay viewer is an optional personal-interest extension after the 32-species sample tournament is complete. It does not change the lab acceptance criteria or autoscaling boundary, and it must not delay the runner, restart/resume, report, resource-sizing, HPA, VPA, or capacity evidence.
 
 The simulator pins `pokemon-showdown` to exact version `0.11.11` and commits `package-lock.json`. Contract tests protect the application from unexpected assumptions about the pinned simulator interface and data.
@@ -50,6 +56,9 @@ The following implementation is complete and verified:
 - one-replica and three-replica exploratory experiments have been completed;
 - Phase 6 fixed-replica resource sizing selected a `500m` CPU request, `1` CPU
   limit, `192Mi` memory request, and `256Mi` memory limit;
+- Phase 8 compared the manual requests with a recommendation-only VPA; the
+  settled `511m` CPU target supported the selected `500m` request and no
+  resources were changed;
 - the singleton tournament-runner Job and its `npm run runner` command override
   are implemented; and
 - the 32-species restart/resume validation completed successfully with a
@@ -487,9 +496,27 @@ Disabling kubelet certificate validation is acceptable only in this local, singl
 
 ## VPA comparison
 
-VPA remains a pending recommendation-only comparison. Configure it with `updateMode: "Off"`, collect representative idle and loaded history, and compare its `lowerBound`, `target`, and `upperBound` with the manually selected requests.
+Phase 8 completed the recommendation-only comparison using VPA `v1.7.1`
+(upstream revision `352365899477910018f40d89fa3ea30b2c5d0e78`). The VPA
+targets the `simulator` container, observes CPU and memory, uses
+`controlledValues: RequestsOnly`, and remains at `updateMode: "Off"`. The
+Deployment retained its `500m`/`1000m` CPU and `192Mi`/`256Mi` memory
+request/limit pairs throughout the experiment.
 
-VPA must not mutate the CPU requests while a CPU-utilization HPA controls the same workload. Changing the request changes the HPA utilization denominator and creates interacting feedback loops. Recommendation-only mode allows an evidence-based comparison without changing running Pods. See the upstream [VPA API](https://github.com/kubernetes/autoscaler/blob/master/vertical-pod-autoscaler/docs/api.md) and [known limitations](https://github.com/kubernetes/autoscaler/blob/master/vertical-pod-autoscaler/docs/known-limitations.md).
+After the 15-minute three-user load, the CPU target settled at `511m`, only
+`11m` or 2.2% above the selected `500m` request. This independently supports
+the Phase 6 request. The `250Mi` memory target equals the recommender's default
+minimum and does not prove a 250Mi application requirement; observed memory
+was approximately 117Mi idle, 143–184Mi loaded, and 137–138Mi in recovery.
+The short-history upper bounds were still converging and are not sizing inputs.
+See the accepted [Phase 8 comparison](phase8-vpa-autoscaling.md).
+
+VPA must not mutate CPU requests while a CPU-utilization HPA controls this
+workload. Changing the request changes the HPA utilization denominator: 70%
+corresponds to approximately `350m` per Pod at a `500m` request and `358m` at
+`511m`. Continuous request changes could create interacting feedback loops, so
+VPA remains recommendation-only. See the upstream [VPA API](https://github.com/kubernetes/autoscaler/blob/master/vertical-pod-autoscaler/docs/api.md)
+and [known limitations](https://github.com/kubernetes/autoscaler/blob/master/vertical-pod-autoscaler/docs/known-limitations.md).
 
 ## Scheduling and capacity demonstration
 
@@ -531,11 +558,13 @@ Compare cost with throughput, p95 latency, failure rate, and availability. Addit
 The final audit package is complete only when it contains all of the following:
 
 - [x] an HPA manifest plus observed scale-out and scale-in evidence;
-- [ ] a VPA Off-mode manifest plus captured recommendation evidence;
+- [x] a VPA Off-mode manifest plus captured recommendation evidence;
 - [x] the in-cluster Locust workload plus exported acceptance-test results;
 - [ ] a capacity demonstration with a scheduler-level Pending Pod and `Insufficient cpu` diagnosis;
 - [x] the offline report interface combining tournament results and separately captured experiment evidence;
-- [ ] a README explaining resource sizing, HPA/VPA interaction, capacity diagnosis, approximate monthly cost, and complete reproduction instructions.
+- [ ] a README covering the complete final operational analysis:
+  - [x] resource sizing and HPA/VPA interaction;
+  - [ ] capacity diagnosis, approximate monthly cost, and complete reproduction instructions.
 
 ## Current risks and validation gates
 
@@ -548,7 +577,7 @@ The final audit package is complete only when it contains all of the following:
 | Keep-alive skews Service distribution | One Pod may be hot while others are underused | Use independent connections and analyze `servedBy` distribution |
 | A wall timeout changes outcomes under load | Identical deterministic input could appear inconsistent | Treat timeouts as retryable operational failures; only turn count determines a capped draw |
 | Startup work distorts samples | Sizing and HPA choices include non-steady behaviour | Gate traffic on readiness and separate warm-up from measurement |
-| VPA has insufficient history | Recommendation is not representative | Collect both idle and sustained-load history and report the sampling period |
+| VPA has insufficient history | Short-run recommendations are not universal production sizing results | Phase 8 captured idle and sustained-load observations, reported the sampling period, and retains this as an experiment limitation |
 | Locust consumes schedulable capacity | Capacity experiment attributes the wrong constraint | Scale Locust down or include its requests in the calculation |
 | Replay viewer integration expands scope or mishandles upstream assets | Optional UI work delays required lab evidence or creates licensing and compatibility risk | Start only after the sample-tournament phase gate; prove one replay in a bounded spike; pin the client revision and document AGPLv3 and asset requirements before integration |
 
@@ -569,7 +598,10 @@ The current implementation state is:
   150-second scale-down stabilization window;
 - further report UI polish and the replay-viewer spike deferred as optional
   work; and
-- phases 8–10 pending.
+- phase 8 complete: the Off-mode VPA comparison produced a settled `511m` CPU
+  target, supported the selected `500m` request, preserved existing resources,
+  and retained the short-history warning as a limitation; and
+- phases 9–10 pending.
 
 The remaining phase gates are:
 
@@ -590,7 +622,11 @@ The remaining phase gates are:
    It recorded scale-out to six Ready Pods, successful traffic through every
    backend, zero failures and restarts, and recovery to one replica. See the
    [Phase 7 record](phase7-hpa-autoscaling.md).
-8. **VPA recommendation comparison — pending.** Collect and compare Off-mode recommendations.
+8. **VPA recommendation comparison — complete.** VPA `v1.7.1` ran in Off mode
+   against the simulator. Its settled `511m` CPU target was 2.2% above the
+   manual `500m` request, the memory target was identified as the recommender's
+   default floor, and existing resources were retained. See the
+   [Phase 8 record](phase8-vpa-autoscaling.md).
 9. **Capacity and scheduler diagnosis — pending.** Produce a scheduler-level `Insufficient cpu` Pending Pod using calculated requests.
 10. **Final run and audit package — pending.** Run all 1,025 species and assemble the final manifests, evidence, cost comparison, report, and reproducibility instructions.
 

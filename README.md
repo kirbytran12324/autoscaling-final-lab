@@ -104,7 +104,7 @@ used a 70% CPU target, a one-to-six replica range, and a 150-second scale-down
 stabilization window. Under three Locust users, the simulator followed
 `1 → 2 → 3 → 5 → 6 → 4 → 1`; all 13,033 requests succeeded, every Ready replica
 served traffic, no simulator container restarted, and the Deployment returned
-to one Ready replica. **Phase 7 HPA experiment: PASS.** Phases 8–10 remain
+to one Ready replica. **Phase 7 HPA experiment: PASS.** Phases 9–10 remain
 pending.
 
 `scripts/capture-hpa-experiment.sh` records the simulator HPA, Deployment,
@@ -153,6 +153,43 @@ Run an experiment in this exact order:
    EndpointSlices, `servedBy` distribution, and Locust performance report.
    `complete` means collection and configuration validation succeeded; it does
    not claim that scale-out, recovery, or service-level acceptance passed.
+
+## Phase 8 VPA recommendation comparison
+
+Phase 8 is complete. The recommendation-only VPA uses `updateMode: "Off"` for
+the `simulator` container, observes CPU and memory, and controls requests only.
+The canonical [Phase 8 analysis and evidence record](docs/phase8-vpa-autoscaling.md)
+links the installed VPA version and revision, observation transcript, VPA
+objects, resource snapshots, `kubectl top` captures, timestamps, and Locust
+report.
+
+| Resource | Manual request | Settled VPA target | Decision |
+| --- | ---: | ---: | --- |
+| CPU | 500m | 511m | Retain 500m; the VPA target is only 11m (2.2%) higher. |
+| Memory | 192Mi | 250Mi | Retain 192Mi; 250Mi is the recommender's default floor, not demonstrated usage. |
+
+The settled CPU recommendation independently supports the Phase 6 request.
+VPA remains Off because automatic CPU-request changes would change the
+CPU-utilization HPA's denominator: 70% is approximately `350m` at a `500m`
+request but approximately `358m` at `511m`. Allowing both controllers to
+change the same scaling signal could create interacting control loops.
+
+To reproduce the manifest deployment and inspect recommendations:
+
+```sh
+kubectl apply -k k8s/vpa
+kubectl -n autoscaling-lab get vpa metronome-simulator -o yaml
+kubectl -n autoscaling-lab describe vpa metronome-simulator
+kubectl -n autoscaling-lab top pods -l app=metronome-simulator
+kubectl -n autoscaling-lab get deployment metronome-simulator \
+  -o jsonpath='{.spec.template.spec.containers[?(@.name=="simulator")].resources}'
+```
+
+Collect idle, sustained-load, end-of-load, and recovery snapshots with local
+timestamps. Keep the HPA and workload configuration fixed, retain
+`updateMode: "Off"`, and export the per-run Locust HTML report. A short-history
+upper bound is not a sizing decision; compare the settled target with measured
+usage and the manually selected request.
 
 ## Generate an offline tournament report
 
