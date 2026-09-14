@@ -1,0 +1,29 @@
+# Relevant fields captured from the Pod-scoped `kubectl get events -o yaml`.
+apiVersion: v1
+items:
+  - action: Scheduling
+    apiVersion: v1
+    eventTime: "2026-09-14T03:22:35.792736Z"
+    involvedObject:
+      apiVersion: v1
+      kind: Pod
+      name: cpu-capacity-demo-99bbdf9cd-qwvdd
+      namespace: capacity-demo
+      uid: c48472d2-14f9-4540-9e13-5ae29721202f
+    kind: Event
+    message: >-
+      0/4 nodes are available: 1 node(s) had untolerated taint(s), 3
+      Insufficient cpu. no new claims to deallocate, preemption: 0/4 nodes are
+      available: 1 Preemption is not helpful for scheduling, 3 No preemption
+      victims found for incoming pod.
+    metadata:
+      creationTimestamp: "2026-09-14T03:22:35Z"
+      name: cpu-capacity-demo-99bbdf9cd-qwvdd.18d511f17ab08038
+      namespace: capacity-demo
+      resourceVersion: "470764"
+      uid: 52ad3d3e-04fa-43ae-8e15-e973332ab3c5
+    reason: FailedScheduling
+    reportingComponent: default-scheduler
+    reportingInstance: default-scheduler-desktop-control-plane
+    type: Warning
+kind: List

@@ -1,8 +1,8 @@
 # Metronome Tournament Autoscaling Lab — Technical Design
 
 Status: active implementation design, updated 2026-09-14.
-Phase 8 VPA comparison is complete. Capacity diagnosis, the full tournament,
-and the final audit package remain pending.
+Phase 9 capacity diagnosis is complete. The full tournament and final audit
+package remain pending.
 
 ## Environment
 
@@ -524,9 +524,27 @@ Simulator Pods may be spread across the three schedulable workers; the tainted c
 
 The capacity demonstration must produce scheduler-level Pending Pods with events that include `FailedScheduling` and `Insufficient cpu`. It must not use a ResourceQuota that turns the result into an admission-time `FailedCreate` failure.
 
-Create an isolated capacity-demo overlay targeting the three schedulable workers. Let `L` be the largest eligible worker's allocatable CPU and choose a demo request `q > L / 2`, which prevents any eligible node from fitting two demo Pods. Confirm that `q` is no greater than the smallest eligible worker's free requested CPU so one demo Pod can fit on each worker. Then request four replicas: one more than the three-worker capacity under that constraint.
+The accepted isolated capacity-demo overlay targets the three schedulable
+workers. Let `L` be the largest eligible worker's allocatable CPU and choose a
+demo request `q > L / 2`, which prevents any eligible node from fitting two
+demo Pods. Confirm that `q` is no greater than the smallest eligible worker's
+free requested CPU so one demo Pod can fit on each worker. Then request four
+replicas: one more than the three-worker capacity under that constraint.
 
-If those bounds do not overlap because the nodes are heterogeneous or already busy, select a homogeneous worker subset with node affinity and repeat the calculation for that subset. Record allocatable resources, existing requests—including Locust unless it has been scaled down—the calculation, Pod conditions, and scheduler events.
+For the accepted run, each worker had `12000m` allocatable CPU, baseline
+requests were `250m`, `700m`, and `300m`, and Locust's `100m` request was
+included. The chosen `q = 6100m` exceeded `L / 2 = 6000m` and remained below
+the minimum `11300m` free requested CPU. One Pod scheduled on each worker; the
+fourth remained Pending. Its `PodScheduled=False` condition and
+`FailedScheduling` event reported `3 Insufficient cpu`, while the fourth
+cluster node was unavailable because of its control-plane taint. See the
+[Phase 9 record](phase9-capacity-demonstration.md).
+
+If those bounds do not overlap in a future reproduction because nodes are
+heterogeneous or already busy, select a homogeneous worker subset with node
+affinity and repeat the calculation for that subset. Record allocatable
+resources, existing requests—including Locust unless it has been scaled
+down—the calculation, Pod conditions, and scheduler events.
 
 Requests drive scheduling and an unsatisfied request leaves a Pod Pending; limits are runtime enforcement. See [Kubernetes resource management](https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/). Docker Desktop has fixed local nodes and no cloud-provider node-group API that a cluster autoscaler could use to add a VM; contrast this with [Kubernetes node autoscaling](https://kubernetes.io/docs/concepts/cluster-administration/node-autoscaling/).
 
@@ -560,11 +578,12 @@ The final audit package is complete only when it contains all of the following:
 - [x] an HPA manifest plus observed scale-out and scale-in evidence;
 - [x] a VPA Off-mode manifest plus captured recommendation evidence;
 - [x] the in-cluster Locust workload plus exported acceptance-test results;
-- [ ] a capacity demonstration with a scheduler-level Pending Pod and `Insufficient cpu` diagnosis;
+- [x] a capacity demonstration with a scheduler-level Pending Pod and `Insufficient cpu` diagnosis;
 - [x] the offline report interface combining tournament results and separately captured experiment evidence;
 - [ ] a README covering the complete final operational analysis:
   - [x] resource sizing and HPA/VPA interaction;
-  - [ ] capacity diagnosis, approximate monthly cost, and complete reproduction instructions.
+  - [x] capacity diagnosis;
+  - [ ] approximate monthly cost and complete reproduction instructions.
 
 ## Current risks and validation gates
 
@@ -601,7 +620,10 @@ The current implementation state is:
 - phase 8 complete: the Off-mode VPA comparison produced a settled `511m` CPU
   target, supported the selected `500m` request, preserved existing resources,
   and retained the short-history warning as a limitation; and
-- phases 9–10 pending.
+- phase 9 complete: one `6100m` request scheduled on each of three workers and
+  a fourth replica remained Pending with a `FailedScheduling` event reporting
+  `3 Insufficient cpu`; and
+- phase 10 pending.
 
 The remaining phase gates are:
 
@@ -627,7 +649,11 @@ The remaining phase gates are:
    manual `500m` request, the memory target was identified as the recommender's
    default floor, and existing resources were retained. See the
    [Phase 8 record](phase8-vpa-autoscaling.md).
-9. **Capacity and scheduler diagnosis — pending.** Produce a scheduler-level `Insufficient cpu` Pending Pod using calculated requests.
+9. **Capacity and scheduler diagnosis — complete.** A calculated four-replica
+   capacity workload placed one `6100m` Pod on each eligible worker and left
+   the fourth Pending with a default-scheduler `FailedScheduling` event
+   reporting `3 Insufficient cpu`. See the
+   [Phase 9 record](phase9-capacity-demonstration.md).
 10. **Final run and audit package — pending.** Run all 1,025 species and assemble the final manifests, evidence, cost comparison, report, and reproducibility instructions.
 
 After the phase 5 exit condition is satisfied, the optional replay-viewer viability spike may run as a separate enhancement. It is not an assignment deliverable or a prerequisite for phases 6–10.

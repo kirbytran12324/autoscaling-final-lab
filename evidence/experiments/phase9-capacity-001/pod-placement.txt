@@ -1,0 +1,6 @@
+$ kubectl -n capacity-demo get pods -l app=cpu-capacity-demo -o wide
+NAME                                READY   STATUS    RESTARTS   AGE   IP           NODE              NOMINATED NODE   READINESS GATES
+cpu-capacity-demo-99bbdf9cd-fjxvk   1/1     Running   0          59s   10.244.2.5   desktop-worker2   <none>           <none>
+cpu-capacity-demo-99bbdf9cd-h8lk6   1/1     Running   0          59s   10.244.1.7   desktop-worker3   <none>           <none>
+cpu-capacity-demo-99bbdf9cd-hctmf   1/1     Running   0          59s   10.244.3.6   desktop-worker    <none>           <none>
+cpu-capacity-demo-99bbdf9cd-qwvdd   0/1     Pending   0          59s   <none>       <none>            <none>           <none>

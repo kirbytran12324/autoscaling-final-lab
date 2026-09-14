@@ -1,0 +1,46 @@
+# Relevant fields captured from `kubectl get pod cpu-capacity-demo-99bbdf9cd-qwvdd -o yaml`.
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: "2026-09-14T03:22:35Z"
+  labels:
+    app: cpu-capacity-demo
+    pod-template-hash: 99bbdf9cd
+  name: cpu-capacity-demo-99bbdf9cd-qwvdd
+  namespace: capacity-demo
+  uid: c48472d2-14f9-4540-9e13-5ae29721202f
+spec:
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: node-role.kubernetes.io/control-plane
+                operator: DoesNotExist
+  containers:
+    - command:
+        - sleep
+        - "86400"
+      image: busybox:1.36
+      name: sleeper
+      resources:
+        limits:
+          cpu: 6100m
+          memory: 32Mi
+        requests:
+          cpu: 6100m
+          memory: 16Mi
+  schedulerName: default-scheduler
+status:
+  conditions:
+    - lastTransitionTime: "2026-09-14T03:22:35Z"
+      message: >-
+        0/4 nodes are available: 1 node(s) had untolerated taint(s), 3
+        Insufficient cpu. no new claims to deallocate, preemption: 0/4 nodes
+        are available: 1 Preemption is not helpful for scheduling, 3 No
+        preemption victims found for incoming pod.
+      reason: Unschedulable
+      status: "False"
+      type: PodScheduled
+  phase: Pending
+  qosClass: Burstable

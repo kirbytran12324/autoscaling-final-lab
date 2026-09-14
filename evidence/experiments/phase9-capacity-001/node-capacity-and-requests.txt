@@ -1,0 +1,50 @@
+$ kubectl get node desktop-control-plane desktop-worker desktop-worker2 desktop-worker3 -o custom-columns='NAME:.metadata.name,ALLOCATABLE_CPU:.status.allocatable.cpu,TAINTS:.spec.taints'
+NAME                    ALLOCATABLE_CPU   TAINTS
+desktop-control-plane   12                [map[effect:NoSchedule key:node-role.kubernetes.io/control-plane]]
+desktop-worker          12                <none>
+desktop-worker2         12                <none>
+desktop-worker3         12                <none>
+
+Pre-demo CPU requests from `kubectl describe node`:
+
+desktop-worker:
+  default/metronome-simulator: 100m
+  kube-system/kindnet: 100m
+  kube-system/kube-proxy: 0
+  kube-system/vpa-recommender: 50m
+  total: 250m
+  free requested CPU: 12000m - 250m = 11750m
+
+desktop-worker2:
+  autoscaling-lab/metronome-simulator: 500m
+  kube-system/kindnet: 100m
+  kube-system/kube-proxy: 0
+  kube-system/metrics-server: 100m
+  total: 700m
+  free requested CPU: 12000m - 700m = 11300m
+
+desktop-worker3:
+  kube-system/kindnet: 100m
+  kube-system/kube-proxy: 0
+  kube-system/vpa-admission-controller: 50m
+  kube-system/vpa-updater: 50m
+  load-testing/metronome-load-test: 100m
+  total: 300m
+  free requested CPU: 12000m - 300m = 11700m
+
+Demo calculation:
+  L = largest eligible worker allocatable CPU = 12000m
+  L / 2 = 6000m
+  q = 6100m
+  q > L / 2: 6100m > 6000m
+  q <= smallest free requested CPU: 6100m <= 11300m
+  eligible workers = 3
+  requested replicas = eligible workers + 1 = 4
+
+Post-placement totals from `kubectl describe node`:
+  desktop-worker: 6350m requested (250m baseline + 6100m demo)
+  desktop-worker2: 6800m requested (700m baseline + 6100m demo)
+  desktop-worker3: 6400m requested (300m baseline + 6100m demo)
+
+The Locust request is included in the desktop-worker3 baseline; it was not
+scaled down for this experiment.

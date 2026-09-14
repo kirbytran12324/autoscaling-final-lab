@@ -104,7 +104,7 @@ used a 70% CPU target, a one-to-six replica range, and a 150-second scale-down
 stabilization window. Under three Locust users, the simulator followed
 `1 → 2 → 3 → 5 → 6 → 4 → 1`; all 13,033 requests succeeded, every Ready replica
 served traffic, no simulator container restarted, and the Deployment returned
-to one Ready replica. **Phase 7 HPA experiment: PASS.** Phases 9–10 remain
+to one Ready replica. **Phase 7 HPA experiment: PASS.** Phase 10 remains
 pending.
 
 `scripts/capture-hpa-experiment.sh` records the simulator HPA, Deployment,
@@ -190,6 +190,33 @@ timestamps. Keep the HPA and workload configuration fixed, retain
 `updateMode: "Off"`, and export the per-run Locust HTML report. A short-history
 upper bound is not a sizing decision; compare the settled target with measured
 usage and the manually selected request.
+
+## Phase 9 capacity demonstration
+
+Phase 9 is complete. The canonical
+[capacity and scheduler diagnosis](docs/phase9-capacity-demonstration.md)
+records the node inventory, sizing calculation, committed manifest, Pod
+conditions, placement, and scheduler event. On three 12-CPU workers with
+11,300m or more free requested CPU, four Pods each requested `6100m`. One Pod
+scheduled per worker and the fourth remained Pending with a scheduler
+`FailedScheduling` event reporting `3 Insufficient cpu`. The control-plane
+node was ineligible because of its `NoSchedule` taint. Locust remained running,
+and its `100m` request was included in the calculation.
+
+Recalculate requests before reproducing; `6100m` is specific to the captured
+cluster state. Then apply, inspect, and remove the isolated demo:
+
+```sh
+kubectl apply -k k8s/capacity-demo
+kubectl -n capacity-demo get deployment,pods -o wide
+kubectl -n capacity-demo get events --sort-by=.metadata.creationTimestamp
+kubectl delete -k k8s/capacity-demo
+```
+
+Kubernetes makes this decision from requests, not current utilization. A local
+Docker Desktop kind cluster cannot add cloud nodes, while a managed cluster
+autoscaler could react to an unschedulable Pod when a configured node group has
+a node type capable of satisfying the request.
 
 ## Generate an offline tournament report
 

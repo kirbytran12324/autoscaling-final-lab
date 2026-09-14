@@ -1,0 +1,47 @@
+# Relevant fields captured from `kubectl get deployment cpu-capacity-demo -o yaml`.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: "2026-09-14T03:22:35Z"
+  generation: 1
+  name: cpu-capacity-demo
+  namespace: capacity-demo
+  uid: 0470694a-240e-4cee-b829-0149d5b94e89
+spec:
+  replicas: 4
+  selector:
+    matchLabels:
+      app: cpu-capacity-demo
+  template:
+    metadata:
+      labels:
+        app: cpu-capacity-demo
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: node-role.kubernetes.io/control-plane
+                    operator: DoesNotExist
+      containers:
+        - command:
+            - sleep
+            - "86400"
+          image: busybox:1.36
+          name: sleeper
+          resources:
+            limits:
+              cpu: 6100m
+              memory: 32Mi
+            requests:
+              cpu: 6100m
+              memory: 16Mi
+      terminationGracePeriodSeconds: 0
+status:
+  availableReplicas: 3
+  observedGeneration: 1
+  readyReplicas: 3
+  replicas: 4
+  unavailableReplicas: 1
+  updatedReplicas: 4

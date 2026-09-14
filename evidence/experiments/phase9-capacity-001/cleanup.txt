@@ -1,0 +1,8 @@
+2026-09-14T10:25:53+07:00
+
+$ kubectl delete -k k8s/capacity-demo --wait=true
+namespace "capacity-demo" deleted
+deployment.apps "cpu-capacity-demo" deleted from capacity-demo namespace
+
+$ kubectl get namespace capacity-demo
+Error from server (NotFound): namespaces "capacity-demo" not found
