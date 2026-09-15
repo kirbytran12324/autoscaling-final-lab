@@ -121,7 +121,7 @@ Build the exact image tags referenced by the manifests:
 
 ```sh
 docker build \
-  --tag metronome-simulator:phase5 \
+  --tag metronome-simulator:phase10 \
   simulator
 
 docker build \
