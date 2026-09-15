@@ -103,6 +103,9 @@ permitted node type could satisfy the request.
   requests.
 - It demonstrates Pending behavior in a fixed local cluster, not successful
   node provisioning by a cloud cluster autoscaler.
+- The three worker Nodes are separate scheduler objects backed by the same
+  Docker Desktop host and VM. Their aggregate reported allocatable CPU is a
+  scheduling model, not evidence of equivalent independent physical CPU.
 - The isolated demo namespace was
   [deleted after capture](../evidence/experiments/phase9-capacity-001/cleanup.txt);
   the evidence is the durable experiment record.

@@ -548,6 +548,12 @@ down—the calculation, Pod conditions, and scheduler events.
 
 Requests drive scheduling and an unsatisfied request leaves a Pod Pending; limits are runtime enforcement. See [Kubernetes resource management](https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/). Docker Desktop has fixed local nodes and no cloud-provider node-group API that a cluster autoscaler could use to add a VM; contrast this with [Kubernetes node autoscaling](https://kubernetes.io/docs/concepts/cluster-administration/node-autoscaling/).
 
+The three Docker Desktop workers are distinct Kubernetes scheduling objects but
+share the physical host and Docker Desktop VM capacity. Their aggregate
+reported allocatable CPU is valid for demonstrating scheduler request
+accounting, but it is not evidence of the same amount of independent physical
+compute capacity.
+
 ## Cost and performance requirement
 
 The Docker Desktop cluster has no defensible cloud node charge, so local measurements and cloud estimates remain clearly separated. At project completion, report:
@@ -571,6 +577,16 @@ costPer1000Battles = estimatedRunCost / completedBattles × 1,000
 
 Compare cost with throughput, p95 latency, failure rate, and availability. Additional simulator replicas consume cluster capacity but add cloud cost only when they cause additional billed infrastructure or service usage.
 
+The accepted comparison uses Linux On-Demand EC2 pricing in Singapore
+(`ap-southeast-1`) and 730 hours per month. One `c7i.xlarge` worker plus the EKS
+standard-support control-plane charge is estimated at `$223.23` per month for
+the selected requests. The 2x-request comparison uses one `c7i.2xlarge` and is
+estimated at `$373.47`, an additional `$150.23` per month. This simplified
+comparison excludes storage, public IPv4, data transfer, load balancers, taxes,
+and production high-availability duplication. The full assumptions,
+calculation, measured performance comparison, and official price sources are
+in the root README.
+
 ## Required deliverables
 
 The final audit package is complete only when it contains all of the following:
@@ -583,7 +599,8 @@ The final audit package is complete only when it contains all of the following:
 - [ ] a README covering the complete final operational analysis:
   - [x] resource sizing and HPA/VPA interaction;
   - [x] capacity diagnosis;
-  - [ ] approximate monthly cost and complete reproduction instructions.
+  - [x] approximate monthly cost;
+  - [ ] complete reproduction instructions.
 
 ## Current risks and validation gates
 

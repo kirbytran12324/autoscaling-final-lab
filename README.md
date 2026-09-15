@@ -5,6 +5,192 @@ restart-safe singleton tournament runner, Kubernetes and load-test manifests,
 and an offline tournament report generator. The architecture and tournament
 rules are defined in [docs/technical-design.md](docs/technical-design.md).
 
+## Reproduce the lab
+
+### Scope
+
+These instructions reproduce the accepted lab configuration on an existing
+Kubernetes cluster. The repository does not provision the Docker Desktop
+cluster or install the upstream VPA controllers.
+
+The accepted environment used Docker Desktop's `kind` provisioner with three
+worker nodes and one tainted control-plane node. Other clusters may run the
+application, but the Phase 9 capacity calculation must be repeated for their
+actual node sizes and existing resource requests.
+
+### Prerequisites
+
+Install or provide:
+
+- Docker Desktop with Kubernetes enabled;
+- `docker`;
+- `kubectl` with Kustomize support;
+- Node.js 24 and npm for local simulator tests;
+- Python 3 and Locust 2.46.2 for local load-test tests;
+- Bash, `jq`, `awk`, `git`, `sha256sum`, `timeout`, and standard core utilities;
+- a default filesystem StorageClass; and
+- Vertical Pod Autoscaler 1.7.1.
+
+Before changing the cluster, verify the selected context and available
+capacity:
+
+```sh
+git status --short
+kubectl config current-context
+kubectl version
+kubectl get nodes -o wide
+kubectl get storageclass
+```
+
+Use a clean, committed worktree for acceptance evidence.
+
+### Install Metrics Server
+
+The repository vendors Metrics Server 0.8.0 with a Docker Desktop-only
+kubelet TLS patch:
+
+```sh
+kubectl apply -k k8s/addons/metrics-server
+
+kubectl wait \
+  --for=condition=Available \
+  apiservice/v1beta1.metrics.k8s.io \
+  --timeout=120s
+
+kubectl top nodes
+kubectl top pods --all-namespaces
+```
+
+The insecure kubelet TLS option is intended only for this local lab. It must
+not be copied into a production or untrusted cluster.
+
+### Install Vertical Pod Autoscaler
+
+VPA is not built into the repository. Install the accepted upstream
+`vertical-pod-autoscaler/v1.7.1` release from a separate checkout:
+
+```sh
+git clone \
+  --depth 1 \
+  --branch vertical-pod-autoscaler/v1.7.1 \
+  https://github.com/kubernetes/autoscaler.git \
+  /path/to/kubernetes-autoscaler
+
+cd /path/to/kubernetes-autoscaler/vertical-pod-autoscaler
+./hack/vpa-up.sh
+```
+
+The `hack` directory used here is inside the upstream
+`vertical-pod-autoscaler` directory, not the similarly named directory at the
+root of the autoscaler repository.
+
+Verify the three VPA components and API:
+
+```sh
+kubectl -n kube-system get deployment \
+  vpa-recommender \
+  vpa-updater \
+  vpa-admission-controller
+
+kubectl api-resources | grep -i verticalpodautoscaler
+```
+
+The repository's `k8s/vpa` overlay creates only the simulator's VPA
+configuration. It does not install these controllers or their CRDs.
+
+### Test and build the application images
+
+Run the simulator suite:
+
+```sh
+cd simulator
+npm ci
+npm test
+cd ..
+```
+
+With Locust 2.46.2 available locally, run its focused tests:
+
+```sh
+python3 -m unittest discover \
+  -s load-test \
+  -p 'test_*.py'
+```
+
+Build the exact image tags referenced by the manifests:
+
+```sh
+docker build \
+  --tag metronome-simulator:phase5 \
+  simulator
+
+docker build \
+  --tag metronome-load-test:0.1.2 \
+  load-test
+```
+
+The images must be available to every Kubernetes worker that may run the
+Pods. The accepted Docker Desktop environment uses its local image
+integration. A different cluster must load these images into each node or pull
+them from an accessible registry. Do not continue if a Pod reports
+`ImagePullBackOff`.
+
+### Render and validate the final manifests
+
+Inspect the rendered resources before applying them:
+
+```sh
+kubectl kustomize k8s/hpa
+kubectl kustomize k8s/load-test
+kubectl kustomize k8s/vpa
+kubectl kustomize k8s/runner
+```
+
+Validate them against the selected cluster without creating resources:
+
+```sh
+kubectl apply --dry-run=server -k k8s/hpa
+kubectl apply --dry-run=server -k k8s/load-test
+kubectl apply --dry-run=server -k k8s/vpa
+kubectl apply --dry-run=server -k k8s/runner
+```
+
+### Deploy the final autoscaling system
+
+Deploy the simulator and HPA, the fixed-replica Locust workload, and the
+recommendation-only VPA:
+
+```sh
+kubectl apply -k k8s/hpa
+kubectl apply -k k8s/load-test
+kubectl apply -k k8s/vpa
+```
+
+Wait for both Deployments:
+
+```sh
+kubectl -n autoscaling-lab rollout status \
+  deployment/metronome-simulator \
+  --timeout=180s
+
+kubectl -n load-testing rollout status \
+  deployment/metronome-load-test \
+  --timeout=180s
+```
+
+Verify the resulting boundaries:
+
+```sh
+kubectl -n autoscaling-lab get deployment,service,hpa,vpa
+kubectl -n load-testing get deployment,service
+kubectl -n autoscaling-lab top pods \
+  -l app=metronome-simulator
+```
+
+Only `metronome-simulator` should be an HPA target. Locust must remain at one
+replica, VPA must remain in `Off` mode, and no tournament runner should be
+started until its run identity has been deliberately selected.
+
 ## Phase 6 resource-sizing evidence
 
 Phase 6 is complete. It measured one fixed simulator Pod with one fixed Locust
@@ -218,6 +404,11 @@ Docker Desktop kind cluster cannot add cloud nodes, while a managed cluster
 autoscaler could react to an unschedulable Pod when a configured node group has
 a node type capable of satisfying the request.
 
+The three Docker Desktop worker Nodes are separate Kubernetes scheduling
+objects, but they share the physical host and Docker Desktop VM capacity. Their
+reported aggregate allocatable CPU therefore demonstrates scheduler accounting;
+it must not be interpreted as the same amount of independent physical CPU.
+
 ## Generate an offline tournament report
 
 Use an already completed run. From `simulator/`:
@@ -270,3 +461,58 @@ but does not replace the required full 1,025-species tournament.
 cd simulator
 npm test
 ```
+
+## Cost and performance tradeoff
+
+This estimate uses Linux On-Demand Amazon EC2 pricing in AWS Asia Pacific
+(Singapore), `ap-southeast-1`, retrieved on 2026-09-14. It models the accepted
+six-replica HPA peak as a controlled lab capacity scenario rather than a
+production traffic forecast. A month is approximated as 730 running hours.
+
+At the selected sizing, six simulator Pods request a total of `3` vCPU and
+`1152Mi` memory. A compute-optimized `c7i.xlarge` provides 4 vCPU and 8 GiB,
+leaving simplified headroom for Kubernetes system processes. At 2×
+over-provisioning, the same six Pods would request `6` vCPU and `2304Mi`;
+the comparison therefore uses a `c7i.2xlarge` with 8 vCPU and 16 GiB.
+
+| Scenario | Per-Pod request | EC2 worker | EC2 hourly | EC2 monthly | EKS control plane | Total monthly |
+| --- | --- | --- | ---: | ---: | ---: | ---: |
+| Selected sizing | 500m CPU, 192Mi memory | `c7i.xlarge` | $0.2058 | $150.23 | $73.00 | $223.23 |
+| 2× over-provisioned | 1000m CPU, 384Mi memory | `c7i.2xlarge` | $0.4116 | $300.47 | $73.00 | $373.47 |
+
+The 2× case adds approximately `$150.23` per month. Worker compute doubles,
+while the modeled total rises by approximately 67% because the EKS
+standard-support control-plane charge remains fixed at `$0.10` per hour.
+
+The selected `500m` CPU request is supported by both fixed-replica measurements
+and VPA recommendations. In the matched one-user validation, throughput
+increased from 20.21 to 51.80 RPS, average latency fell from 49.3 to 19.2 ms,
+p95 fell from 110 to 36 ms, and throttled periods fell from 98.3% to 17.0%.
+The accepted HPA experiment subsequently served 13,033 requests with zero
+failures and zero simulator restarts while scaling from one to six Pods and
+back to one. VPA targets of 511m and later 476m independently remained close
+to the selected request.
+
+Doubling requests would not guarantee double performance. With an unchanged
+70% HPA target, doubling the CPU request would raise the effective per-Pod
+target from approximately 350m to 700m and could delay scale-out. Additional
+capacity is valuable for bursts, rolling updates and node failure, but paying
+for persistently unused capacity wastes money and reduces scheduling density.
+
+Under-provisioning has the opposite risk. The original fixed-replica evidence
+confirmed severe CPU throttling and materially worse latency and throughput.
+Larger exploratory loads showed diminishing throughput returns and increasing
+latency, consistent with approaching a workload or shared-host capacity
+boundary, although those tests did not isolate one limiting component. No
+accepted experiment observed request failures, simulator restarts or memory
+exhaustion.
+
+This is a simplified compute comparison, not a production AWS architecture.
+It assumes one continuously running worker and excludes EBS volumes, public
+IPv4 addresses, data transfer, load balancers, taxes and high-availability
+worker duplication. A production estimate would require real traffic history,
+multiple Availability Zones and longer measurements.
+
+Sources: [Amazon EC2 On-Demand pricing](https://aws.amazon.com/ec2/pricing/on-demand/),
+[Amazon EKS pricing](https://aws.amazon.com/eks/pricing/), and the
+[official regional EC2 price list](https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonEC2/current/ap-southeast-1/index.csv).
