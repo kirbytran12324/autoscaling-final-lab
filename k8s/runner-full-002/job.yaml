@@ -1,0 +1,71 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: tournament-runner-full-002
+spec:
+  completions: 1
+  parallelism: 1
+  backoffLimit: 3
+  podReplacementPolicy: Failed
+  template:
+    metadata:
+      labels:
+        app: tournament-runner
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      securityContext:
+          runAsNonRoot: true
+          runAsUser: 1000
+          runAsGroup: 1000
+          fsGroup: 1000
+          seccompProfile:
+            type: RuntimeDefault
+      containers:
+        - name: runner
+          image: metronome-simulator:phase10
+          imagePullPolicy: IfNotPresent
+          command:
+            - npm
+          args:
+            - run
+            - runner
+          env:
+            - name: TOURNAMENT_RUN_ID
+              value: "full-1025-002"
+            - name: TOURNAMENT_MODE
+              value: "full"
+            - name: TOURNAMENT_SEED
+              value: "full-1025-seed-002"
+            - name: TOURNAMENT_STATE_ROOT
+              value: "/data/tournaments"
+            - name: SIMULATOR_BASE_URL
+              value: "http://metronome-simulator"
+            - name: RUNNER_CONCURRENCY
+              value: "10"
+            - name: RULES_VERSION
+              value: "metronome-singles-v1"
+            - name: SIMULATOR_VERSION
+              value: "pokemon-showdown@0.11.11"
+            - name: SIMULATOR_IMAGE
+              value: "metronome-simulator:phase10"
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: 100m
+              memory: 1Gi
+            limits:
+              cpu: 500m
+              memory: 2Gi
+          volumeMounts:
+            - name: tournament-state
+              mountPath: /data/tournaments
+      volumes:
+        - name: tournament-state
+          persistentVolumeClaim:
+            claimName: tournament-state
