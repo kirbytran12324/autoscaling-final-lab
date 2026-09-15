@@ -290,8 +290,9 @@ used a 70% CPU target, a one-to-six replica range, and a 150-second scale-down
 stabilization window. Under three Locust users, the simulator followed
 `1 → 2 → 3 → 5 → 6 → 4 → 1`; all 13,033 requests succeeded, every Ready replica
 served traffic, no simulator container restarted, and the Deployment returned
-to one Ready replica. **Phase 7 HPA experiment: PASS.** Phase 10 remains
-pending.
+to one Ready replica. **Phase 7 HPA experiment: PASS.** This controlled
+autoscaling experiment is separate from tournament execution and its telemetry
+is not embedded in the canonical tournament report.
 
 `scripts/capture-hpa-experiment.sh` records the simulator HPA, Deployment,
 Pods, CPU and memory samples, and Service EndpointSlices on a fixed schedule.
@@ -409,6 +410,30 @@ objects, but they share the physical host and Docker Desktop VM capacity. Their
 reported aggregate allocatable CPU therefore demonstrates scheduler accounting;
 it must not be interpreted as the same amount of independent physical CPU.
 
+## Prepare the next full tournament run
+
+`k8s/runner-full-002/job.yaml` defines the next isolated full run. Its explicit
+identity is `full-1025-002` with tournament seed `full-1025-seed-002`, so it
+writes to a new PVC directory and cannot resume or overwrite `full-1025-001`.
+It starts with the `1Gi` memory request and `2Gi` limit that completed the
+prior run's recovery; the historical original and recovery manifests remain
+unchanged.
+
+Before applying it, verify that the simulator is Ready, the HPA and PVC are
+present, and no tournament runner is active:
+
+```sh
+kubectl -n autoscaling-lab get deployment metronome-simulator -o wide
+kubectl -n autoscaling-lab get hpa metronome-simulator
+kubectl -n autoscaling-lab get pvc tournament-state
+kubectl -n autoscaling-lab get jobs,pods -l app=tournament-runner -o wide
+kubectl apply --dry-run=client -f k8s/runner-full-002/job.yaml
+```
+
+Review the run ID, seed, image, concurrency, and resources before the real
+apply. Creating the Job is a separate, state-changing step and is not part of
+report generation.
+
 ## Generate an offline tournament report
 
 Use an already completed run. From `simulator/`:
@@ -425,29 +450,15 @@ The command validates all canonical run artifacts and atomically writes:
 <TOURNAMENT_STATE_ROOT>/runs/<TOURNAMENT_RUN_ID>/report.html
 ```
 
-Optional evidence directories can be supplied without changing tournament
-state:
+The report accepts no restart, recovery, or autoscaling evidence inputs. It is
+derived only from the canonical completed tournament artifacts. Phase 7 Pod
+readiness, resource, EndpointSlice, replica, and load-test evidence remains in
+its standalone experiment record.
 
-```sh
-REPORT_RESTART_EVIDENCE_DIR=/path/to/restart-evidence \
-REPORT_AUTOSCALING_EVIDENCE_DIR=/path/to/autoscaling-evidence \
-TOURNAMENT_STATE_ROOT=/path/to/tournament-state \
-TOURNAMENT_RUN_ID=sample-32-001 \
-npm run report
-```
-
-Restart evidence must contain the current harness `summary.txt` and
-`checkpoint-before-interruption.json` for the selected run. For the accepted
-Phase 7 view, set `REPORT_AUTOSCALING_EVIDENCE_DIR` to the recorder directory
-containing `capture-status.json`, `metadata.json`, the HPA/replica/Pod/endpoint
-and sample-status CSVs, `locust.log`, and the Locust HTML report. The report
-validates collection status, sample counts, scale-out and return to one,
-restart counts, Locust totals, and `servedBy` membership before rendering the
-accepted timeline and results. Incomplete or conflicting Phase 7 evidence is
-shown as incompatible rather than partially rendered. The earlier compatible
-`autoscaling-timeline.csv` format remains supported for generic timelines.
-When optional evidence is absent, the report shows explicit placeholders and
-does not invent values.
+The report groups accepted results by their `servedBy` value and displays
+accepted counts, shares, and stage totals for each reported hostname. This is
+response attribution only; it does not infer Pod identity, readiness, node
+placement, restart count, simultaneous availability, or lifecycle.
 
 The resulting HTML is self-contained and can be opened through `file://`; it
 uses no CDN, external font, stylesheet, script, framework, or network request.

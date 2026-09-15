@@ -1,8 +1,8 @@
 # Metronome Tournament Autoscaling Lab — Technical Design
 
-Status: active implementation design, updated 2026-09-14.
-Phase 9 capacity diagnosis is complete. The full tournament and final audit
-package remain pending.
+Status: implemented and validated, updated 2026-09-15.
+The full tournament, resource-assisted recovery, and final audit package are
+complete.
 
 ## Environment
 
@@ -264,7 +264,7 @@ The runner owns tournament execution state and writes these machine-readable art
   game retains its game number, match ID, participants, seed, outcome and
   winner, turns, termination, and protocol hash.
 
-The separate [resource-capture script](../scripts/capture-resource-usage.sh), not the runner, owns experiment observations. For each never-before-used experiment directory, it records immutable metadata, simulator and Locust resources, simulator replica and per-Pod health data, cumulative per-container CPU-throttling counters when the runtime exposes them, and explicit per-sample and final capture status. Acceptance capture starts only from a clean Git worktree and settled one-replica Deployments, records their actual runtime image IDs, and succeeds only if their identities, complete specs, runtime images, settled status, and no-HPA assumption still match at the end. The Locust Pod UID, container ID, and restart count must also remain unchanged because replacement or restart loses its in-memory run state; simulator restarts remain measured evidence. Each measurement has its own collection timestamp; sample start/end and fixed scheduled deadlines expose collection drift without adding collection time to each interval. After the last scheduled sample, capture waits until its nominal duration ends before final validation. Throttling counters reset when a container restarts, so analysis calculates deltas only within one recorded container ID. Phase 7 uses its focused HPA recorder, and the report loads that recorder directory and exported Locust result directly. The legacy `autoscaling-timeline.csv` remains a compatible generic report input but is derived rather than authoritative evidence. These observations are collected only during dedicated sizing or Locust/HPA runs. A normal tournament run does not implicitly run a load experiment.
+The separate [resource-capture script](../scripts/capture-resource-usage.sh), not the runner, owns experiment observations. For each never-before-used experiment directory, it records immutable metadata, simulator and Locust resources, simulator replica and per-Pod health data, cumulative per-container CPU-throttling counters when the runtime exposes them, and explicit per-sample and final capture status. Acceptance capture starts only from a clean Git worktree and settled one-replica Deployments, records their actual runtime image IDs, and succeeds only if their identities, complete specs, runtime images, settled status, and no-HPA assumption still match at the end. The Locust Pod UID, container ID, and restart count must also remain unchanged because replacement or restart loses its in-memory run state; simulator restarts remain measured evidence. Each measurement has its own collection timestamp; sample start/end and fixed scheduled deadlines expose collection drift without adding collection time to each interval. After the last scheduled sample, capture waits until its nominal duration ends before final validation. Throttling counters reset when a container restarts, so analysis calculates deltas only within one recorded container ID. Phase 7 uses its focused HPA recorder. The legacy `autoscaling-timeline.csv` remains a compatible generic experiment input but is derived rather than authoritative evidence. These observations are collected only during dedicated sizing or Locust/HPA runs and are not ingested by the canonical tournament report. A normal tournament run does not implicitly run a load experiment.
 
 For a Locust run, its per-run HTML report is sufficient evidence when it
 contains request totals, RPS, failures, latency percentiles, user history, and
@@ -275,12 +275,16 @@ capture status incorrectly contain `phase6-1-user-001`, while the directory
 and Locust report show that two users ran. The original evidence remains
 unchanged. See the [Phase 6 resource-sizing record](phase6-resource-sizing.md).
 
-The report generator combines the tournament artifacts with separately captured experiment evidence and produces a self-contained `report.html` with embedded data, CSS, and JavaScript. It works offline after being copied into the repository and has no CDN dependency. Regeneration from identical inputs produces substantively identical content apart from an explicitly labelled generation timestamp.
+The report generator validates the canonical completed tournament artifacts
+and produces a self-contained `report.html` with embedded data, CSS, and
+JavaScript. It does not ingest restart, recovery, or autoscaling experiments.
+It works offline after being copied into the repository and has no CDN
+dependency. Regeneration from identical inputs produces substantively
+identical content apart from an explicitly labelled generation timestamp.
 
 The implemented generator is invoked from `simulator/` with `npm run report`.
 `TOURNAMENT_STATE_ROOT` and `TOURNAMENT_RUN_ID` are required and select
-`<stateRoot>/runs/<runId>/`; `REPORT_RESTART_EVIDENCE_DIR` and
-`REPORT_AUTOSCALING_EVIDENCE_DIR` are optional. The default output is
+`<stateRoot>/runs/<runId>/`. The default output is
 `<stateRoot>/runs/<runId>/report.html`. Before writing, the generator validates
 the completed metadata, immutable roster and hash, authoritative result set,
 final checkpoint, recomputed standings, deterministic bracket progression,
@@ -289,17 +293,22 @@ identity-conflicting core evidence stops generation. The HTML is written to a
 same-directory temporary file and atomically renamed, so regeneration may
 safely replace an earlier report without exposing a partial file.
 
-The simulation explorer keeps the full accepted result set in escaped embedded
-JSON but creates at most 100 table rows in the document at once. Search,
-filters, sorting, and pagination run locally. Restart evidence is displayed
-only when compatible current-harness artifacts for the same run are supplied;
-Pod identities are never inferred. Autoscaling charts are displayed for either
-a compatible generic `autoscaling-timeline.csv` or a complete Phase 7 recorder
-directory. Recorder input is accepted only after its sample counts, final
-validation, HPA configuration, replica lifecycle, restart counts, Locust
-totals, and `servedBy` Pod/Ready-endpoint membership reconcile. Absent evidence
-retains an explicit placeholder; incompatible evidence is rejected without a
-partial chart.
+The battle explorer keeps the full accepted result set in escaped,
+column-oriented embedded JSON but renders only the selected page. Search,
+filters, sorting, and pagination run locally. The battle explorer and group
+standings default to 25 rows and offer 25-, 50-, and 100-row pages. Group
+standings use artifact-derived tabs, while knockout round tabs and their
+series/game counts are derived from `bracket.json`.
+
+The report also aggregates accepted results by the reported `servedBy`
+hostname, with dynamic stage counts discovered from the normalized result
+data. When multiple hostnames share a useful prefix, the report derives that
+prefix from the observed collection, de-emphasizes it in the complete table
+value, and uses the distinguishing remainder as the chart label. It assumes no
+deployment name or suffix length. This is accepted-response attribution, not
+Pod lifecycle, readiness, replica, EndpointSlice, resource, restart, or
+node-placement evidence. Phase 7 retains those claims in its standalone
+controlled-experiment record.
 
 `results.jsonl` remains authoritative for accepted simulations. After a
 restart, the runner recomputes standings from those results rather than
@@ -321,18 +330,16 @@ simulator or creating run state. The image still starts the simulator server
 by default; the runner Job overrides its command with the runner npm script.
 
 The report provides a run summary, integrity and reproducibility checks,
-sortable group tables with advancement cutoffs, the knockout bracket and
-expandable series/game details, a bounded searchable simulation table,
-operational timing and Pod summaries, restart/resume evidence, and—when
-supplied—an autoscaling chart aligned across replica count, request rate, p95
-latency, and failures. It is read-only and never becomes the source of truth.
+filterable and paginated group standings with advancement cutoffs, round-based
+knockout views with expandable series/game details, a bounded searchable
+simulation table, operational timing, and generic accepted-response hostname
+attribution. It is read-only and never becomes the source of truth.
 
-### Deferred optional UI polish and Pokémon Showdown replay viewer
+### Deferred Pokémon Showdown replay viewer
 
 The implemented offline report design is accepted for the required lab
-interface. Further visual or interaction polish is deferred optional work,
-alongside the separate replay-viewer viability spike; neither is a phase gate
-or assignment deliverable.
+interface. The separate replay-viewer viability spike remains optional; it is
+not a phase gate or assignment deliverable.
 
 After the 32-species sample tournament, restart/resume validation, and offline report are complete, perform a bounded viability spike for a separate read-only replay viewer. A user should be able to search for a matchup, select a recorded simulation, and watch it turn by turn using the actual Pokémon Showdown battle UI rather than only reading a move log or final result.
 
@@ -632,17 +639,18 @@ The current implementation state is:
 - phase 7 complete: the accepted HPA scaled from one to six Ready replicas,
   routed successful traffic to every replica, and returned to one with the
   150-second scale-down stabilization window;
-- further report UI polish and the replay-viewer spike deferred as optional
-  work; and
+- the replay-viewer spike remains deferred as optional work;
 - phase 8 complete: the Off-mode VPA comparison produced a settled `511m` CPU
   target, supported the selected `500m` request, preserved existing resources,
   and retained the short-history warning as a limitation; and
 - phase 9 complete: one `6100m` request scheduled on each of three workers and
   a fourth replica remained Pending with a `FailedScheduling` event reporting
   `3 Insufficient cpu`; and
-- phase 10 pending.
+- phase 10 complete: the interrupted full run resumed from 130,962 accepted
+  results, appended seven results, and completed with 130,969 unique accepted
+  match IDs and Giratina as champion.
 
-The remaining phase gates are:
+The phase gates are:
 
 1. **Environment inventory — complete.** The accepted cluster facts are reflected in this design.
 2. **Pinned simulator contract — complete.** Deterministic battle and catalog contracts are tested.
@@ -671,7 +679,10 @@ The remaining phase gates are:
    the fourth Pending with a default-scheduler `FailedScheduling` event
    reporting `3 Insufficient cpu`. See the
    [Phase 9 record](phase9-capacity-demonstration.md).
-10. **Final run and audit package — pending.** Run all 1,025 species and assemble the final manifests, evidence, cost comparison, report, and reproducibility instructions.
+10. **Final run and audit package — complete.** The 1,025-species tournament
+    completed after a resource-assisted resume. The final canonical artifacts
+    contain 130,969 unique accepted match IDs and Giratina as champion; the
+    operational incident history is documented separately from result trust.
 
 After the phase 5 exit condition is satisfied, the optional replay-viewer viability spike may run as a separate enhancement. It is not an assignment deliverable or a prerequisite for phases 6–10.
 

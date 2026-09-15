@@ -2,7 +2,10 @@
 
 ## Status
 
-Diagnosis and disposable recovery validation recorded on 2026-09-15. Authoritative recovery and long-term remediation remain pending. The interrupted authoritative run and the disposable recovery do not establish Phase 10 acceptance.
+Diagnosis, disposable validation, and authoritative recovery were completed on
+2026-09-15. The interruption and resume are an operational history of the run;
+trust in the tournament outcome comes from validation of the final canonical
+artifacts, not from treating a particular Job or Pod lifecycle as authoritative.
 
 ## Run configuration
 
@@ -102,7 +105,10 @@ The verified local copy is therefore byte-for-byte identical to the authoritativ
 
 The Pods terminated with exit code `134` and Kubernetes reason `Error`. A Kubernetes cgroup-level OOM kill would normally be reported as `OOMKilled` and commonly exits with code `137`.
 
-Exit code `134`, together with the out-of-memory log message, is consistent with the Node.js process aborting after V8 JavaScript heap exhaustion.
+Exit code `134`, together with the out-of-memory log message and the measured
+V8 heap ceilings below, is strongly consistent with the Node.js process
+aborting after V8 JavaScript heap exhaustion. No peak heap, RSS, or container
+memory measurement was captured at the failure instant.
 
 A post-failure node snapshot showed:
 
@@ -138,7 +144,9 @@ This validates resource-only recovery as a workable approach for this run. It do
 
 ## Working diagnosis
 
-The immediate failure was runner-process heap exhaustion, not simulator HPA failure or demonstrated exhaustion of aggregate cluster memory.
+The immediate failure is strongly consistent with runner-process heap
+exhaustion, not simulator HPA failure or demonstrated exhaustion of aggregate
+cluster memory. It was not accompanied by a peak-memory measurement.
 
 The runner reconstructs validated results from `results.jsonl` and retains complete result records in an in-memory `acceptedRecordsByMatchId` map. It also retains the tournament schedule, completed-match IDs, missing matches, standings inputs, bracket state, and validation structures.
 
@@ -150,33 +158,62 @@ The offline `512Mi` reconstruction rules out reconstruction by itself as a suffi
 
 The exact allocation responsible for the peak remains unconfirmed. The successful `2Gi` run neither locates that allocation nor establishes the minimum sufficient memory limit.
 
-## Impact and preserved state
+## Authoritative recovery and final state
 
-The authoritative tournament remains incomplete and has no accepted champion. Giratina is the champion only in the completed disposable copy; that result must not be presented as authoritative Phase 10 evidence.
+The new singleton Job `tournament-runner-full-resume-1` mounted the
+authoritative `tournament-state` PVC and resumed the existing run. The original
+manifest defined a `128Mi` memory request and `512Mi` limit; the recovery
+manifest defined a `1Gi` request and `2Gi` limit. Run ID, mode, seed, runner
+concurrency, rules version, simulator version, simulator image, and PVC were
+unchanged.
 
-However:
+The observed recovery execution used one Pod, completed with exit code `0`,
+and took 36 seconds. Those are Kubernetes observations whose raw captures were
+not retained in this repository; the durable acceptance boundary is the final
+artifact reconciliation below.
 
-- 130,962 accepted results remain persisted;
-- the group stage is complete;
-- only `r4` and `r2` remain;
-- the artifacts are valid and internally reconciled at the checked boundaries;
-- the verified profiling copy matches the PVC;
-- metadata remains resumable with the established immutable identity.
+Artifact reconciliation verified this transition:
 
-The disposable recovery artifacts are non-authoritative and must not be copied into the PVC. The failed Job, its termination evidence, and the PVC must remain preserved through authoritative recovery.
+| Boundary | Accepted results | Checkpoint |
+| --- | ---: | --- |
+| Interrupted state | 130,962 | `knockout` / `r4` / position `0` |
+| Completed state | 130,969 | `complete` / `r2` / position `3` |
 
-## Authoritative recovery decision
+Exactly seven newline-terminated results were appended to `results.jsonl`.
+They cover the two semifinal series and final series. All seven records report
+the hostname `metronome-simulator-558bdb896d-4qmrc` in `servedBy`. That field
+attributes accepted responses to a reported hostname; it does not establish a
+Pod UID, readiness interval, restart history, simultaneous replica count, node
+placement, or other lifecycle fact.
 
-The authoritative recovery will:
+The completed local artifact copy and the PVC copy had matching SHA-256 values
+for `run-metadata.json`, `roster.json`, `results.jsonl`, `checkpoint.json`,
+`standings.json`, and `bracket.json`. The final artifacts contain 130,969
+unique accepted match IDs, a final group standing with 130,816 results, a
+completed six-round knockout bracket, and Giratina as champion.
 
-- use a new singleton Job;
-- request `1Gi` of runner memory and set a `2Gi` runner memory limit;
-- preserve the original failed Job and its evidence;
-- use the authoritative PVC state rather than any disposable artifacts;
-- preserve the same run ID, seed, concurrency, versions, image, configuration, checkpoint, and persisted artifacts;
-- ensure only one recovery runner can be active;
-- verify that recovery advances beyond 130,962 accepted results and completes with unique, valid results.
+The successful recovery demonstrates that the increased memory allocation was
+sufficient for this short resume. It does not prove that `2Gi` is the minimum
+sufficient limit or identify the dominant allocation. Bounded-memory runner
+refactoring remains future work.
 
-Further profiling may measure RSS, heap used, heap allocated, external memory, and heap ceiling to identify the precise peak and evaluate a lower safe limit. Bounded-memory reconstruction and runtime behavior remain candidates for long-term remediation.
+## Evidence boundary
+
+The accepted-result transition, final checkpoint, immutable identity, final
+standings and bracket, champion, reported hostnames, and local/PVC checksum
+agreement are artifact-verified facts. The manifest-defined resource change is
+verified by the committed original and recovery Job manifests.
+
+The failed Job status, four exit-code-134 terminations, log wording, recovery
+Pod exit code and runtime, and contemporaneous cluster observations were
+recorded during diagnosis, but their raw Kubernetes captures were not retained
+in this repository. They remain operational observations rather than inputs to
+the tournament result validation. Phase 7 autoscaling captures are separate
+experiment evidence and are not tournament-run telemetry.
+
+Further profiling may measure RSS, heap used, heap allocated, external memory,
+and heap ceiling to identify the precise peak and evaluate a lower safe limit.
+Bounded-memory reconstruction and runtime behavior remain candidates for
+long-term remediation.
 
 Any implementation redesign must preserve duplicate-result protection, deterministic standings, append-only authoritative results, atomic checkpoints, and immutable restart validation.
