@@ -206,6 +206,7 @@ function createSimulatorClient(options) {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
+                'Connection': 'close',
               },
               body: requestBody,
               signal: controller.signal,

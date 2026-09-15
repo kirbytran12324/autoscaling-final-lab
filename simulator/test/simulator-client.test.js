@@ -392,21 +392,24 @@ test('runBattle posts the unchanged JSON request and validates the response', as
   assert.equal(calls[0][1].method, 'POST');
   assert.deepEqual(calls[0][1].headers, {
     'Content-Type': 'application/json',
+    'Connection': 'close',
   });
   assert.deepEqual(JSON.parse(calls[0][1].body), request);
   assert.ok(calls[0][1].signal instanceof AbortSignal);
 });
 
-test('runBattle retries with 250/500/1000 ms delays and unchanged data', async () => {
+test('runBattle retries with unchanged data and routing headers', async () => {
   const request = battleRequest();
   const requestBefore = structuredClone(request);
   const bodies = [];
+  const headers = [];
   const signals = [];
   const delays = [];
   let attempt = 0;
   const client = createSimulatorClient(clientOptions({
     fetchImpl: async (url, options) => {
       bodies.push(options.body);
+      headers.push(options.headers);
       signals.push(options.signal);
       attempt++;
 
@@ -425,6 +428,10 @@ test('runBattle retries with 250/500/1000 ms delays and unchanged data', async (
   assert.equal(bodies.length, 4);
   assert.ok(bodies.every(body => body === bodies[0]));
   assert.deepEqual(JSON.parse(bodies[0]), requestBefore);
+  assert.deepEqual(headers, Array.from({length: 4}, () => ({
+    'Content-Type': 'application/json',
+    'Connection': 'close',
+  })));
   assert.deepEqual(request, requestBefore);
   assert.equal(new Set(signals).size, 4);
   assert.ok(signals.every(signal => !signal.aborted));
