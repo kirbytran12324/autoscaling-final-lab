@@ -21,12 +21,6 @@ function parseReportConfiguration(env) {
   return {
     stateRoot,
     runId,
-    restartEvidenceDirectory: env.REPORT_RESTART_EVIDENCE_DIR === undefined
-      ? undefined
-      : requiredEnvironment(env, 'REPORT_RESTART_EVIDENCE_DIR'),
-    autoscalingEvidenceDirectory: env.REPORT_AUTOSCALING_EVIDENCE_DIR === undefined
-      ? undefined
-      : requiredEnvironment(env, 'REPORT_AUTOSCALING_EVIDENCE_DIR'),
   };
 }
 

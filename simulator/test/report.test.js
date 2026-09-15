@@ -1,21 +1,27 @@
 'use strict';
 
 const assert = require('node:assert/strict');
-const {
-  cp,
-  mkdtemp,
-  readFile,
-  readdir,
-  rm,
-  writeFile,
-} = require('node:fs/promises');
+const {cp, mkdtemp, readFile, readdir, rm, writeFile} = require('node:fs/promises');
 const {tmpdir} = require('node:os');
 const {join} = require('node:path');
 const {after, before, test} = require('node:test');
+const vm = require('node:vm');
 
-const {generateReport, atomicWriteText} = require('../src/report');
+const {atomicWriteText, generateReport} = require('../src/report');
 const {parseReportConfiguration, runCli} = require('../src/report-cli');
-const {loadAutoscalingEvidence, loadRestartEvidence} = require('../src/report-evidence');
+const {loadTournamentArtifacts} = require('../src/report-loader');
+const {
+  aggregatePodAttribution,
+  deriveSharedHostnamePrefix,
+  formatDuration,
+  formatNumber,
+  PAGE_SIZE_OPTIONS,
+  paginateRows,
+  paginateStandings,
+  renderPodAttribution,
+  renderReport,
+  roundCounts,
+} = require('../src/report-renderer');
 const {runTournament} = require('../src/runner');
 
 const RUN_ID = 'completed-report-fixture';
@@ -62,195 +68,8 @@ async function json(path) {
   return JSON.parse(await readFile(path, 'utf8'));
 }
 
-function restartSummary(overrides = {}) {
-  return {
-    result: 'job-completed',
-    run_id: RUN_ID,
-    interruption_stage: 'groups',
-    interruption_threshold: '10',
-    first_pod: 'runner-original',
-    first_pod_uid: 'original-uid',
-    replacement_pod: 'runner-replacement',
-    replacement_pod_uid: 'replacement-uid',
-    pvc_preserved: 'true',
-    job_preserved: 'true',
-    ...overrides,
-  };
-}
-
-function restartCheckpoint(overrides = {}) {
-  return {
-    schemaVersion: 1,
-    stage: 'groups',
-    round: null,
-    schedulePosition: 10,
-    acceptedResultCount: 10,
-    updatedAt: '2026-09-11T08:15:00.000Z',
-    ...overrides,
-  };
-}
-
-async function writeRestartEvidence(directory, summary, checkpoint) {
-  await writeFile(
-    join(directory, 'summary.txt'),
-    `${Object.entries(summary).map(([key, value]) => `${key}=${value}`).join('\n')}\n`,
-    'utf8'
-  );
-  await writeFile(
-    join(directory, 'checkpoint-before-interruption.json'),
-    JSON.stringify(checkpoint),
-    'utf8'
-  );
-}
-
-async function writePhase7Evidence(directory, overrides = {}) {
-  const experimentId = 'phase7-test';
-  const captureStatus = {
-    schemaVersion: '1',
-    experimentId,
-    status: 'complete',
-    sampleCount: 40,
-    successfulSampleCount: 40,
-    failedSampleCount: 0,
-    finalValidation: 'ok',
-    finalArtifactCollection: 'ok',
-    observations: {
-      maximumDesiredReplicas: 6,
-      maximumReadyReplicas: 6,
-      finalReplicaCount: 1,
-      finalDesiredReplicas: 1,
-      experimentAcceptanceEvaluated: false,
-    },
-    ...overrides.captureStatus,
-  };
-  const metadata = {
-    schemaVersion: '1',
-    experimentId,
-    inputs: {
-      captureDurationSeconds: 600,
-      sampleIntervalSeconds: 15,
-      evidenceLocustUsers: 3,
-      evidenceLocustSpawnRate: 1,
-      evidenceLocustRunSeconds: 180,
-    },
-    simulator: {
-      deployment: {
-        resourceSettings: {
-          requests: {cpu: '500m', memory: '192Mi'},
-          limits: {cpu: '1', memory: '256Mi'},
-        },
-      },
-      hpa: {startingConfiguration: {
-        scaleTargetRef: {kind: 'Deployment', name: 'metronome-simulator'},
-        minReplicas: 1,
-        maxReplicas: 6,
-        metrics: [{
-          type: 'Resource',
-          resource: {
-            name: 'cpu',
-            target: {type: 'Utilization', averageUtilization: 70},
-          },
-        }],
-        behavior: {
-          scaleUp: {stabilizationWindowSeconds: 0},
-          scaleDown: {stabilizationWindowSeconds: 150},
-        },
-      }},
-    },
-    locust: {
-      runtime: {podUid: 'locust-uid', containerId: 'containerd://locust', restartCount: 0},
-    },
-    ...overrides.metadata,
-  };
-  const timestamps = Array.from({length: 40}, (_, index) =>
-    new Date(Date.parse('2026-09-13T15:51:26Z') + index * 15_000).toISOString()
-  );
-  const desired = timestamps.map((_, index) => {
-    if (index < 4) return 1;
-    if (index === 4) return 2;
-    if (index < 7) return 3;
-    if (index < 10) return 5;
-    if (index < 25) return 6;
-    if (index === 25) return 4;
-    return 1;
-  });
-  const hpaRows = timestamps.map((timestamp, index) =>
-    `${timestamp},70,350m,70,${desired[index]},${desired[index]},ReadyForNewScale`
-  );
-  const replicaRows = timestamps.map((timestamp, index) =>
-    `${timestamp},${desired[index]},${desired[index]},${desired[index]},` +
-    `${desired[index]},${desired[index]},0`
-  );
-  const sampleRows = timestamps.map((timestamp, index) =>
-    `${timestamp},${timestamp},${timestamp},${index + 1},ok,ok,ok,ok,ok,ok`
-  );
-  const podNames = Array.from({length: 6}, (_, index) => `simulator-pod-${index + 1}`);
-  const podRows = podNames.map(pod =>
-    `2026-09-13T15:53:56Z,${pod},uid-${pod},worker,Running,,false,True,true,0,` +
-    `simulator:test,simulator:test,sha256:test,containerd://${pod},500m,180Mi`
-  );
-  const endpointRows = podNames.map((pod, index) =>
-    `2026-09-13T15:53:56Z,slice,10.0.0.${index + 1},${pod},true,true,false`
-  );
-  const distribution = podNames.map((pod, index) =>
-    `${pod}=${index === 0 ? 3 : 2}`
-  ).join(', ');
-  const locust = {
-    start_time: '2026-09-13T15:51:30Z',
-    end_time: '2026-09-13T15:54:30Z',
-    requests_statistics: [{
-      name: 'Aggregated',
-      num_requests: 13,
-      num_failures: 0,
-      total_rps: 72.42,
-      avg_response_time: 41.02,
-      median_response_time: 33,
-      'response_time_percentile_0.95': 95,
-      'response_time_percentile_0.99': 160,
-      max_response_time: 949,
-    }],
-    history: [{
-      time: '2026-09-13T15:53:00Z',
-      current_rps: ['2026-09-13T15:53:00Z', 75],
-      'response_time_percentile_0.95': ['2026-09-13T15:53:00Z', 95],
-      current_fail_per_sec: ['2026-09-13T15:53:00Z', 0],
-    }],
-  };
-  const files = {
-    'capture-status.json': `${JSON.stringify(captureStatus)}\n`,
-    'metadata.json': `${JSON.stringify(metadata)}\n`,
-    'hpa.csv': [
-      'timestamp,current_cpu_utilization,current_cpu_average_value,target_cpu_utilization,current_replicas,desired_replicas,condition_reasons',
-      ...hpaRows,
-      '',
-    ].join('\n'),
-    'replicas.csv': [
-      'timestamp,desired_replicas,current_replicas,updated_replicas,available_replicas,ready_replicas,unavailable_replicas',
-      ...replicaRows,
-      '',
-    ].join('\n'),
-    'pods.csv': [
-      'timestamp,pod_name,pod_uid,node,phase,deletion_timestamp,terminating,pod_ready,container_ready,restart_count,declared_image,runtime_image,runtime_image_id,container_id,cpu,memory',
-      ...podRows,
-      '',
-    ].join('\n'),
-    'endpoints.csv': [
-      'timestamp,endpointslice_name,address,target_pod,ready,serving,terminating',
-      ...endpointRows,
-      '',
-    ].join('\n'),
-    'sample-status.csv': [
-      'scheduled_at,sample_started_at,sample_completed_at,sample_number,status,hpa,deployment,pods,pod_metrics,endpointslices',
-      ...sampleRows,
-      '',
-    ].join('\n'),
-    'locust.log': `servedBy distribution: ${distribution}\n`,
-    'locust_report.html': `<script>window.templateArgs = ${JSON.stringify(locust)}\n` +
-      `window.theme = "dark"</script>`,
-  };
-  await Promise.all(Object.entries(files).map(([name, contents]) =>
-    writeFile(join(directory, name), contents, 'utf8')
-  ));
+async function fixtureArtifacts() {
+  return loadTournamentArtifacts({stateRoot: baselineRoot, runId: RUN_ID});
 }
 
 before(async () => {
@@ -284,10 +103,11 @@ test('completed-run report generation uses the default output location', async t
   assert.equal(summary.acceptedResultCount, 157);
   assert.equal(summary.duplicateMatchIdCount, 0);
   const html = await readFile(expectedPath, 'utf8');
-  assert.match(html, /Run summary/);
+  assert.match(html, /Tournament outcome/);
   assert.match(html, /Group standings/);
-  assert.match(html, /Knockout bracket and series/);
-  assert.match(html, /Simulation explorer/);
+  assert.match(html, /Knockout rounds/);
+  assert.match(html, /Battle explorer/);
+  assert.match(html, /Accepted battles by reported simulator Pod/);
   assert.match(html, /completed-report-fixture/);
 });
 
@@ -299,12 +119,10 @@ test('regeneration atomically replaces report.html and leaves no temporary file'
   await writeFile(outputPath, 'old partial report', 'utf8');
   await generateReport({stateRoot, runId: RUN_ID, now: () => GENERATED_AT});
   assert.match(await readFile(outputPath, 'utf8'), /^<!doctype html>/);
-  assert.ok(!(await readdir(runDirectory)).some(name =>
-    name.startsWith('.report.html.')
-  ));
+  assert.ok(!(await readdir(runDirectory)).some(name => name.startsWith('.report.html.')));
 });
 
-test('atomic writer preserves an old report if rename fails', async t => {
+test('atomic writer preserves an old report and cleans up if rename fails', async t => {
   const directory = await mkdtemp(join(tmpdir(), 'report-atomic-'));
   t.after(() => rm(directory, {recursive: true, force: true}));
   const path = join(directory, 'report.html');
@@ -341,10 +159,7 @@ test('run-ID conflicts and incomplete runs are rejected', async t => {
     const metadata = await json(path);
     metadata.runId = 'different-run';
     await writeFile(path, `${JSON.stringify(metadata)}\n`, 'utf8');
-    await assert.rejects(
-      generateReport({stateRoot, runId: RUN_ID}),
-      /run ID conflict/i
-    );
+    await assert.rejects(generateReport({stateRoot, runId: RUN_ID}), /run ID conflict/i);
   });
 
   await t.test('incomplete', async t => {
@@ -355,265 +170,234 @@ test('run-ID conflicts and incomplete runs are rejected', async t => {
     metadata.status = 'running';
     metadata.completedAt = null;
     await writeFile(path, `${JSON.stringify(metadata)}\n`, 'utf8');
-    await assert.rejects(
-      generateReport({stateRoot, runId: RUN_ID}),
-      /tournament is incomplete/i
-    );
+    await assert.rejects(generateReport({stateRoot, runId: RUN_ID}), /tournament is incomplete/i);
   });
 });
 
-test('absent optional evidence renders explicit placeholders', async t => {
-  const stateRoot = await createFixtureRoot();
-  t.after(() => rm(stateRoot, {recursive: true, force: true}));
-  const {outputPath} = await generateReport({
-    stateRoot,
-    runId: RUN_ID,
-    now: () => GENERATED_AT,
-  });
-  const html = await readFile(outputPath, 'utf8');
-  assert.match(html, /Restart\/resume evidence not supplied\./);
-  assert.match(html, /Phase 7 HPA evidence was not supplied/);
-  assert.doesNotMatch(html, /id="autoscaling-chart"/);
+test('Pod attribution aggregates arbitrary hostnames and stages deterministically', () => {
+  const attribution = aggregatePodAttribution([
+    {servedBy: 'worker-z', stage: 'qualifier'},
+    {servedBy: 'worker-a', stage: 'finals'},
+    {servedBy: 'worker-z', stage: 'unexpected-stage'},
+    {servedBy: 'worker-a', stage: 'qualifier'},
+    {servedBy: 'worker-b', stage: 'qualifier'},
+    {servedBy: 'worker-z', stage: 'qualifier'},
+    {servedBy: 'worker-b', stage: 'finals'},
+  ]);
+  assert.equal(attribution.totalAcceptedCount, 7);
+  assert.equal(attribution.attributedCount, 7);
+  assert.equal(attribution.distinctHostnameCount, 3);
+  assert.deepEqual(attribution.rows.map(row => row.fullHostname), [
+    'worker-z',
+    'worker-a',
+    'worker-b',
+  ]);
+  assert.deepEqual(attribution.rows.map(row => row.sharedPrefix), [
+    'worker-',
+    'worker-',
+    'worker-',
+  ]);
+  assert.deepEqual(attribution.rows.map(row => row.distinguishingPart), ['z', 'a', 'b']);
+  assert.deepEqual(attribution.rows.map(row => row.acceptedCount), [3, 2, 2]);
+  assert.deepEqual(attribution.stages, [
+    {stage: 'qualifier', count: 4},
+    {stage: 'finals', count: 2},
+    {stage: 'unexpected-stage', count: 1},
+  ]);
+  assert.ok(Math.abs(
+    attribution.rows.reduce((total, row) => total + row.acceptedShare, 0) - 100
+  ) < 1e-9);
 });
 
-test('supplied current restart evidence is rendered without inferred Pod data', async t => {
-  const stateRoot = await createFixtureRoot();
-  const evidence = await mkdtemp(join(tmpdir(), 'restart-evidence-'));
-  t.after(() => Promise.all([
-    rm(stateRoot, {recursive: true, force: true}),
-    rm(evidence, {recursive: true, force: true}),
-  ]));
-  await writeRestartEvidence(
-    evidence,
-    restartSummary(),
-    restartCheckpoint()
+test('hostname comparison derives a useful prefix without assuming a suffix length', () => {
+  const hostnames = [
+    'metronome-simulator-558bdb896d-c5pl7',
+    'metronome-simulator-558bdb896d-4qmrc',
+    'metronome-simulator-558bdb896d-q7gt9',
+  ];
+  assert.equal(
+    deriveSharedHostnamePrefix(hostnames),
+    'metronome-simulator-558bdb896d-'
   );
-  const {outputPath} = await generateReport({
-    stateRoot,
-    runId: RUN_ID,
-    restartEvidenceDirectory: evidence,
-    now: () => GENERATED_AT,
-  });
-  const html = await readFile(outputPath, 'utf8');
-  assert.match(html, /runner-original/);
-  assert.match(html, /runner-replacement/);
-  assert.match(html, /Duplicate accepted match IDs<\/span><strong>0/);
+  assert.equal(deriveSharedHostnamePrefix(['alpha', 'zulu']), '');
+  assert.equal(deriveSharedHostnamePrefix(['only-host']), '');
 });
 
-test('restart evidence rejects malformed checkpoints', async t => {
-  const evidence = await mkdtemp(join(tmpdir(), 'restart-invalid-checkpoint-'));
-  t.after(() => rm(evidence, {recursive: true, force: true}));
-  await writeRestartEvidence(evidence, restartSummary(), []);
-  const result = await loadRestartEvidence(evidence, RUN_ID, {
-    duplicateMatchIdCount: 0,
-    uniqueResultCount: 144,
-  });
-  assert.equal(result.status, 'incompatible');
-  assert.match(result.reason, /checkpoint evidence is invalid.*non-array object/i);
+test('Pod attribution handles one hostname and missing attribution or stage', () => {
+  const single = aggregatePodAttribution([
+    {servedBy: 'only-host', stage: 'round-one'},
+    {servedBy: 'only-host'},
+  ]);
+  assert.equal(single.distinctHostnameCount, 1);
+  assert.equal(single.rows[0].acceptedShare, 100);
+  assert.equal(single.rows[0].sharedPrefix, '');
+  assert.equal(single.rows[0].distinguishingPart, 'only-host');
+  assert.deepEqual(single.rows[0].stageCounts, {'round-one': 1, Unspecified: 1});
+
+  const missing = aggregatePodAttribution([
+    {servedBy: '', stage: 'round-one'},
+    {stage: 'round-two'},
+    {servedBy: '  ', stage: 'round-three'},
+  ]);
+  assert.equal(missing.totalAcceptedCount, 3);
+  assert.equal(missing.attributedCount, 0);
+  assert.equal(missing.unattributedCount, 3);
+  assert.equal(missing.distinctHostnameCount, 0);
+  assert.deepEqual(missing.rows, []);
 });
 
-test('restart evidence rejects a failed harness status', async t => {
-  const evidence = await mkdtemp(join(tmpdir(), 'restart-failed-status-'));
-  t.after(() => rm(evidence, {recursive: true, force: true}));
-  await writeRestartEvidence(
-    evidence,
-    restartSummary({result: 'job-failed'}),
-    restartCheckpoint()
-  );
-  const result = await loadRestartEvidence(evidence, RUN_ID, {});
-  assert.equal(result.status, 'incompatible');
-  assert.match(result.reason, /not job-completed/i);
+test('Pod attribution uses a compact breakdown for many discovered stages', async () => {
+  const artifacts = await fixtureArtifacts();
+  const stages = ['alpha', 'beta', 'gamma', 'delta', 'epsilon'];
+  const data = {
+    ...artifacts,
+    results: artifacts.results.slice(0, stages.length).map((result, index) => ({
+      ...result,
+      servedBy: `host-${index % 2}`,
+      stage: stages[index],
+    })),
+  };
+  const html = renderPodAttribution(data);
+  assert.match(html, /<th>Stage breakdown<\/th>/);
+  for (const stage of stages) assert.match(html, new RegExp(`${stage}: 1`));
 });
 
-test('restart evidence rejects identical original and replacement identities', async t => {
-  for (const [description, overrides, pattern] of [
-    [
-      'Pod names',
-      {replacement_pod: 'runner-original'},
-      /Pod names must differ/i,
-    ],
-    [
-      'Pod UIDs',
-      {replacement_pod_uid: 'original-uid'},
-      /Pod UIDs must differ/i,
-    ],
-  ]) {
-    await t.test(description, async t => {
-      const evidence = await mkdtemp(join(tmpdir(), 'restart-same-identity-'));
-      t.after(() => rm(evidence, {recursive: true, force: true}));
-      await writeRestartEvidence(
-        evidence,
-        restartSummary(overrides),
-        restartCheckpoint()
-      );
-      const result = await loadRestartEvidence(evidence, RUN_ID, {});
-      assert.equal(result.status, 'incompatible');
-      assert.match(result.reason, pattern);
-    });
+test('Pod attribution section is omitted when no hostname is usable', async () => {
+  const artifacts = await fixtureArtifacts();
+  const html = renderReport({
+    ...artifacts,
+    results: artifacts.results.map(result => ({...result, servedBy: ''})),
+  }, {generatedAt: GENERATED_AT});
+  assert.doesNotMatch(html, /id="pod-attribution"/);
+  assert.doesNotMatch(html, /href="#pod-attribution"/);
+});
+
+test('standings pagination supports filtering, empty results, and partial pages', () => {
+  const group = {
+    standings: Array.from({length: 123}, (_, index) => ({
+      rank: index + 1,
+      species: index === 122 ? 'Needlemon' : `Species ${index + 1}`,
+    })),
+  };
+  const first = paginateStandings(group, '', 0);
+  const second = paginateStandings(group, '', 1);
+  const last = paginateStandings(group, '', 4);
+  assert.equal(first.entries.length, 25);
+  assert.equal(second.entries.length, 25);
+  assert.equal(last.entries.length, 23);
+  assert.equal(last.pageCount, 5);
+  assert.equal(paginateStandings(group, 'needle', 2).page, 0);
+  assert.equal(paginateStandings(group, 'needle', 0).entries[0].species, 'Needlemon');
+  const empty = paginateStandings(group, 'missing', 10);
+  assert.deepEqual(empty.entries, []);
+  assert.equal(empty.page, 0);
+  assert.equal(empty.pageCount, 1);
+  assert.deepEqual(PAGE_SIZE_OPTIONS, [25, 50, 100]);
+  assert.equal(paginateRows(group.standings, 1, 50).entries.length, 50);
+  assert.equal(paginateRows(group.standings, 1, 100).entries.length, 23);
+  assert.equal(paginateRows(group.standings, 99, 17).pageSize, 25);
+});
+
+test('generated group and round tabs derive their accessible state from artifacts', async () => {
+  const artifacts = await fixtureArtifacts();
+  const html = renderReport(artifacts, {generatedAt: GENERATED_AT});
+  assert.equal((html.match(/data-group-index="\d+"[^>]*role="tab"/g) || []).length, 0);
+  assert.equal((html.match(/role="tab"[^>]*data-group-index="\d+"/g) || []).length, 4);
+  assert.equal((html.match(/role="tab"[^>]*data-round-index="\d+"/g) || []).length, 4);
+  assert.match(html, /role="tablist" aria-label="Tournament groups"/);
+  assert.match(html, /role="tablist" aria-label="Knockout rounds"/);
+  assert.match(html, /aria-selected="true" aria-controls="standings-panel-0" tabindex="0"/);
+  assert.match(html, /aria-selected="false" aria-controls="round-panel-1" tabindex="-1"/);
+  assert.match(html, /advances/);
+  assert.match(html, /Game outcome \/ game winner/);
+  const counts = artifacts.bracket.rounds.map(roundCounts);
+  assert.deepEqual(counts.map(item => item.series), [8, 4, 2, 1]);
+  assert.equal(counts.reduce((total, item) => total + item.games, 0),
+    artifacts.results.length - artifacts.expectedGroupResultCount);
+});
+
+test('number and duration formatting are readable and deterministic', () => {
+  assert.equal(formatNumber(130969), '130,969');
+  assert.equal(formatNumber(1025), '1,025');
+  assert.equal(formatDuration(12), '12 ms');
+  assert.equal(formatDuration(12_500), '12.50 s');
+  assert.equal(formatDuration(200 * 60_000 + 20_222), '3h 20m 20s');
+});
+
+test('report uses corrected interpretation wording and excludes experiment panels', async () => {
+  const artifacts = await fixtureArtifacts();
+  const html = renderReport(artifacts, {generatedAt: GENERATED_AT});
+  assert.match(html, /Wall-clock span/);
+  assert.match(html, /not active runner execution time/);
+  assert.match(html, /Terminal battle failures/);
+  assert.match(html, /bounded concurrent completion order/);
+  assert.doesNotMatch(html, /Restart\/resume|autoscaling-chart|Phase 7 HPA|Phase 8|Phase 9|Phase 10/);
+});
+
+test('report hierarchy and reusable table controls keep secondary evidence collapsed', async () => {
+  const artifacts = await fixtureArtifacts();
+  const html = renderReport(artifacts, {generatedAt: GENERATED_AT});
+  const headline = html.match(
+    /<div class="metric-grid headline-metrics">([\s\S]*?)<\/div><\/section>/
+  )[1];
+  assert.equal((headline.match(/class="metric"/g) || []).length, 5);
+  assert.match(html, /class="verified-banner/);
+  assert.match(html, /<summary>Verification details<\/summary>/);
+  assert.match(html, /<section id="details"/);
+  assert.match(html, /<summary>Configuration and timing<\/summary>/);
+  assert.match(html, /id="standings-page-size"/);
+  assert.match(html, /id="sim-page-size"/);
+  for (const size of PAGE_SIZE_OPTIONS) {
+    assert.match(html, new RegExp(`<option value="${size}"`));
   }
+  assert.match(html, /class="data-table primary-sticky/);
+  assert.match(html, /id="sim-reset"/);
+  assert.match(html, /id="sim-detail"/);
+  assert.match(html, /aria-current/);
+  assert.match(html, /class="back-top"/);
+  assert.match(html, /data-copy=/);
+  assert.match(html, /class="pod-hostname"/);
+  assert.match(html, /class="hostname-prefix"/);
+  assert.match(html, /class="hostname-distinguishing"/);
+  assert.match(html, /class="chart-hostname"/);
+  assert.match(html, /--sticky-nav-height/);
+  assert.match(html, /ResizeObserver/);
 });
 
-test('restart evidence rejects inconsistent interruption counts', async t => {
-  const evidence = await mkdtemp(join(tmpdir(), 'restart-counts-'));
-  t.after(() => rm(evidence, {recursive: true, force: true}));
-  await writeRestartEvidence(
-    evidence,
-    restartSummary({interruption_threshold: '11'}),
-    restartCheckpoint({acceptedResultCount: 10})
-  );
-  const result = await loadRestartEvidence(evidence, RUN_ID, {});
-  assert.equal(result.status, 'incompatible');
-  assert.match(result.reason, /below the interruption threshold/i);
-});
-
-test('restart evidence rejects non-preserved Job and PVC values', async t => {
-  for (const [field, pattern] of [
-    ['pvc_preserved', /PVC was preserved/i],
-    ['job_preserved', /Job was preserved/i],
-  ]) {
-    await t.test(field, async t => {
-      const evidence = await mkdtemp(join(tmpdir(), 'restart-not-preserved-'));
-      t.after(() => rm(evidence, {recursive: true, force: true}));
-      await writeRestartEvidence(
-        evidence,
-        restartSummary({[field]: 'false'}),
-        restartCheckpoint()
-      );
-      const result = await loadRestartEvidence(evidence, RUN_ID, {});
-      assert.equal(result.status, 'incompatible');
-      assert.match(result.reason, pattern);
-    });
-  }
-});
-
-test('compatible autoscaling evidence renders an offline aligned chart', async t => {
-  const stateRoot = await createFixtureRoot();
-  const evidence = await mkdtemp(join(tmpdir(), 'autoscaling-evidence-'));
-  t.after(() => Promise.all([
-    rm(stateRoot, {recursive: true, force: true}),
-    rm(evidence, {recursive: true, force: true}),
-  ]));
-  await writeFile(join(evidence, 'autoscaling-timeline.csv'), [
-    'timestamp,ready_replicas,request_rate,p95_latency_ms,failures',
-    '2026-09-11T08:00:00Z,1,10,850,2',
-    '2026-09-11T08:01:00Z,3,28,310,0',
-    '',
-  ].join('\n'), 'utf8');
-  const {outputPath} = await generateReport({
-    stateRoot,
-    runId: RUN_ID,
-    autoscalingEvidenceDirectory: evidence,
-    now: () => GENERATED_AT,
-  });
-  const html = await readFile(outputPath, 'utf8');
-  assert.match(html, /id="autoscaling-chart"/);
-  assert.match(html, /ready_replicas|"replicas":1/);
-  assert.doesNotMatch(html, /Pending Phase 7/);
-  assert.doesNotMatch(html, /https?:\/\//);
-  assert.match(html, /index\*\(1160\/\(rows\.length-1\|\|1\)\)/);
-  assert.doesNotMatch(html, /Math\.max\(1,1160/);
-});
-
-test('complete Phase 7 recorder evidence renders validated HPA acceptance', async t => {
-  const stateRoot = await createFixtureRoot();
-  const evidence = await mkdtemp(join(tmpdir(), 'phase7-evidence-'));
-  t.after(() => Promise.all([
-    rm(stateRoot, {recursive: true, force: true}),
-    rm(evidence, {recursive: true, force: true}),
-  ]));
-  await writePhase7Evidence(evidence);
-
-  const loaded = await loadAutoscalingEvidence(evidence);
-  assert.equal(loaded.status, 'supplied');
-  assert.equal(loaded.verdict, 'PASS');
-  assert.deepEqual(
-    loaded.transitions.map(row => row.desiredReplicas),
-    [1, 2, 3, 5, 6, 4, 1]
-  );
-  assert.equal(loaded.locust.requests, 13);
-  assert.equal(loaded.distribution.length, 6);
-
-  const {outputPath} = await generateReport({
-    stateRoot,
-    runId: RUN_ID,
-    autoscalingEvidenceDirectory: evidence,
-    now: () => GENERATED_AT,
-  });
-  const html = await readFile(outputPath, 'utf8');
-  assert.match(html, /Phase 7 HPA experiment: PASS/);
-  assert.match(html, /1 → 2 → 3 → 5 → 6 → 4 → 1/);
-  assert.match(html, /72\.42/);
-  assert.match(html, /simulator-pod-6/);
-  assert.match(html, /approximately 350m per Pod/);
-  assert.match(html, /192Mi request \/ 256Mi limit/);
-  assert.match(html, /id="autoscaling-chart"/);
-  assert.doesNotMatch(html, /https?:\/\//);
-});
-
-test('incomplete or conflicting Phase 7 recorder evidence is incompatible', async t => {
-  await t.test('missing required artifact', async t => {
-    const evidence = await mkdtemp(join(tmpdir(), 'phase7-incomplete-'));
-    t.after(() => rm(evidence, {recursive: true, force: true}));
-    await writePhase7Evidence(evidence);
-    await rm(join(evidence, 'endpoints.csv'));
-    const loaded = await loadAutoscalingEvidence(evidence);
-    assert.equal(loaded.status, 'incompatible');
-    assert.match(loaded.reason, /endpoints\.csv is missing/);
-  });
-
-  await t.test('servedBy total mismatch', async t => {
-    const evidence = await mkdtemp(join(tmpdir(), 'phase7-conflict-'));
-    t.after(() => rm(evidence, {recursive: true, force: true}));
-    await writePhase7Evidence(evidence);
-    const logPath = join(evidence, 'locust.log');
-    const log = await readFile(logPath, 'utf8');
-    await writeFile(logPath, log.replace('simulator-pod-1=3', 'simulator-pod-1=4'));
-    const loaded = await loadAutoscalingEvidence(evidence);
-    assert.equal(loaded.status, 'incompatible');
-    assert.match(loaded.reason, /request total does not reconcile/);
-  });
-
-  await t.test('non-accepted HPA configuration', async t => {
-    const evidence = await mkdtemp(join(tmpdir(), 'phase7-wrong-config-'));
-    t.after(() => rm(evidence, {recursive: true, force: true}));
-    await writePhase7Evidence(evidence);
-    const metadataPath = join(evidence, 'metadata.json');
-    const metadata = JSON.parse(await readFile(metadataPath, 'utf8'));
-    metadata.simulator.hpa.startingConfiguration.behavior.scaleDown
-      .stabilizationWindowSeconds = 300;
-    await writeFile(metadataPath, `${JSON.stringify(metadata)}\n`);
-    const loaded = await loadAutoscalingEvidence(evidence);
-    assert.equal(loaded.status, 'incompatible');
-    assert.match(loaded.reason, /HPA configuration is incompatible/);
-  });
-});
-
-test('HTML escapes artifact strings, embeds no external resources, and bounds rows', async t => {
-  const stateRoot = await createFixtureRoot();
-  t.after(() => rm(stateRoot, {recursive: true, force: true}));
-  const {outputPath} = await generateReport({
-    stateRoot,
-    runId: RUN_ID,
-    now: () => GENERATED_AT,
-  });
-  const html = await readFile(outputPath, 'utf8');
+test('HTML escapes strings, embeds no external resources, and bounds rendered rows', async () => {
+  const artifacts = await fixtureArtifacts();
+  const html = renderReport(artifacts, {generatedAt: GENERATED_AT});
   assert.doesNotMatch(html, /<img src=x onerror=alert/);
   assert.match(html, /&lt;\/script&gt;&lt;img/);
   assert.doesNotMatch(html, /<(?:script|link)[^>]+(?:src|href)\s*=\s*["']https?:/i);
   assert.doesNotMatch(html, /@import\s+url/i);
-  assert.match(html, /const pageSize=100/);
-  assert.match(html, /filtered\.slice\(start,start\+pageSize\)/);
-  assert.equal((html.match(/<tbody>/g) || []).length < 100, true);
+  assert.match(html, /defaultSize:25/);
+  assert.match(html, /filtered\.slice\(start,start\+simPager\.pageSize\)/);
+  assert.ok((html.match(/<tr/g) || []).length < 180);
+
+  const scripts = [...html.matchAll(/<script(?: [^>]*)?>([\s\S]*?)<\/script>/g)];
+  assert.doesNotThrow(() => new vm.Script(scripts.at(-1)[1]));
+  const payload = JSON.parse(
+    html.match(/<script id="simulation-data" type="application\/json">([\s\S]*?)<\/script>/)[1]
+  );
+  assert.equal(payload.rows.length, artifacts.results.length);
+  assert.equal(payload.rows[0].length, payload.columns.length);
 });
 
-test('generation is substantively deterministic with a controlled timestamp', async t => {
+test('generation differs only at explicitly labelled timestamps', async t => {
   const stateRoot = await createFixtureRoot();
   t.after(() => rm(stateRoot, {recursive: true, force: true}));
   const first = join(stateRoot, 'first.html');
   const second = join(stateRoot, 'second.html');
+  const later = '2026-09-11T10:00:00.000Z';
   await generateReport({stateRoot, runId: RUN_ID, outputPath: first, now: () => GENERATED_AT});
-  await generateReport({stateRoot, runId: RUN_ID, outputPath: second, now: () => GENERATED_AT});
-  assert.equal(await readFile(first, 'utf8'), await readFile(second, 'utf8'));
+  await generateReport({stateRoot, runId: RUN_ID, outputPath: second, now: () => later});
+  const firstHtml = await readFile(first, 'utf8');
+  const secondHtml = await readFile(second, 'utf8');
+  assert.equal((firstHtml.match(new RegExp(GENERATED_AT, 'g')) || []).length, 2);
+  assert.equal((secondHtml.match(new RegExp(later, 'g')) || []).length, 2);
+  assert.equal(firstHtml.replaceAll(GENERATED_AT, '<generated-at>'),
+    secondHtml.replaceAll(later, '<generated-at>'));
 });
 
 test('report CLI exposes only the required run location contract', async () => {
@@ -623,8 +407,6 @@ test('report CLI exposes only the required run location contract', async () => {
   }), {
     stateRoot: '/state',
     runId: 'sample-32-001',
-    restartEvidenceDirectory: undefined,
-    autoscalingEvidenceDirectory: undefined,
   });
   const output = [];
   const exitCode = await runCli({
@@ -636,7 +418,7 @@ test('report CLI exposes only the required run location contract', async () => {
     stdout: message => output.push(message),
     stderr: () => assert.fail('successful report CLI must not write stderr'),
     async generateReportImpl(options) {
-      assert.equal(options.runId, 'sample-32-001');
+      assert.deepEqual(options, {stateRoot: '/state', runId: 'sample-32-001'});
       return {acceptedResultCount: 144, outputPath: '/state/runs/sample-32-001/report.html'};
     },
   });

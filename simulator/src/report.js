@@ -4,7 +4,6 @@ const {randomUUID} = require('node:crypto');
 const {open, rename, unlink} = require('node:fs/promises');
 const {basename, dirname, join} = require('node:path');
 
-const {loadAutoscalingEvidence, loadRestartEvidence} = require('./report-evidence');
 const {loadTournamentArtifacts} = require('./report-loader');
 const {renderReport} = require('./report-renderer');
 
@@ -61,17 +60,11 @@ async function generateReport(options) {
     stateRoot: options.stateRoot,
     runId: options.runId,
   });
-  const [restartEvidence, autoscalingEvidence] = await Promise.all([
-    loadRestartEvidence(options.restartEvidenceDirectory, options.runId, artifacts),
-    loadAutoscalingEvidence(options.autoscalingEvidenceDirectory),
-  ]);
   const generatedAt = options.now === undefined
     ? new Date().toISOString()
     : options.now();
   const html = renderReport(artifacts, {
     generatedAt,
-    restartEvidence,
-    autoscalingEvidence,
   });
   const outputPath = options.outputPath === undefined
     ? join(artifacts.runDirectory, 'report.html')
