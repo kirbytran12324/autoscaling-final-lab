@@ -6,6 +6,7 @@ namespace: autoscaling-lab
 resources:
   - ../base
   - horizontal-pod-autoscaler.yaml
+  - namespace.yaml
 images:
   - name: metronome-simulator
     newTag: phase10
