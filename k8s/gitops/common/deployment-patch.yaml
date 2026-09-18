@@ -1,0 +1,12 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: metronome-simulator
+spec:
+  template:
+    spec:
+      containers:
+        - name: simulator
+          envFrom:
+            - configMapRef:
+                name: metronome-config

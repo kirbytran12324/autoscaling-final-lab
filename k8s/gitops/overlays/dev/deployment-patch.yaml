@@ -1,0 +1,19 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: metronome-simulator
+
+spec:
+  replicas: 1
+  
+  template:
+    spec:
+      containers:
+        - name: simulator
+          resources:
+            requests:
+              cpu: 250m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi

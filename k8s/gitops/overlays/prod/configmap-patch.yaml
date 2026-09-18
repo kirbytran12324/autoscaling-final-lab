@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: metronome-config
+
+data:
+  NODE_ENV: production
