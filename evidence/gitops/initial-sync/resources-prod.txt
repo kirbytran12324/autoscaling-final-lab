@@ -1,0 +1,14 @@
+NAME                         DATA   AGE
+configmap/kube-root-ca.crt   1      6m5s
+configmap/metronome-config   1      6m5s
+
+NAME                          TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)   AGE    SELECTOR
+service/metronome-simulator   ClusterIP   10.96.144.163   <none>        80/TCP    6m3s   app=metronome-simulator
+
+NAME                                  READY   UP-TO-DATE   AVAILABLE   AGE    CONTAINERS   IMAGES                        SELECTOR
+deployment.apps/metronome-simulator   3/3     3            3           6m3s   simulator    metronome-simulator:phase10   app=metronome-simulator
+
+NAME                                       READY   STATUS    RESTARTS   AGE    IP           NODE              NOMINATED NODE   READINESS GATES
+pod/metronome-simulator-5778b4d9c6-4nxhs   1/1     Running   0          6m2s   10.244.2.9   desktop-worker2   <none>           <none>
+pod/metronome-simulator-5778b4d9c6-pmpk5   1/1     Running   0          6m2s   10.244.3.6   desktop-worker    <none>           <none>
+pod/metronome-simulator-5778b4d9c6-sfs4t   1/1     Running   0          6m2s   10.244.1.8   desktop-worker3   <none>           <none>
