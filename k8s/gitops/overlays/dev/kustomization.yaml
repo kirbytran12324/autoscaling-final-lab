@@ -9,7 +9,7 @@ resources:
 
 images:
   - name: metronome-simulator
-    newTag: phase10
+    newTag: 80fd0c0
 
 patches:
   - target:
