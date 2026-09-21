@@ -9,7 +9,7 @@ resources:
 
 images:
   - name: metronome-simulator
-    newTag: huh-it-doesnt-exist
+    newTag: phase10
 
 patches:
   - target:
