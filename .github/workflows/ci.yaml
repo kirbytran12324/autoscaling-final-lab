@@ -1,0 +1,35 @@
+name: Simulator CI
+
+on: 
+  pull_request:
+    paths:
+      - 'simulator/**'
+      - '.github/workflows/ci.yaml'
+
+permissions:
+  contents: read
+
+jobs:
+  test-and-build:
+    timeout-minutes: 15
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with: 
+          node-version: "24.20.0"
+          cache: npm
+          cache-dependency-path: simulator/package-lock.json
+
+      - name: Install dependencies
+        working-directory: simulator
+        run: npm ci --omit=dev --ignore-scripts
+
+      - name: Run tests
+        working-directory: simulator
+        run: npm test
+
+      - name: Build Docker image
+        run: docker build -t metronome-simulator:${{ github.sha }} simulator/
