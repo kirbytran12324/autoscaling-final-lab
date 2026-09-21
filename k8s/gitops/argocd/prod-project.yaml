@@ -1,0 +1,23 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: metronome-prod
+  namespace: argocd
+spec:
+  description: GitOps lab production environment
+  sourceRepos:
+    - https://github.com/kirbytran12324/autoscaling-final-lab.git
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: metronome-prod
+  clusterResourceWhitelist:
+    - group: ""
+      kind: Namespace
+      name: metronome-prod  
+  namespaceResourceWhitelist:
+    - group: ""
+      kind: ConfigMap
+    - group: ""
+      kind: Service
+    - group: apps
+      kind: Deployment

@@ -4,3 +4,5 @@ kind: Kustomization
 resources:
   - dev-project.yaml
   - dev-application.yaml
+  - prod-project.yaml
+  - prod-application.yaml
