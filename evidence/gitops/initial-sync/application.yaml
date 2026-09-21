@@ -1,0 +1,143 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"argoproj.io/v1alpha1","kind":"Application","metadata":{"annotations":{},"name":"metronome-dev","namespace":"argocd"},"spec":{"destination":{"namespace":"metronome-dev","server":"https://kubernetes.default.svc"},"project":"metronome-dev","source":{"path":"k8s/gitops/overlays/dev","repoURL":"https://github.com/kirbytran12324/autoscaling-final-lab.git","targetRevision":"main"},"syncPolicy":{"automated":{"enabled":true,"prune":true,"selfHeal":true}}}}
+  creationTimestamp: "2026-09-21T03:20:27Z"
+  generation: 16
+  name: metronome-dev
+  namespace: argocd
+  resourceVersion: "705078"
+  uid: ddd2e9d6-2de5-4b31-b69a-09a4eb748126
+spec:
+  destination:
+    namespace: metronome-dev
+    server: https://kubernetes.default.svc
+  project: metronome-dev
+  source:
+    path: k8s/gitops/overlays/dev
+    repoURL: https://github.com/kirbytran12324/autoscaling-final-lab.git
+    targetRevision: main
+  syncPolicy:
+    automated:
+      enabled: true
+      prune: true
+      selfHeal: true
+status:
+  controllerNamespace: argocd
+  health:
+    lastTransitionTime: "2026-09-21T03:24:16Z"
+    status: Healthy
+  history:
+  - deployStartedAt: "2026-09-21T03:24:02Z"
+    deployedAt: "2026-09-21T03:24:05Z"
+    id: 0
+    initiatedBy:
+      automated: true
+    revision: aad3680b027e4d0785d3c0e7e75182fa8a593bcd
+    source:
+      path: k8s/gitops/overlays/dev
+      repoURL: https://github.com/kirbytran12324/autoscaling-final-lab.git
+      targetRevision: main
+  operationState:
+    finishedAt: "2026-09-21T03:24:05Z"
+    message: successfully synced (all tasks run)
+    operation:
+      initiatedBy:
+        automated: true
+      retry:
+        limit: 5
+      sync:
+        prune: true
+        revision: aad3680b027e4d0785d3c0e7e75182fa8a593bcd
+        source:
+          path: k8s/gitops/overlays/dev
+          repoURL: https://github.com/kirbytran12324/autoscaling-final-lab.git
+          targetRevision: main
+    phase: Succeeded
+    startedAt: "2026-09-21T03:24:02Z"
+    syncResult:
+      resources:
+      - group: ""
+        hookPhase: Succeeded
+        kind: Namespace
+        message: namespace/metronome-dev created
+        name: metronome-dev
+        namespace: metronome-dev
+        status: Synced
+        syncPhase: Sync
+        version: v1
+      - group: ""
+        hookPhase: Succeeded
+        kind: ConfigMap
+        message: configmap/metronome-config created
+        name: metronome-config
+        namespace: metronome-dev
+        status: Synced
+        syncPhase: Sync
+        version: v1
+      - group: ""
+        hookPhase: Running
+        kind: Service
+        message: service/metronome-simulator created
+        name: metronome-simulator
+        namespace: metronome-dev
+        status: Synced
+        syncPhase: Sync
+        version: v1
+      - group: apps
+        hookPhase: Running
+        images:
+        - metronome-simulator:phase10
+        kind: Deployment
+        message: deployment.apps/metronome-simulator created
+        name: metronome-simulator
+        namespace: metronome-dev
+        status: Synced
+        syncPhase: Sync
+        version: v1
+      revision: aad3680b027e4d0785d3c0e7e75182fa8a593bcd
+      source:
+        path: k8s/gitops/overlays/dev
+        repoURL: https://github.com/kirbytran12324/autoscaling-final-lab.git
+        targetRevision: main
+  reconciledAt: "2026-09-21T03:27:39Z"
+  resourceHealthSource: appTree
+  resources:
+  - kind: ConfigMap
+    name: metronome-config
+    namespace: metronome-dev
+    status: Synced
+    syncWave: -1
+    version: v1
+  - kind: Namespace
+    name: metronome-dev
+    status: Synced
+    syncWave: -2
+    version: v1
+  - kind: Service
+    name: metronome-simulator
+    namespace: metronome-dev
+    status: Synced
+    version: v1
+  - group: apps
+    kind: Deployment
+    name: metronome-simulator
+    namespace: metronome-dev
+    status: Synced
+    version: v1
+  sourceHydrator: {}
+  sourceType: Kustomize
+  summary: {}
+  sync:
+    comparedTo:
+      destination:
+        namespace: metronome-dev
+        server: https://kubernetes.default.svc
+      source:
+        path: k8s/gitops/overlays/dev
+        repoURL: https://github.com/kirbytran12324/autoscaling-final-lab.git
+        targetRevision: main
+    revision: aad3680b027e4d0785d3c0e7e75182fa8a593bcd
+    status: Synced
