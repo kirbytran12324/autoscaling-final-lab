@@ -1,0 +1,67 @@
+Name:             metronome-simulator-5fb7cf8c6c-lr9cr
+Namespace:        metronome-dev
+Priority:         0
+Service Account:  default
+Node:             desktop-worker2/172.19.0.4
+Start Time:       Mon, 21 Sep 2026 11:07:39 +0700
+Labels:           app=metronome-simulator
+                  pod-template-hash=5fb7cf8c6c
+Annotations:      <none>
+Status:           Pending
+SeccompProfile:   RuntimeDefault
+IP:               10.244.2.8
+IPs:
+  IP:           10.244.2.8
+Controlled By:  ReplicaSet/metronome-simulator-5fb7cf8c6c
+Containers:
+  simulator:
+    Container ID:   
+    Image:          metronome-simulator:huh-it-doesnt-exist
+    Image ID:       
+    Port:           3000/TCP (http)
+    Host Port:      0/TCP (http)
+    State:          Waiting
+      Reason:       ImagePullBackOff
+    Ready:          False
+    Restart Count:  0
+    Limits:
+      cpu:     500m
+      memory:  256Mi
+    Requests:
+      cpu:      250m
+      memory:   128Mi
+    Liveness:   http-get http://:http/health/live delay=0s timeout=1s period=10s #success=1 #failure=3
+    Readiness:  http-get http://:http/health/ready delay=0s timeout=1s period=10s #success=1 #failure=3
+    Startup:    http-get http://:http/health/ready delay=0s timeout=1s period=10s #success=1 #failure=30
+    Environment Variables from:
+      metronome-config  ConfigMap  Optional: false
+    Environment:        <none>
+    Mounts:
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-7v5bq (ro)
+Conditions:
+  Type                        Status
+  PodReadyToStartContainers   True 
+  Initialized                 True 
+  Ready                       False 
+  ContainersReady             False 
+  PodScheduled                True 
+Volumes:
+  kube-api-access-7v5bq:
+    Type:                    Projected (a volume that contains injected data from multiple sources)
+    TokenExpirationSeconds:  3607
+    ConfigMapName:           kube-root-ca.crt
+    Optional:                false
+    DownwardAPI:             true
+QoS Class:                   Burstable
+Node-Selectors:              <none>
+Tolerations:                 node.kubernetes.io/not-ready:NoExecute op=Exists for 300s
+                             node.kubernetes.io/unreachable:NoExecute op=Exists for 300s
+Events:
+  Type     Reason     Age                   From               Message
+  ----     ------     ----                  ----               -------
+  Normal   Scheduled  6m7s                  default-scheduler  Successfully assigned metronome-dev/metronome-simulator-5fb7cf8c6c-lr9cr to desktop-worker2
+  Normal   Pulling    2m56s (x5 over 6m5s)  kubelet            spec.containers{simulator}: Pulling image "metronome-simulator:huh-it-doesnt-exist"
+  Warning  Failed     2m53s (x5 over 6m2s)  kubelet            spec.containers{simulator}: Failed to pull image "metronome-simulator:huh-it-doesnt-exist": failed to pull and unpack image "docker.io/library/metronome-simulator:huh-it-doesnt-exist": failed to resolve reference "docker.io/library/metronome-simulator:huh-it-doesnt-exist": pull access denied, repository does not exist or may require authorization: server message: insufficient_scope: authorization failed
+  Warning  Failed     2m53s (x5 over 6m2s)  kubelet            spec.containers{simulator}: Error: ErrImagePull
+  Warning  Failed     59s (x20 over 6m2s)   kubelet            spec.containers{simulator}: Error: ImagePullBackOff
+  Normal   BackOff    46s (x21 over 6m2s)   kubelet            spec.containers{simulator}: Back-off pulling image "metronome-simulator:huh-it-doesnt-exist"

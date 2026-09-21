@@ -1,0 +1,9 @@
+NAME                                  READY   UP-TO-DATE   AVAILABLE   AGE   CONTAINERS   IMAGES                        SELECTOR
+deployment.apps/metronome-simulator   1/1     1            1           54m   simulator    metronome-simulator:phase10   app=metronome-simulator
+
+NAME                                             DESIRED   CURRENT   READY   AGE   CONTAINERS   IMAGES                                    SELECTOR
+replicaset.apps/metronome-simulator-5fb7cf8c6c   0         0         0       11m   simulator    metronome-simulator:huh-it-doesnt-exist   app=metronome-simulator,pod-template-hash=5fb7cf8c6c
+replicaset.apps/metronome-simulator-c98f56d74    1         1         1       54m   simulator    metronome-simulator:phase10               app=metronome-simulator,pod-template-hash=c98f56d74
+
+NAME                                      READY   STATUS    RESTARTS   AGE   IP           NODE             NOMINATED NODE   READINESS GATES
+pod/metronome-simulator-c98f56d74-qc7l7   1/1     Running   0          54m   10.244.3.5   desktop-worker   <none>           <none>

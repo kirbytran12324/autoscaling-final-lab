@@ -1,0 +1,5 @@
+703e7ab Merge pull request #3 from kirbytran12324/revert-2-experiment/gitops-bad-image
+88e8fff Revert "test(gitops): deploy invalid dev image"
+70c88df Merge pull request #2 from kirbytran12324/experiment/gitops-bad-image
+a0383d9 test(gitops): deploy invalid dev image
+dd250f5 docs(gitops): record initial sync and drift correction
