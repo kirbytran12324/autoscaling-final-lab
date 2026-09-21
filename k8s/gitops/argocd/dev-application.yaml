@@ -1,0 +1,19 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: metronome-dev
+  namespace: argocd
+spec:
+  project: metronome-dev
+  source:
+    repoURL: https://github.com/kirbytran12324/autoscaling-final-lab.git
+    targetRevision: main
+    path: k8s/gitops/overlays/dev
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: metronome-dev
+  syncPolicy:
+    automated:
+      enabled: true
+      prune: true
+      selfHeal: true
