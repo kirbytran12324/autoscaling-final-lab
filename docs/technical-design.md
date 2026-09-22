@@ -1,6 +1,6 @@
 # Metronome Tournament Autoscaling Lab — Technical Design
 
-Status: implemented and validated, updated 2026-09-15.
+Status: implemented and validated, updated 2026-09-22.
 The full tournament, resource-assisted recovery, and final audit package are
 complete.
 
@@ -80,16 +80,76 @@ The application supplies fixed teams and selects Metronome, but does not choose 
 
 ## Architecture and workload ownership
 
-```text
-Tournament runner Job ──────┐
-                            ├──> ClusterIP Service ──> simulator Pods
-Locust Deployment ──────────┘                            ▲
-                                                        │
-Metrics Server ──> HPA ─────────────────────────────────┘
+![Metronome simulator Kubernetes architecture](metronome-autoscaling-architecture.drawio.png)
 
-Runner Job ──> results/checkpoint PVC ──> report generator
-Resource-capture script ──> experiment evidence ──> report generator
-```
+The diagram separates five kinds of relationship. Dotted bidirectional lines
+represent components reading and writing Kubernetes state through the API
+Server. Solid control or ownership lines represent reconciliation, scaling,
+or the creation and removal of subordinate resources. Service-to-Pod and
+client-to-Service lines represent request routing rather than ownership. The
+dashed VPA target line represents observation and recommendation without
+mutation. The runner-to-PVC line represents a mounted storage dependency.
+Line direction describes the architectural effect and is not intended as a
+packet-level protocol trace.
+
+### Deployment and request path
+
+The simulator Deployment manages its ReplicaSet, and the ReplicaSet maintains
+the desired simulator Pod count. The ClusterIP Service does not own those
+Pods: it selects Ready endpoints by label and provides a stable DNS name for
+clients. Locust sends `POST /v1/battles` load through that Service, and the
+tournament runner uses the same Service for deterministic tournament work.
+The runner separately mounts the PVC for immutable results, restart-safe
+checkpoints, derived standings, bracket state, and reports.
+
+Locust is a fixed-replica Deployment in the separate `load-testing` namespace.
+Its Service exposes the web UI, which the operator reaches through a local
+port-forward. This separation prevents the load generator from becoming part
+of the HPA target while still accounting for its resource requests in cluster
+capacity calculations.
+
+### Horizontal autoscaling control loop
+
+Simulator CPU and memory measurements originate at the Pods and are collected
+through the kubelets by Metrics Server. Metrics Server publishes
+`metrics.k8s.io` through the aggregated Kubernetes API. The HPA controller
+combines the observed CPU utilization with the policy stored in the HPA
+resource: a 70% CPU target, one minimum replica, six maximum replicas, no
+scale-up stabilization, and a 150-second scale-down stabilization window.
+
+When a change is required, the HPA controller writes the simulator
+Deployment's scale subresource through the API Server. The HPA does not create
+Pods directly. The Deployment controller reconciles the new desired replica
+count, the ReplicaSet creates or removes Pods, and the Scheduler assigns new
+Pods to eligible nodes. The resulting Pod measurements close the feedback
+loop.
+
+### Vertical recommendation loop
+
+The VPA recommender reads workload state and usage history through Kubernetes
+APIs and writes its calculated CPU and memory recommendation into the VPA
+resource's status. The VPA resource's `targetRef` identifies the simulator
+Deployment, but `updateMode: "Off"` means no recommendation is applied and no
+Pod is evicted or restarted. `controlledValues: RequestsOnly` records that the
+comparison concerns requests rather than limits. VPA therefore acts as a
+sizing advisor and does not become a second actuator competing with the
+CPU-utilization HPA.
+
+### Kubernetes control and evidence boundaries
+
+The API Server is the coordination point for the Scheduler, Deployment
+controller, HPA controller, Metrics Server, and VPA recommender. For example,
+the Scheduler watches for unscheduled Pods and writes node bindings back
+through the API Server; it is not directly invoked by the Deployment or HPA.
+
+The workstation and evidence areas are operational boundaries rather than
+in-cluster workloads. Git stores the manifests, Kustomize renders the selected
+overlays, and `kubectl` applies them through the API Server. The HPA and
+resource-usage recorder scripts also query the API through `kubectl`; they do
+not start Locust or modify the autoscaling configuration. Their observations
+are written to unique directories beneath `evidence/experiments/`, while
+tournament artifacts are retained beneath `evidence/tournaments/runs/` and
+the analysis is maintained in `docs/`.
 
 Only simulator Pods autoscale. The HPA uses the simulator Deployment as its `scaleTargetRef`; Locust labels and selectors are separate and are excluded from the HPA target.
 
@@ -607,7 +667,7 @@ The final audit package is complete only when it contains all of the following:
   - [x] resource sizing and HPA/VPA interaction;
   - [x] capacity diagnosis;
   - [x] approximate monthly cost;
-  - [ ] complete reproduction instructions.
+  - [x] complete reproduction instructions.
 
 ## Current risks and validation gates
 
@@ -685,5 +745,3 @@ The phase gates are:
     operational incident history is documented separately from result trust.
 
 After the phase 5 exit condition is satisfied, the optional replay-viewer viability spike may run as a separate enhancement. It is not an assignment deliverable or a prerequisite for phases 6–10.
-
-At project completion, replace this progress section and the opening status with a clean description of the implemented final design and its accepted results.

@@ -5,6 +5,34 @@ restart-safe singleton tournament runner, Kubernetes and load-test manifests,
 and an offline tournament report generator. The architecture and tournament
 rules are defined in [docs/technical-design.md](docs/technical-design.md).
 
+## Architecture
+
+![Metronome simulator Kubernetes architecture](docs/metronome-autoscaling-architecture.drawio.png)
+
+The simulator is the only horizontally autoscaled workload. Locust, in the
+separate `load-testing` namespace, and the singleton tournament runner both
+send battle requests through the simulator's ClusterIP Service. The Service
+selects Ready simulator Pods, while the simulator Deployment and its
+ReplicaSet own and maintain those Pods.
+
+The autoscaling control loop has separate observed and desired inputs. Pod
+resource usage is exposed by Metrics Server through the Kubernetes API, while
+the HPA resource defines the 70% CPU target and the one-to-six replica range.
+The HPA controller compares those inputs and updates the simulator
+Deployment's desired replica count; the Deployment and ReplicaSet then create
+or remove Pods. The recommendation-only VPA observes the same workload and
+writes CPU and memory recommendations to VPA status, but `updateMode: "Off"`
+and `controlledValues: RequestsOnly` prevent it from mutating the workload or
+competing with the HPA.
+
+The operator runs Kustomize, `kubectl`, Locust port-forwarding, and the
+recording scripts from the workstation. The recorders query the Kubernetes
+API and write immutable per-run artifacts beneath `evidence/experiments/`;
+tournament artifacts are retained separately beneath
+`evidence/tournaments/runs/`. See
+[Architecture and workload ownership](docs/technical-design.md#architecture-and-workload-ownership)
+for the meaning of every connection and boundary in the diagram.
+
 ## Reproduce the lab
 
 ### Scope
