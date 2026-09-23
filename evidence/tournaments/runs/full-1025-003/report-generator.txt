@@ -1,0 +1,5 @@
+report_source=repository-working-tree
+git_revision=d91aae009344673b1dfcbdf26adb39602eaa194e
+git_simulator_src_state=clean
+runtime_image_reference=metronome-simulator:phase10
+runtime_image_id=sha256:36dbdfdd93edc7edfb6c7cbeb732bdda6335f4b47e3f7f394462ba90ba5c5b2e
