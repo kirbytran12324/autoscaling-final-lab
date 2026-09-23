@@ -27,7 +27,7 @@ repository_root="$(
   pwd
 )"
 
-kustomize_dir="${RUNNER_KUSTOMIZE_DIR:-${repository_root}/k8s/runner}"
+kustomize_dir="${RUNNER_KUSTOMIZE_DIR:-${repository_root}/k8s/jobs/runner}"
 output_dir="${1:-${repository_root}/evidence/experiments/sample-restart-resume}"
 
 first_pod=""

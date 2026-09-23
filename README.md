@@ -440,7 +440,7 @@ it must not be interpreted as the same amount of independent physical CPU.
 
 ## Prepare the next full tournament run
 
-`k8s/runner-full-002/job.yaml` defines the next isolated full run. Its explicit
+`k8s/jobs/runner-full-002/job.yaml` defines the next isolated full run. Its explicit
 identity is `full-1025-002` with tournament seed `full-1025-seed-002`, so it
 writes to a new PVC directory and cannot resume or overwrite `full-1025-001`.
 It starts with the `1Gi` memory request and `2Gi` limit that completed the
