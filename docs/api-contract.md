@@ -38,7 +38,10 @@ Runs one deterministic Pokémon battle.
 }
 ```
 
-`servedBy` identifies the process or Kubernetes Pod that handled the battle. During an autoscaling experiment, this field proves that requests reached multiple simulator replicas.
+`servedBy` is the hostname reported by the process that handled the battle. By
+itself, it proves only response attribution to the reported hostname. Phase 7
+establishes that traffic reached each Ready replica by reconciling those values
+with the captured Pod and EndpointSlice evidence.
 
 ### Invalid request — `400 Bad Request`
 

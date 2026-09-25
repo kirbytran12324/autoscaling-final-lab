@@ -1,5 +1,20 @@
 # Lab 1: GitOps
 
+This is an extension to the core autoscaling assignment. Argo CD reconciles
+the repository's dev and prod Kustomize overlays; CI-to-overlay image promotion
+is not automated.
+
+## Initial synchronization
+
+The committed Application snapshots show both environments reaching
+`Synced / Healthy`, and the resource inventories record their resulting
+ConfigMaps, Services, Deployments, and Pods:
+
+- [dev Application snapshot](../evidence/gitops/initial-sync/application-dev.yaml)
+- [dev resource inventory](../evidence/gitops/initial-sync/resources-dev.txt)
+- [prod Application snapshot](../evidence/gitops/initial-sync/application-prod.yaml)
+- [prod resource inventory](../evidence/gitops/initial-sync/resources-prod.txt)
+
 ## Drift correction
 
 **Date:** 2026-09-21  
@@ -115,3 +130,12 @@ After reconciliation:
 ### Result
 
 **Passed.** Reverting the broken Git change restored the last valid application state without manually modifying the Deployment or manually synchronizing Argo CD.
+
+The committed rollback evidence includes the
+[Argo CD revision history](../evidence/gitops/rollback/argocd-history.txt),
+[Git history](../evidence/gitops/rollback/git-history.txt),
+[broken Application status](../evidence/gitops/rollback/broken-application.txt),
+[broken Pod details](../evidence/gitops/rollback/broken-pod.txt),
+[broken resource inventory](../evidence/gitops/rollback/broken-resources.txt),
+[recovered Application status](../evidence/gitops/rollback/recovered-application.txt),
+and [recovered resource inventory](../evidence/gitops/rollback/recovered-resources.txt).

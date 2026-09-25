@@ -1,5 +1,9 @@
 # Three-Replica Load Experiment
 
+Status: historical pre-HPA exploratory experiment. Its findings informed the
+later controlled Phase 6 sizing and Phase 7 HPA work; the follow-up items below
+record what was unresolved at the time rather than current assignment gaps.
+
 ## Technical summary
 
 Running the same load profile against three simulator replicas increased average throughput from 13.7 to 37.7 requests/second while reducing the failure rate from 10.0% to 2.1%. Median latency fell from 1.5 seconds to 790 milliseconds, and p95 latency fell from 19 seconds to 2.2 seconds.
@@ -48,13 +52,15 @@ Both experiments used 50 concurrent users, a spawn rate of 5 users/second, a thr
 
 The strongest improvement was in tail latency: p95 decreased by 88%. The lower failure rate and higher throughput show that the three-replica run was much more resilient under this load. Because every replica still reached its CPU limit and healthy capacity declined, three fixed replicas should be treated as an improved comparison point rather than evidence that the workload has sufficient headroom.
 
-## Limitations and next steps
+## Historical limitations and follow-up
 
 - These are two separate runs on different dates, with one observation per configuration. The results are descriptive and do not isolate every possible environmental difference.
 - The replica CSV records desired, current, ready, and available counts, but not container restart counters. It supports the observed readiness degradation, not an exact restart count for the three-replica run.
-- Repeat each configuration several times to measure run-to-run variation.
-- Test autoscaling from one to three or more replicas and verify whether replicas become ready before the existing pods saturate.
-- Capture container restart counts and events alongside resource and replica samples in future runs.
+- Repeated configurations would have measured run-to-run variation.
+- Phase 7 later tested autoscaling beyond three replicas and reconciled Ready
+  Pods, EndpointSlices, and reported response hostnames.
+- Phase 7 also captured container restart counts and events alongside resource
+  and replica samples.
 
 ## Supporting evidence
 

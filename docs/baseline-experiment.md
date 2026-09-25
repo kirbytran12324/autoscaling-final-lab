@@ -1,8 +1,14 @@
 # Baseline Load Experiment
 
+Status: historical pre-HPA exploratory experiment. Its findings motivated the
+later controlled Phase 6 sizing and Phase 7 HPA work; it is not an unfinished
+acceptance phase.
+
 ## Purpose
 
-This experiment establishes the behavior of the simulator under sustained load when only one simulator replica is available. It is the baseline for evaluating whether autoscaling improves throughput, latency, availability, and workload stability.
+This experiment established the behavior of the simulator under sustained load
+when only one simulator replica was available. It became the exploratory
+baseline used to evaluate later autoscaling results.
 
 ## Test configuration
 
@@ -30,7 +36,10 @@ The measured Locust run started at `2026-09-04T10:04:57Z` and ended at `2026-09-
 
 The single replica was CPU-constrained under this workload. Simulator CPU repeatedly reached approximately `500m`, coinciding with degraded readiness and three restarts. With no additional replica available to absorb traffic, the run completed with a 10% failure rate and a long latency tail: although the median response took 1.5 seconds, 5% of responses took at least 19 seconds.
 
-This result is the comparison point for later autoscaling experiments. An effective autoscaling configuration should keep more requests successful, reduce tail latency, and avoid restarts while sustaining at least the baseline offered load.
+This result became the comparison point for the later autoscaling experiments.
+The accepted Phase 7 run subsequently tested scale-out, successful requests,
+tail latency, restart behavior, and return to minimum capacity under a
+controlled load profile.
 
 The [three-replica experiment](three-pod-experiment.md) repeats this load profile and includes a side-by-side comparison with the baseline.
 

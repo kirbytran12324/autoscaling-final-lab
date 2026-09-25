@@ -1,6 +1,7 @@
 # Tournament Runner State Contract
 
-Status: accepted phase 5 persistence and recovery contract.
+Status: accepted persistence and recovery contract, originating in Phase 5 and
+remaining active through Phase 10.
 
 This contract defines which runner artifacts are authoritative, when a battle is accepted, and how the singleton runner resumes after its Pod restarts. The tournament rules and architecture remain authoritative in [technical-design.md](technical-design.md).
 
@@ -20,6 +21,11 @@ directory:
   bracket.json
   report.html              # optional derived output after completion
 ```
+
+The PVC's `ReadWriteOnce` access mode limits attachment to one node; it does
+not guarantee a single Pod writer. Writer exclusivity is an operational
+property of the singleton Job. The runner does not coordinate concurrent
+writers, so only one runner Job may be active at a time.
 
 Each run ID names exactly one run directory. Historical run directories remain
 on the PVC and are not reused or modified when a different run ID is selected.

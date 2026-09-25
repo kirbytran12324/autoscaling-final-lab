@@ -1,6 +1,6 @@
 # Metronome Tournament Autoscaling Lab — Technical Design
 
-Status: implemented and validated, updated 2026-09-22.
+Status: implemented and validated, updated 2026-09-24.
 The full tournament, resource-assisted recovery, and final audit package are
 complete.
 
@@ -82,6 +82,11 @@ The application supplies fixed teams and selects Metronome, but does not choose 
 
 ![Metronome simulator Kubernetes architecture](metronome-autoscaling-architecture.drawio.png)
 
+This diagram covers the core autoscaling and tournament system. The separate
+GitOps extension deploys dev and prod Kustomize overlays through Argo CD; those
+extension environments and the CI image-publishing workflow are intentionally
+outside the diagram's boundary.
+
 The diagram separates five kinds of relationship. Dotted bidirectional lines
 represent components reading and writing Kubernetes state through the API
 Server. Solid control or ownership lines represent reconciliation, scaling,
@@ -153,7 +158,20 @@ the analysis is maintained in `docs/`.
 
 Only simulator Pods autoscale. The HPA uses the simulator Deployment as its `scaleTargetRef`; Locust labels and selectors are separate and are excluded from the HPA target.
 
-The singleton runner generates a deterministic schedule and uses a bounded HTTP worker pool. Its single ReadWriteOnce PVC retains multiple historical runs under `<stateRoot>/runs/<runId>/`, with metadata, roster, results, checkpoint, standings, bracket, and failure-diagnostic artifacts isolated per run directory. One singleton runner writes only the selected run directory at a time. Before its first battle request, a new run atomically creates an immutable `roster.json` containing the exact selected and shuffled entrant order. On restart, the runner verifies the directory's immutable identity, loads and validates that persisted roster instead of rebuilding it from mutable configuration, reloads its checkpoint and results, ignores completed match IDs, and safely resends only missing work. A missing, corrupt, or conflicting established roster stops recovery without overwriting evidence. Because each match ID determines the inputs and seed, a duplicate response is harmless and only one result is accepted.
+The singleton runner generates a deterministic schedule and uses a bounded HTTP
+worker pool. Its PVC uses `ReadWriteOnce`, a single-node attachment mode rather
+than a single-Pod writer guarantee, and retains multiple historical runs under
+`<stateRoot>/runs/<runId>/`. Writer exclusivity comes from operating one
+singleton runner Job at a time; the runner does not coordinate multiple
+writers. Metadata, roster, results, checkpoint, standings, bracket, and
+failure-diagnostic artifacts are isolated per run directory. Before its first
+battle request, a new run atomically creates an immutable `roster.json`
+containing the exact selected and shuffled entrant order. On restart, the
+runner verifies the directory's immutable identity, loads and validates that
+persisted roster instead of rebuilding it from mutable configuration, reloads
+its checkpoint and results, ignores completed match IDs, and safely resends
+only missing work. A missing, corrupt, or conflicting established roster stops
+recovery without overwriting evidence. Because each match ID determines its inputs and seed, a duplicate with identical deterministic fields is deduplicated and accepted only once. A duplicate whose deterministic fields conflict is treated as a reproducibility failure: recovery stops and the established evidence is left unchanged.
 
 The runner and Locust resolve the simulator Service through Kubernetes DNS. A Service routes connections across Ready endpoints but does not guarantee strict request-by-request round robin; clients use enough independent connections, and the returned `servedBy` value is used to verify distribution.
 
@@ -378,7 +396,7 @@ results available when the snapshot was calculated and can change as later
 results are accepted.
 
 The executable runner is `npm run runner` in the simulator image. The
-implemented singleton Kubernetes Job under `k8s/runner/` supplies
+implemented singleton Kubernetes Job manifests under `k8s/jobs/` supply
 `TOURNAMENT_RUN_ID`, `TOURNAMENT_MODE`,
 `TOURNAMENT_SEED`, `TOURNAMENT_STATE_ROOT`, `SIMULATOR_BASE_URL`,
 `RUNNER_CONCURRENCY`, `RULES_VERSION`, `SIMULATOR_VERSION`, and
@@ -397,17 +415,31 @@ attribution. It is read-only and never becomes the source of truth.
 
 ### Deferred Pokémon Showdown replay viewer
 
-The implemented offline report design is accepted for the required lab
-interface. The separate replay-viewer viability spike remains optional; it is
+The implemented offline report is the accepted interface for the tournament
+extension. The separate replay-viewer viability spike remains optional; it is
 not a phase gate or assignment deliverable.
 
-After the 32-species sample tournament, restart/resume validation, and offline report are complete, perform a bounded viability spike for a separate read-only replay viewer. A user should be able to search for a matchup, select a recorded simulation, and watch it turn by turn using the actual Pokémon Showdown battle UI rather than only reading a move log or final result.
+The sample tournament, restart/resume validation, and offline report
+prerequisites are complete. If pursued, the deferred work is a bounded
+viability spike for a separate read-only replay viewer. Its target experience
+would let a user search for a matchup, select a recorded simulation, and watch
+it turn by turn using the actual Pokémon Showdown battle UI rather than only
+reading a move log or final result.
 
 The viewer does not require a database or a second simulation engine. For a selected `matchId`, the system reloads the canonical participants, seed, rule version, and simulator version from the tournament artifacts, re-simulates the battle with the same fixed teams and player choices, verifies the winner, turn count, termination, and `protocolHash` against the stored result, and passes the regenerated battle protocol to a pinned Pokémon Showdown client replay player.
 
 Full replay protocols are not stored for every simulation by default. They are regenerated on demand, while sampled or explicitly requested replay logs may be retained as evidence. `results.jsonl` remains the authoritative tournament record, and a replay mismatch is treated as a reproducibility failure rather than replacing the stored result.
 
-The required `report.html` remains self-contained and usable offline without the viewer. The replay viewer is a separate optional interface and may use a locally served simulator plus explicitly pinned client assets. Its viability spike must identify the client commit, required sprite and animation assets, browser delivery path, and licensing obligations; the Pokémon Showdown client is AGPLv3 even though the simulator package is MIT-licensed. The first spike needs to prove only that one recorded battle renders with working replay controls and agrees with the stored result. If that integration is impractical, the viewer remains deferred and does not block any required lab deliverable.
+The existing `report.html` remains self-contained and usable offline without
+the viewer. The replay viewer is a separate optional interface and may use a
+locally served simulator plus explicitly pinned client assets. Any viability
+spike would need to identify the client commit, required sprite and animation
+assets, browser delivery path, and licensing obligations; the Pokémon Showdown
+client is AGPLv3 even though the simulator package is MIT-licensed. A first
+spike would need to prove only that one recorded battle renders with working
+replay controls and agrees with the stored result. If that integration is
+impractical, the viewer remains deferred and does not block any assignment
+deliverable.
 
 ## Container and Pod security
 
@@ -557,7 +589,14 @@ traffic distribution, earlier experiments, and limitations.
 
 ## Metrics Server
 
-Metrics Server `v0.8.0` is installed from its vendored upstream `components.yaml` using Kustomize. The local overlay applies `--kubelet-insecure-tls` because the Docker Desktop kubelet serving certificate failed validation. The [installation documentation](../k8s/addons/metrics-server/README.md) records the local-only rationale, but the repository does not yet contain the original error output. The exact certificate-validation error must be captured in the evidence package before the final audit; until then, the design does not claim that raw TLS failure evidence is retained.
+Metrics Server `v0.8.0` is installed from its vendored upstream
+`components.yaml` using Kustomize. The local overlay applies
+`--kubelet-insecure-tls` because the Docker Desktop kubelet serving certificate
+failed validation. The
+[installation documentation](../k8s/addons/metrics-server/README.md) records the
+local-only rationale and the applied workaround. The original raw
+certificate-validation error was not retained; this is a documented evidence
+limitation, and the audit package does not claim otherwise.
 
 Disabling kubelet certificate validation is acceptable only in this local, single-user lab. A production or shared cluster must use trusted kubelet serving certificates. Metrics Server `0.8.x` supports Kubernetes `1.31+`, including this Kubernetes `v1.36.1` cluster; see the upstream [compatibility matrix](https://github.com/kubernetes-sigs/metrics-server#compatibility-matrix).
 
@@ -656,14 +695,15 @@ in the root README.
 
 ## Required deliverables
 
-The final audit package is complete only when it contains all of the following:
+The final audit package contains all of the following completed deliverables:
 
 - [x] an HPA manifest plus observed scale-out and scale-in evidence;
 - [x] a VPA Off-mode manifest plus captured recommendation evidence;
 - [x] the in-cluster Locust workload plus exported acceptance-test results;
 - [x] a capacity demonstration with a scheduler-level Pending Pod and `Insufficient cpu` diagnosis;
-- [x] the offline report interface combining tournament results and separately captured experiment evidence;
-- [ ] a README covering the complete final operational analysis:
+- [x] the offline tournament report interface, with autoscaling and load-test
+  evidence retained separately rather than ingested into the report;
+- [x] a README covering the complete final operational analysis:
   - [x] resource sizing and HPA/VPA interaction;
   - [x] capacity diagnosis;
   - [x] approximate monthly cost;
@@ -708,7 +748,10 @@ The current implementation state is:
   `3 Insufficient cpu`; and
 - phase 10 complete: the interrupted full run resumed from 130,962 accepted
   results, appended seven results, and completed with 130,969 unique accepted
-  match IDs and Giratina as champion.
+  match IDs and Giratina as champion; and
+- extension validation complete: `sample-32-002` and the later full runs
+  `full-1025-002` and `full-1025-003` completed and were committed with their
+  self-contained reports.
 
 The phase gates are:
 
@@ -717,9 +760,9 @@ The phase gates are:
 3. **Local HTTP service — complete.** Battle, liveness, readiness, and validation paths are implemented.
 4. **Container and single-Pod Kubernetes path — complete.** The secured simulator Deployment and ClusterIP Service run in Kubernetes.
 5. **Runner, PVC, sample tournament, and report — complete.** The runner Job,
-   32-species tournament, and restart/resume validation are complete. Generate
-   the offline report from the completed artifacts and open it locally to exit
-   the phase.
+   32-species tournament, restart/resume validation, and offline report are
+   complete. The self-contained report was generated from the completed
+   artifacts and opened locally.
 6. **Measure and right-size — complete.** Fixed one-Pod measurements and the
    matched one-user validation selected a `500m` CPU request, `1` CPU limit,
    `192Mi` memory request, and `256Mi` memory limit. The detailed evidence and
@@ -739,9 +782,13 @@ The phase gates are:
    the fourth Pending with a default-scheduler `FailedScheduling` event
    reporting `3 Insufficient cpu`. See the
    [Phase 9 record](phase9-capacity-demonstration.md).
-10. **Final run and audit package — complete.** The 1,025-species tournament
-    completed after a resource-assisted resume. The final canonical artifacts
-    contain 130,969 unique accepted match IDs and Giratina as champion; the
-    operational incident history is documented separately from result trust.
+10. **Full tournament runs and audit package — complete.** The first
+    1,025-species tournament completed after a resource-assisted resume. Its
+    final canonical artifacts contain 130,969 unique accepted match IDs and
+    Giratina as champion; the operational incident history is documented
+    separately from result trust. Two later full runs also completed and were
+    exported as `full-1025-002` and `full-1025-003`.
 
-After the phase 5 exit condition is satisfied, the optional replay-viewer viability spike may run as a separate enhancement. It is not an assignment deliverable or a prerequisite for phases 6–10.
+The Phase 5 exit condition is satisfied. The optional replay-viewer viability
+spike remains a separate deferred enhancement, not an assignment deliverable
+or a prerequisite for Phases 6–10.

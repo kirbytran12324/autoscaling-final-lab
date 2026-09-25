@@ -5,9 +5,31 @@ restart-safe singleton tournament runner, Kubernetes and load-test manifests,
 and an offline tournament report generator. The architecture and tournament
 rules are defined in [docs/technical-design.md](docs/technical-design.md).
 
+## Assignment scope and evidence
+
+The required autoscaling assignment is complete in Phases 6–9 and the
+cost/performance analysis below. Tournament operations, offline reporting, CI,
+and GitOps are completed extensions; they are useful demonstrations but are
+not required to establish the autoscaling results.
+
+| Scope | Evidence |
+| --- | --- |
+| Resource sizing | [Phase 6](docs/phase6-resource-sizing.md) |
+| HPA scale-out/in | [Phase 7](docs/phase7-hpa-autoscaling.md) |
+| VPA comparison | [Phase 8](docs/phase8-vpa-autoscaling.md) |
+| Pending-Pod diagnosis | [Phase 9](docs/phase9-capacity-demonstration.md) |
+| Cost/performance | [README](#cost-and-performance-tradeoff) |
+| Tournament runner/report | [Extension](#tournament-runner-and-completed-run-evidence) |
+| CI and GitOps | [Extension](#ci-and-gitops) |
+
 ## Architecture
 
 ![Metronome simulator Kubernetes architecture](docs/metronome-autoscaling-architecture.drawio.png)
+
+The diagram represents the core autoscaling and tournament system. The
+separate GitOps extension deploys dev and prod Kustomize overlays through Argo
+CD and is documented under [CI and GitOps](#ci-and-gitops); those environments
+are intentionally outside this core-system diagram.
 
 The simulator is the only horizontally autoscaled workload. Locust, in the
 separate `load-testing` namespace, and the singleton tournament runner both
@@ -171,7 +193,7 @@ Inspect the rendered resources before applying them:
 kubectl kustomize k8s/hpa
 kubectl kustomize k8s/load-test
 kubectl kustomize k8s/vpa
-kubectl kustomize k8s/runner
+kubectl kustomize k8s/jobs/runner
 ```
 
 Validate them against the selected cluster without creating resources:
@@ -180,7 +202,7 @@ Validate them against the selected cluster without creating resources:
 kubectl apply --dry-run=server -k k8s/hpa
 kubectl apply --dry-run=server -k k8s/load-test
 kubectl apply --dry-run=server -k k8s/vpa
-kubectl apply --dry-run=server -k k8s/runner
+kubectl apply --dry-run=server -k k8s/jobs/runner
 ```
 
 ### Deploy the final autoscaling system
@@ -438,31 +460,124 @@ objects, but they share the physical host and Docker Desktop VM capacity. Their
 reported aggregate allocatable CPU therefore demonstrates scheduler accounting;
 it must not be interpreted as the same amount of independent physical CPU.
 
-## Prepare the next full tournament run
+## Cost and performance tradeoff
 
-`k8s/jobs/runner-full-002/job.yaml` defines the next isolated full run. Its explicit
-identity is `full-1025-002` with tournament seed `full-1025-seed-002`, so it
-writes to a new PVC directory and cannot resume or overwrite `full-1025-001`.
-It starts with the `1Gi` memory request and `2Gi` limit that completed the
-prior run's recovery; the historical original and recovery manifests remain
-unchanged.
+This estimate uses Linux On-Demand Amazon EC2 pricing in AWS Asia Pacific
+(Singapore), `ap-southeast-1`, retrieved on 2026-09-14. It models the accepted
+six-replica HPA peak as a controlled lab capacity scenario rather than a
+production traffic forecast. A month is approximated as 730 running hours.
 
-Before applying it, verify that the simulator is Ready, the HPA and PVC are
-present, and no tournament runner is active:
+At the selected sizing, six simulator Pods request a total of `3` vCPU and
+`1152Mi` memory. A compute-optimized `c7i.xlarge` provides 4 vCPU and 8 GiB,
+leaving simplified headroom for Kubernetes system processes. At 2×
+over-provisioning, the same six Pods would request `6` vCPU and `2304Mi`;
+the comparison therefore uses a `c7i.2xlarge` with 8 vCPU and 16 GiB.
+
+| Scenario | Per-Pod request | EC2 worker | EC2 hourly | EC2 monthly | EKS control plane | Total monthly |
+| --- | --- | --- | ---: | ---: | ---: | ---: |
+| Selected sizing | 500m CPU, 192Mi memory | `c7i.xlarge` | $0.2058 | $150.23 | $73.00 | $223.23 |
+| 2× over-provisioned | 1000m CPU, 384Mi memory | `c7i.2xlarge` | $0.4116 | $300.47 | $73.00 | $373.47 |
+
+The 2× case adds approximately `$150.23` per month. Worker compute doubles,
+while the modeled total rises by approximately 67% because the EKS
+standard-support control-plane charge remains fixed at `$0.10` per hour.
+
+The selected `500m` CPU request is supported by both fixed-replica measurements
+and VPA recommendations. In the matched one-user validation, throughput
+increased from 20.21 to 51.80 RPS, average latency fell from 49.3 to 19.2 ms,
+p95 fell from 110 to 36 ms, and throttled periods fell from 98.3% to 17.0%.
+The accepted HPA experiment subsequently served 13,033 requests with zero
+failures and zero simulator restarts while scaling from one to six Pods and
+back to one. The settled VPA CPU target of `511m` independently remained close
+to the selected request.
+
+Doubling requests would not guarantee double performance. With an unchanged
+70% HPA target, doubling the CPU request would raise the effective per-Pod
+target from approximately 350m to 700m and could delay scale-out. Additional
+capacity is valuable for bursts, rolling updates and node failure, but paying
+for persistently unused capacity wastes money and reduces scheduling density.
+
+Under-provisioning has the opposite risk. The original fixed-replica evidence
+confirmed severe CPU throttling and materially worse latency and throughput.
+Larger exploratory loads showed diminishing throughput returns and increasing
+latency, consistent with approaching a workload or shared-host capacity
+boundary, although those tests did not isolate one limiting component. No
+accepted experiment observed request failures, simulator restarts or memory
+exhaustion.
+
+This is a simplified compute comparison, not a production AWS architecture.
+It assumes one continuously running worker and excludes EBS volumes, public
+IPv4 addresses, data transfer, load balancers, taxes and high-availability
+worker duplication. A production estimate would require real traffic history,
+multiple Availability Zones and longer measurements.
+
+Sources: [Amazon EC2 On-Demand pricing](https://aws.amazon.com/ec2/pricing/on-demand/),
+[Amazon EKS pricing](https://aws.amazon.com/eks/pricing/), and the
+[official regional EC2 price list](https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonEC2/current/ap-southeast-1/index.csv).
+
+## Extensions
+
+The tournament runner/report and CI/GitOps work below extend the completed
+autoscaling assignment. They do not replace the Phase 6–9 evidence above.
+
+### Tournament runner and completed-run evidence
+
+Five committed runs are complete. Their manifests are retained under
+`k8s/jobs/`, and their validated artifacts and self-contained reports are under
+`evidence/tournaments/runs/`.
+
+| Run | Concurrency | Accepted results | Champion |
+| --- | ---: | ---: | --- |
+| `sample-32-001` | 2 | 144 | Rayquaza |
+| `sample-32-002` | 6 | 146 | Kyogre |
+| `full-1025-001` | 6 | 130,969 | Giratina |
+| `full-1025-002` | 10 | 130,975 | Magearna |
+| `full-1025-003` | 15 | 130,968 | Solgaleo |
+
+The accepted totals can differ between runs because each best-of-three
+knockout series stops when a competitor reaches two wins, while draws and the
+seven-game safety cap can require additional games.
+
+The first full run was interrupted by a failure strongly consistent with V8 heap exhaustion under the original 512Mi container limit. Its authoritative state
+remained valid at 130,962 accepted results. The singleton recovery Job kept the
+same run identity, seed, image, concurrency, and PVC, raised the runner request
+and limit to `1Gi` and `2Gi`, appended the seven missing knockout results, and
+completed at 130,969 with Giratina as champion. The evidence boundary and the
+limits of that diagnosis are recorded in the
+[Phase 10 incident report](docs/phase10-runner-memory-incident.md).
+
+The later `full-1025-002` and `full-1025-003` runs both completed without that
+recovery path. From committed metadata, concurrency 10 completed in 24m 08.838s
+and concurrency 15 completed in 26m 23.833s. The concurrency-15 run was
+therefore not materially faster; it was about 2m 15s slower. Higher concurrency
+only increases parallel HTTP simulation. Accepted responses enter one serialized
+durability path: each result is appended and flushed before an atomically
+written and flushed checkpoint advances. That serialized, durability-first persistence path is the leading explanation for the observed throughput ceiling, although storage latency was not instrumented. More HTTP workers therefore do not necessarily increase end-to-end throughput. These two runs used different
+seeds and are operational comparisons, not a controlled benchmark.
+
+The PVC uses `ReadWriteOnce`, which is a single-node attachment mode rather
+than a single-Pod writer guarantee. Writer exclusivity comes from operating one
+singleton runner Job at a time; the runner has no multi-writer coordination.
+
+Export a newly completed PVC run with the committed helper:
 
 ```sh
-kubectl -n autoscaling-lab get deployment metronome-simulator -o wide
-kubectl -n autoscaling-lab get hpa metronome-simulator
-kubectl -n autoscaling-lab get pvc tournament-state
-kubectl -n autoscaling-lab get jobs,pods -l app=tournament-runner -o wide
-kubectl apply --dry-run=client -f k8s/runner-full-002/job.yaml
+bash scripts/export-tournament-run.sh <run-id>
 ```
 
-Review the run ID, seed, image, concurrency, and resources before the real
-apply. Creating the Job is a separate, state-changing step and is not part of
-report generation.
+The script mounts the PVC read-only in a temporary Pod, copies one completed
+run into a new `evidence/tournaments/runs/<run-id>/` directory, validates it by
+generating `report.html`, records report-generator provenance, and writes and
+verifies checksums. It refuses to overwrite an existing export.
 
-## Generate an offline tournament report
+To refresh only the derived report and its provenance for an already exported
+run, without reading from or changing the PVC, use:
+
+```sh
+bash scripts/export-tournament-run.sh --refresh-report <run-id>
+```
+
+### Generate an offline tournament report
 
 Use an already completed run. From `simulator/`:
 
@@ -492,7 +607,27 @@ The resulting HTML is self-contained and can be opened through `file://`; it
 uses no CDN, external font, stylesheet, script, framework, or network request.
 `results.jsonl` remains authoritative, and `report.html` is read-only derived
 output that may be regenerated. Sample mode validates the 32-species pipeline
-but does not replace the required full 1,025-species tournament.
+without claiming a full-roster result; the three committed full runs contain
+the complete 1,025-species tournaments.
+
+### CI and GitOps
+
+The CI extension tests and builds the simulator on relevant pull requests. On
+pushes to `main` that change the simulator or release workflow, the release
+workflow retests the code and publishes
+`ghcr.io/<repository-owner>/metronome-simulator:<full-commit-SHA>`.
+
+The GitOps extension defines separate dev and prod Kustomize overlays and Argo
+CD Applications with automated synchronization, pruning, and self-healing. The
+committed [GitOps lab record](docs/gitops-lab.md) covers initial sync, live-drift
+correction, and recovery by reverting a broken Git change.
+
+CI tests and publishes immutable images, while Argo CD reconciles the Kustomize
+overlays. In the current local extension, image promotion into an overlay is a
+deliberate Git change rather than an automated CI-to-CD handoff. In particular,
+the release workflow publishes a full-SHA GHCR tag, while the current overlays
+refer to local-style tags `80fd0c0` and `phase10`; no workflow updates an overlay
+to a newly published GHCR tag.
 
 ## Test
 
@@ -500,58 +635,3 @@ but does not replace the required full 1,025-species tournament.
 cd simulator
 npm test
 ```
-
-## Cost and performance tradeoff
-
-This estimate uses Linux On-Demand Amazon EC2 pricing in AWS Asia Pacific
-(Singapore), `ap-southeast-1`, retrieved on 2026-09-14. It models the accepted
-six-replica HPA peak as a controlled lab capacity scenario rather than a
-production traffic forecast. A month is approximated as 730 running hours.
-
-At the selected sizing, six simulator Pods request a total of `3` vCPU and
-`1152Mi` memory. A compute-optimized `c7i.xlarge` provides 4 vCPU and 8 GiB,
-leaving simplified headroom for Kubernetes system processes. At 2×
-over-provisioning, the same six Pods would request `6` vCPU and `2304Mi`;
-the comparison therefore uses a `c7i.2xlarge` with 8 vCPU and 16 GiB.
-
-| Scenario | Per-Pod request | EC2 worker | EC2 hourly | EC2 monthly | EKS control plane | Total monthly |
-| --- | --- | --- | ---: | ---: | ---: | ---: |
-| Selected sizing | 500m CPU, 192Mi memory | `c7i.xlarge` | $0.2058 | $150.23 | $73.00 | $223.23 |
-| 2× over-provisioned | 1000m CPU, 384Mi memory | `c7i.2xlarge` | $0.4116 | $300.47 | $73.00 | $373.47 |
-
-The 2× case adds approximately `$150.23` per month. Worker compute doubles,
-while the modeled total rises by approximately 67% because the EKS
-standard-support control-plane charge remains fixed at `$0.10` per hour.
-
-The selected `500m` CPU request is supported by both fixed-replica measurements
-and VPA recommendations. In the matched one-user validation, throughput
-increased from 20.21 to 51.80 RPS, average latency fell from 49.3 to 19.2 ms,
-p95 fell from 110 to 36 ms, and throttled periods fell from 98.3% to 17.0%.
-The accepted HPA experiment subsequently served 13,033 requests with zero
-failures and zero simulator restarts while scaling from one to six Pods and
-back to one. VPA targets of 511m and later 476m independently remained close
-to the selected request.
-
-Doubling requests would not guarantee double performance. With an unchanged
-70% HPA target, doubling the CPU request would raise the effective per-Pod
-target from approximately 350m to 700m and could delay scale-out. Additional
-capacity is valuable for bursts, rolling updates and node failure, but paying
-for persistently unused capacity wastes money and reduces scheduling density.
-
-Under-provisioning has the opposite risk. The original fixed-replica evidence
-confirmed severe CPU throttling and materially worse latency and throughput.
-Larger exploratory loads showed diminishing throughput returns and increasing
-latency, consistent with approaching a workload or shared-host capacity
-boundary, although those tests did not isolate one limiting component. No
-accepted experiment observed request failures, simulator restarts or memory
-exhaustion.
-
-This is a simplified compute comparison, not a production AWS architecture.
-It assumes one continuously running worker and excludes EBS volumes, public
-IPv4 addresses, data transfer, load balancers, taxes and high-availability
-worker duplication. A production estimate would require real traffic history,
-multiple Availability Zones and longer measurements.
-
-Sources: [Amazon EC2 On-Demand pricing](https://aws.amazon.com/ec2/pricing/on-demand/),
-[Amazon EKS pricing](https://aws.amazon.com/eks/pricing/), and the
-[official regional EC2 price list](https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonEC2/current/ap-southeast-1/index.csv).
