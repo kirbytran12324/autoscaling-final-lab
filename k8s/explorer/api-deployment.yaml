@@ -1,0 +1,76 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: metronome-explorer-api
+  labels:
+    app: metronome-explorer-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: metronome-explorer-api
+  template:
+    metadata:
+      labels:
+        app: metronome-explorer-api
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: api
+          image: metronome-explorer-api:0.1.0
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: SIMULATOR_BASE_URL
+              value: http://metronome-simulator
+            - name: TOURNAMENT_STATE_ROOT
+              value: /data/tournaments
+          ports:
+            - name: http
+              containerPort: 3001
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+          startupProbe:
+            httpGet:
+              path: /health/ready
+              port: http
+            failureThreshold: 30
+            periodSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: http
+            failureThreshold: 3
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: http
+            failureThreshold: 3
+            periodSeconds: 10
+          volumeMounts:
+            - name: tournament-state
+              mountPath: /data/tournaments
+              readOnly: true
+      volumes:
+        - name: tournament-state
+          persistentVolumeClaim:
+            claimName: tournament-state
+            readOnly: true

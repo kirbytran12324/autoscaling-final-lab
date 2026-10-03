@@ -622,6 +622,19 @@ output that may be regenerated. Sample mode validates the 32-species pipeline
 without claiming a full-roster result; the three committed full runs contain
 the complete 1,025-species tournaments.
 
+### Completed-run web explorer
+
+The first frontend milestone adds a separate React/TypeScript application and
+read-only Node.js API for browsing strictly validated completed runs. The
+implementation is additive: neither component changes the simulator, runner,
+offline report generator, or accepted baseline manifests. Only the API mounts
+the existing tournament PVC, and that mount is read-only.
+
+Local development, image builds, the API contract, Kubernetes deployment, and
+the deferred live-progress, run-control, and Azure Blob work are
+documented in the
+[completed-run explorer guide](docs/completed-run-explorer.md).
+
 ### CI and GitOps
 
 Repository CI tests the simulator, explorer API, frontend, and Locust, builds

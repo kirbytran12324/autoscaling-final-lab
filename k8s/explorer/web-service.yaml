@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: metronome-explorer-web
+  labels:
+    app: metronome-explorer-web
+spec:
+  type: ClusterIP
+  selector:
+    app: metronome-explorer-web
+  ports:
+    - name: http
+      port: 80
+      targetPort: http

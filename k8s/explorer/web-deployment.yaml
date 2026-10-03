@@ -1,0 +1,67 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: metronome-explorer-web
+  labels:
+    app: metronome-explorer-web
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: metronome-explorer-web
+  template:
+    metadata:
+      labels:
+        app: metronome-explorer-web
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 101
+        runAsGroup: 101
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: web
+          image: metronome-explorer-web:0.1.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
+            limits:
+              cpu: 250m
+              memory: 128Mi
+          startupProbe:
+            httpGet:
+              path: /health/ready
+              port: http
+            failureThreshold: 30
+            periodSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: http
+            failureThreshold: 3
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: http
+            failureThreshold: 3
+            periodSeconds: 10
+          volumeMounts:
+            - name: runtime-temp
+              mountPath: /tmp
+      volumes:
+        - name: runtime-temp
+          emptyDir: {}
