@@ -75,7 +75,7 @@ jobs:
       - run: python scripts/validate-manifests.py
 
   images:
-    needs: [node-tests, load-test, manifests]
+    needs: [node-tests, load-test, manifests, operations]
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -123,3 +123,19 @@ jobs:
           labels: |
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
+
+  operations:
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24.20.0'
+      - run: sudo apt-get update && sudo apt-get install -y shellcheck jq
+      - name: Validate maintained files and capture policies
+        run: |
+          node scripts/check-file-size.js
+          for script in scripts/*.sh scripts/lib/*.sh; do bash -n "$script"; done
+          shellcheck -x -P SCRIPTDIR scripts/*.sh
+          python3 -m unittest discover -s scripts/test -p 'test_*.py'

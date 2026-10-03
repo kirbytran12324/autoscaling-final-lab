@@ -10,3 +10,6 @@
 npm-debug.log*
 explorer-web/public/showdown/vendor/
 *.log
+
+**/vite.config.js
+**/vite.config.d.ts
