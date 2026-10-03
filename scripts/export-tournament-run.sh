@@ -94,7 +94,7 @@ write_report_provenance() {
 
   (
     cd -- "${repository_root}/simulator"
-    find src -maxdepth 1 -type f -name '*.js' -print0 |
+    find src -type f -name '*.js' -print0 |
       sort -z |
       xargs -0 sha256sum
   ) >"${run_directory}/REPORT-GENERATOR-SHA256SUMS"
