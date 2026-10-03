@@ -1,0 +1,83 @@
+{
+  "date": "2026-10-01",
+  "originalRevision": "672249ab84e566301678cd34585dcbd8886aecf0",
+  "runtime": "Node.js 24.20.0",
+  "checks": {
+    "simulator": 321,
+    "api": 23,
+    "browser": 9,
+    "locust": 7,
+    "capturePolicies": 3,
+    "containers": [
+      "simulator",
+      "explorer-api",
+      "explorer-web",
+      "load-test"
+    ],
+    "renderedOverlays": 12,
+    "maintainedFileCeiling": 800,
+    "maintainedFilesAllWithinTargetMaximum": 500,
+    "apiContainerSmokeRoutes": 4,
+    "exportContainerSmoke": "passed on disposable sample evidence",
+    "recursiveProvenanceSourceModules": 60
+  },
+  "compatibility": {
+    "completedRuns": [
+      {
+        "runId": "full-1025-001",
+        "results": 130969,
+        "champion": "Giratina",
+        "rosterHash": "40b83c2d6eedda97174c269d768e8a220fc20bfe8c692140a597cc595fd04319",
+        "deterministicResultsSha256": "a2e08b7494eed72f4043e1ab1af0661b1fab988f2f08ba38a006b816d1229168"
+      },
+      {
+        "runId": "full-1025-002",
+        "results": 130975,
+        "champion": "Magearna",
+        "rosterHash": "316efdb7efc2e649e46c601be08589c7094458d74e42c28f937059af4c5c956f",
+        "deterministicResultsSha256": "7122c8c0c2514cdbd3844e9931e60d1341fa5d661354f94b5aeeccdb8dab1370"
+      },
+      {
+        "runId": "full-1025-003",
+        "results": 130968,
+        "champion": "Solgaleo",
+        "rosterHash": "312de5c52a9aa15d9723a349b6fe75d21e39e3084714221628516b531c9d8f90",
+        "deterministicResultsSha256": "80f2449b35f8519c38873d8fdb9fb779e77ba04f98fa3072022c52f98ecedb69"
+      },
+      {
+        "runId": "sample-32-001",
+        "results": 144,
+        "champion": "Rayquaza",
+        "rosterHash": "5024e514876b507b1c7a1ebcca6898b1a332b7dda585e3aa473c2e46393364a2",
+        "deterministicResultsSha256": "84dee5cfaf4f043c82164f54b22e5c8b327b44054045bd6aa15aef69433c6a90"
+      },
+      {
+        "runId": "sample-32-002",
+        "results": 146,
+        "champion": "Kyogre",
+        "rosterHash": "3605d9172fe2e9082af58de7b98cd7796e5ed908bcdaab2ca8c3b448d3a1e27b",
+        "deterministicResultsSha256": "4dadbabd695b6947334ac2e0ef8060208aa16749a7694d07dde60d969fdf9cff"
+      }
+    ],
+    "originalComparison": "identical deterministic results, standings, champions, roster hashes, and public facade exports",
+    "sampleReports": "byte-identical at fixed generation timestamp"
+  },
+  "paginationBenchmark": {
+    "runId": "full-1025-002",
+    "runtime": "v24.20.0",
+    "matches": 130975,
+    "coldLoadMs": 1726.0520980000001,
+    "firstPageMs": 350.77537600000005,
+    "warmPageSamples": 30,
+    "warmP95Ms": 1.6964859999998225,
+    "peakRssMiB": 413.9453125,
+    "retainedRssMiB": 412.80078125,
+    "coldEventLoopMaxDelayMs": 1075.838975,
+    "warmEventLoopMaxDelayMs": 9.977855
+  },
+  "limitations": [
+    "Workstation measurements; no Kubernetes rollout or PVC latency/crash-durability experiment",
+    "Cold validation remains CPU intensive: measured event-loop pause is recorded separately",
+    "Graph generation 2026-10-01T03:41:42Z is stale for extracted modules; tests/scripts excluded; current source and executable checks provide verification"
+  ]
+}
