@@ -1,0 +1,39 @@
+# Temporary operator tool; delete after importing verified completed exports.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: archive-import
+spec:
+  restartPolicy: Never
+  automountServiceAccountToken: false
+  nodeSelector:
+    kubernetes.io/os: linux
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    runAsGroup: 1000
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+    - name: import
+      image: metronome-simulator
+      command: [sleep, '3600']
+      resources:
+        requests:
+          cpu: 50m
+          memory: 64Mi
+        limits:
+          cpu: 500m
+          memory: 2Gi
+      securityContext:
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        capabilities:
+          drop: [ALL]
+      volumeMounts:
+        - name: archive
+          mountPath: /archive
+  volumes:
+    - name: archive
+      persistentVolumeClaim:
+        claimName: tournament-archive

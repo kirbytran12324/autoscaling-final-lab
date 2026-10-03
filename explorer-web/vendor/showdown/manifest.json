@@ -1,0 +1,42 @@
+{
+  "clientRevision": "c0f6bfc707a5e3bba4da3785e9cb06c8ae04f8d9",
+  "simulatorVersion": "pokemon-showdown@0.11.11",
+  "spriteMetadata": {
+    "retrievedAt": "2026-10-03",
+    "urls": [
+      "https://play.pokemonshowdown.com/data/pokedex-mini.js",
+      "https://play.pokemonshowdown.com/data/pokedex-mini-bw.js"
+    ]
+  },
+  "sha256": {
+    "LICENSE": "76a97c878c9c7a8321bb395c2b44d3fe2f8d81314d219b20138ed0e2dddd5182",
+    "licenses/Apache-2.0.txt": "074e6e32c86a4c0ef8b3ed25b721ca23aca83df277cd88106ef7177c354615ff",
+    "licenses/CC0-1.0.txt": "a2010f343487d3f7618affe54f789f5487602331c0a8d03f49e9a7c547cf0499",
+    "licenses/GPL-2.0-only.txt": "aaf135472f81c5b4a0dca9367e5bb5e9750032b5bebe5442b36e4c0a47430df3",
+    "licenses/MIT.txt": "b05785f9f18e6716bab63424b11454513b9943a222595b70411009202fc592b5",
+    "play.pokemonshowdown.com/js/lib/html-sanitizer-minified.js": "618196efc83d034f173dd558fe0c53008717fd5d8752dfe230675175ab0a4998",
+    "play.pokemonshowdown.com/js/lib/jquery-1.11.0.min.js": "b294e973896f8f874e90a8eb1a8908ac790980d034c4c4bdf0fc3d37b8abf682",
+    "play.pokemonshowdown.com/src/battle-animations-moves.ts": "f35d025fbbe843336fdcb8f38c33d937a3d6ec66ca2d1a8a35515a80ca0e82ad",
+    "play.pokemonshowdown.com/src/battle-animations.ts": "eed81e4111a79518a215333c038a2f03dfdb65a32a81d58687339af57c9df878",
+    "play.pokemonshowdown.com/src/battle-dex-data.ts": "87947933db10aa8859d46afb36ffbceedf7182ca8d2af17057766528efe6e0ef",
+    "play.pokemonshowdown.com/src/battle-dex.ts": "e86c285e7aa54080e8f7029cf42d471db1c59b486f31c24686b4ad75db53f853",
+    "play.pokemonshowdown.com/src/battle-log-misc.js": "37d1f25f6f57c1b046e160b0f58041c5e09e798effef692e4151444fc8adafb5",
+    "play.pokemonshowdown.com/src/battle-log.ts": "a21f45424e3af85f8ba7132deee885d91b0c56d72058ca4f1993e4fe2534d5fb",
+    "play.pokemonshowdown.com/src/battle-scene-stub.ts": "cf782955238a1855d9e771484254299d8506ba5c3f08b404c99ceeb7b571174c",
+    "play.pokemonshowdown.com/src/battle-sound.ts": "18c439ddee49894f162a6f427b8e44b71da5e7e232f95583b608474ff1bee575",
+    "play.pokemonshowdown.com/src/battle-teams.ts": "f358e3a5ece1900783b54423a793ea9ffd84deb9411e658371288daf8002145f",
+    "play.pokemonshowdown.com/src/battle-text-parser.ts": "106308fcc694a891c1b94113612e2e10c72e5b8090b3a7e13e53d7e158979558",
+    "play.pokemonshowdown.com/src/battle-tooltips.ts": "4be0a408372ad3dbf9d46b9ad24bc3f3640a1e50a787df39e6e7dde1763e7d1f",
+    "play.pokemonshowdown.com/src/battle.ts": "81115bc660901ea927c0276d771d3a761c8dd2f92fc8ccdc7661c76ea709a601",
+    "play.pokemonshowdown.com/src/replay-embed.ts": "01431f9f2b9766696051bedda68d7418cbb32c80f83ffd73f3e5a3b85c18c440",
+    "play.pokemonshowdown.com/style/battle-log.css": "d50c093fde76832d8bdce6f2f73df33761218f4b38ce759d470d7c9861f3cc8d",
+    "play.pokemonshowdown.com/style/battle.css": "546bb1c26fd3f4d22287749c3fc09dc45cf6aa51a6397a791a05752d3ec2bbe5",
+    "play.pokemonshowdown.com/style/replay.css": "3ce93dd4121288cc3da86345faacb5db59dc23963b111f300e5990e59b993c33",
+    "play.pokemonshowdown.com/style/utilichart.css": "f0e9605f711abbf49b12d2d7810f9f28f801f20b723107c565da96bb49faa8a1",
+    "server/LICENSE": "b2002a9fd52ba8db3783a05fbdebfb09c34fd09513b90f6b390a2c0dfbc93ed0",
+    "server/chat-formatter.ts": "9aa8be1caf2bd4da7bb0ba72628a568cd06a45cb6682572dce118b471714724d",
+    "snapshots/battle-data.json": "66f3d76014a9125b290d3a5ebc8e6a889fe51cbc338bfa955434170173d071a7",
+    "snapshots/pokedex-mini-bw.js": "41b951a54eb8cd9fd3fad42610c9405ab80c33aacab90abc8601d63737586e4a",
+    "snapshots/pokedex-mini.js": "108fd89933128e0384fea0c57d61bfec3ce233716f4b491120eb420d9ee9feeb"
+  }
+}

@@ -1,5 +1,6 @@
 import {KeyboardEvent, useEffect, useState} from 'react';
 import type {Bracket, RunDetail} from '../types';
+import {AppHeader} from '../components';
 import {BackToRuns} from './shared';
 import {Summary, Verification} from './summary';
 import {Standings} from './standings';
@@ -51,14 +52,14 @@ export default function ReportView({run, bracket, goHome}: {
 }) {
   const hasPods = run.report.podAttribution.distinctHostnameCount > 0;
   return <div className="report-page">
-    <header className="application-header"><div className="app-identity"><span className="app-mark">M</span><span><strong>METRONOME</strong><small>Tournament explorer</small></span></div><div className="app-actions">{run.hasReport && <a className="report-download" href={`/api/runs/${encodeURIComponent(run.runId)}/report`} download>Download offline report <span aria-hidden="true">↓</span></a>}<BackToRuns goHome={goHome} /></div></header>
+    <AppHeader>{run.hasReport && <a className="report-download" aria-label="Download offline report" href={`/api/runs/${encodeURIComponent(run.runId)}/report`} download><span className="wide-label">Download offline report</span><span className="compact-label" aria-hidden="true">Offline report</span><span aria-hidden="true">↓</span></a>}<BackToRuns goHome={goHome} /></AppHeader>
     <header id="top" className="report-header">
       <p>Metronome tournament · completed-run explorer</p>
       <h1>{run.runId}</h1>
       <p className="champion-line">Champion <strong>{run.champion.species}</strong></p>
     </header>
     <SectionNavigation hasPods={hasPods} />
-    <main>
+    <main id="main-content" tabIndex={-1}>
       <Summary run={run} />
       <Verification run={run} />
       <Standings runId={run.runId} />

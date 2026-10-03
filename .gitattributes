@@ -1,0 +1,2 @@
+# Keep vendored inputs byte-for-byte identical to the SHA-256 source manifest.
+explorer-web/vendor/showdown/source/** -text

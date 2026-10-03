@@ -1,0 +1,11 @@
+# The explorer API builds from the repository root; exclude evidence and tooling.
+*
+!simulator/
+!simulator/package.json
+!simulator/package-lock.json
+!simulator/src/
+!simulator/src/**
+!explorer-api/
+!explorer-api/package.json
+!explorer-api/src/
+!explorer-api/src/**

@@ -5,6 +5,18 @@ restart-safe singleton tournament runner, Kubernetes and load-test manifests,
 and an offline tournament report generator. The architecture and tournament
 rules are defined in [docs/technical-design.md](docs/technical-design.md).
 
+## Learn and prepare for Azure
+
+Start with the [step-by-step Azure learning plan](docs/azure-learning-plan.md).
+It teaches how to convert the existing local Kubernetes setup one assumption
+at a time: image delivery, managed cluster, storage, networking, and scaling.
+The Azure overlays are reference answers to compare with your own conversion.
+
+The [deployment reference](docs/azure-deployment.md) explains the prepared AKS
+configuration and its manual validation steps. No cloud resources are created
+automatically. The [pipeline audit](docs/pipeline-audit.md) records fixes,
+remaining performance decisions, and validation limits.
+
 ## Assignment scope and evidence
 
 The required autoscaling assignment is complete in Phases 6–9 and the
@@ -612,10 +624,16 @@ the complete 1,025-species tournaments.
 
 ### CI and GitOps
 
-The CI extension tests and builds the simulator on relevant pull requests. On
-pushes to `main` that change the simulator or release workflow, the release
-workflow retests the code and publishes
-`ghcr.io/<repository-owner>/metronome-simulator:<full-commit-SHA>`.
+Repository CI tests the simulator, explorer API, frontend, and Locust, builds
+the frontend, and renders all Kustomizations on pull requests. Image builds
+run after those checks, with separate Buildx caches for each component. On
+relevant pushes to `main`, or manual release dispatch, the same reusable
+workflow verifies and publishes four immutable full-commit-SHA tags to GHCR:
+`metronome-simulator`, `metronome-explorer-api`, `metronome-explorer-web`, and
+`metronome-load-test` under `ghcr.io/<repository-owner>/`.
+
+Tests are explicit CI gates rather than repeated inside Docker builds. Run
+the appropriate test suites before building images manually.
 
 The GitOps extension defines separate dev and prod Kustomize overlays and Argo
 CD Applications with automated synchronization, pruning, and self-healing. The
@@ -630,6 +648,10 @@ refer to local-style tags `80fd0c0` and `phase10`; no workflow updates an overla
 to a newly published GHCR tag.
 
 ## Test
+
+The online report supports **Watch replay** in a verified playback dialog.
+See [battle replay setup and architecture](docs/battle-replays.md) for local
+startup, version compatibility, caching, viewer provenance, and asset configuration.
 
 ```sh
 cd simulator

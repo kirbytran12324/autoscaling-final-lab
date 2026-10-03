@@ -178,3 +178,13 @@ export interface Bracket {
 }
 
 export interface MatchPage {items: Match[]; total: number; nextCursor: string | null}
+
+export interface VerifiedReplay {
+  runId: string;
+  matchId: string;
+  rulesVersion: string;
+  simulatorVersion: string;
+  protocolHash: string;
+  verified: true;
+  log: string;
+}

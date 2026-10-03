@@ -1,0 +1,38 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: metronome-azure
+resources:
+  - ../../load-test
+images:
+  - name: metronome-load-test
+    newName: metronomelab.azurecr.io/metronome-load-test
+    newTag: REPLACE_WITH_COMMIT_SHA
+patches:
+  - target:
+      kind: Namespace
+      name: load-testing
+    patch: |-
+      apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: load-testing
+      $patch: delete
+  - target:
+      kind: Deployment
+      name: metronome-load-test
+    patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: metronome-load-test
+      spec:
+        template:
+          spec:
+            automountServiceAccountToken: false
+            nodeSelector:
+              kubernetes.io/os: linux
+            containers:
+              - name: locust
+                env:
+                  - name: LOCUST_HOST
+                    value: http://metronome-simulator

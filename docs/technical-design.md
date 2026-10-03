@@ -413,33 +413,30 @@ knockout views with expandable series/game details, a bounded searchable
 simulation table, operational timing, and generic accepted-response hostname
 attribution. It is read-only and never becomes the source of truth.
 
-### Deferred Pokémon Showdown replay viewer
+### Verified Pokémon Showdown replay dialog
 
-The implemented offline report is the accepted interface for the tournament
-extension. The separate replay-viewer viability spike remains optional; it is
-not a phase gate or assignment deliverable.
+The online report now includes **Watch replay** in its battle details. It opens
+the permanent in-page dialog and starts the pinned Showdown player paused and
+muted. There is no dedicated replay page.
 
-The sample tournament, restart/resume validation, and offline report
-prerequisites are complete. If pursued, the deferred work is a bounded
-viability spike for a separate read-only replay viewer. Its target experience
-would let a user search for a matchup, select a recorded simulation, and watch
-it turn by turn using the actual Pokémon Showdown battle UI rather than only
-reading a move log or final result.
+For a selected `matchId`, the API loads validated completed tournament artifacts
+and requests regeneration from the existing internal simulator. The same fixed
+teams, seed, choices, rule version, engine version, and 100-turn cap are used.
+Every deterministic result field, including the original normalized raw
+`protocolHash`, must match before a separate public spectator log is displayed.
+`results.jsonl` remains authoritative; a mismatch blocks playback with HTTP 409.
 
-The viewer does not require a database or a second simulation engine. For a selected `matchId`, the system reloads the canonical participants, seed, rule version, and simulator version from the tournament artifacts, re-simulates the battle with the same fixed teams and player choices, verifies the winner, turn count, termination, and `protocolHash` against the stored result, and passes the regenerated battle protocol to a pinned Pokémon Showdown client replay player.
+Successful verified logs are cached in API memory for five minutes with bounded
+size and concurrent regeneration. Player scripts, styles, supporting data,
+source, checksums, and license notices are packaged locally. Graphics and audio
+use a configurable HTTPS asset base. The engine and styles retain their separate
+licensing obligations. See [Verified battle replays](battle-replays.md) for the
+flow, limits, build instructions, deployment configuration, and validation.
 
-Full replay protocols are not stored for every simulation by default. They are regenerated on demand, while sampled or explicitly requested replay logs may be retained as evidence. `results.jsonl` remains the authoritative tournament record, and a replay mismatch is treated as a reproducibility failure rather than replacing the stored result.
-
-The existing `report.html` remains self-contained and usable offline without
-the viewer. The replay viewer is a separate optional interface and may use a
-locally served simulator plus explicitly pinned client assets. Any viability
-spike would need to identify the client commit, required sprite and animation
-assets, browser delivery path, and licensing obligations; the Pokémon Showdown
-client is AGPLv3 even though the simulator package is MIT-licensed. A first
-spike would need to prove only that one recorded battle renders with working
-replay controls and agrees with the stored result. If that integration is
-impractical, the viewer remains deferred and does not block any assignment
-deliverable.
+The accepted offline `report.html` remains self-contained and usable without
+the online viewer. This enhancement needs no database, persistent replay
+storage, application secrets, or public Showdown replay upload, and is not an
+assignment phase gate.
 
 ## Container and Pod security
 
@@ -722,7 +719,7 @@ The final audit package contains all of the following completed deliverables:
 | Startup work distorts samples | Sizing and HPA choices include non-steady behaviour | Gate traffic on readiness and separate warm-up from measurement |
 | VPA has insufficient history | Short-run recommendations are not universal production sizing results | Phase 8 captured idle and sustained-load observations, reported the sampling period, and retains this as an experiment limitation |
 | Locust consumes schedulable capacity | Capacity experiment attributes the wrong constraint | Scale Locust down or include its requests in the calculation |
-| Replay viewer integration expands scope or mishandles upstream assets | Optional UI work delays required lab evidence or creates licensing and compatibility risk | Start only after the sample-tournament phase gate; prove one replay in a bounded spike; pin the client revision and document AGPLv3 and asset requirements before integration |
+| Replay assets or engine versions drift | A replay becomes incompatible or its attribution is lost | Pin client and simulator versions, verify source checksums and results, serve per-file notices and original source, and retain separate style/artwork terms |
 
 ## Phase status
 
@@ -739,7 +736,7 @@ The current implementation state is:
 - phase 7 complete: the accepted HPA scaled from one to six Ready replicas,
   routed successful traffic to every replica, and returned to one with the
   150-second scale-down stabilization window;
-- the replay-viewer spike remains deferred as optional work;
+- verified replays are available in the online report's in-page dialog;
 - phase 8 complete: the Off-mode VPA comparison produced a settled `511m` CPU
   target, supported the selected `500m` request, preserved existing resources,
   and retained the short-history warning as a limitation; and
@@ -789,6 +786,5 @@ The phase gates are:
     separately from result trust. Two later full runs also completed and were
     exported as `full-1025-002` and `full-1025-003`.
 
-The Phase 5 exit condition is satisfied. The optional replay-viewer viability
-spike remains a separate deferred enhancement, not an assignment deliverable
-or a prerequisite for Phases 6–10.
+The Phase 5 exit condition is satisfied. The online replay dialog is an
+enhancement, not an assignment deliverable or a prerequisite for Phases 6–10.

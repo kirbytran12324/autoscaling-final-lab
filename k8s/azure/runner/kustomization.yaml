@@ -1,0 +1,24 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: metronome-azure
+resources:
+  - ../../jobs/runner
+images:
+  - name: metronome-simulator
+    newName: metronomelab.azurecr.io/metronome-simulator
+    newTag: REPLACE_WITH_COMMIT_SHA
+patches:
+  - path: state.yaml
+  - path: runner-patch.yaml
+# Keep the run provenance identical to the image actually executed.
+replacements:
+  - source:
+      kind: Job
+      name: tournament-runner
+      fieldPath: spec.template.spec.containers.[name=runner].image
+    targets:
+      - select:
+          kind: Job
+          name: tournament-runner
+        fieldPaths:
+          - spec.template.spec.containers.[name=runner].env.[name=SIMULATOR_IMAGE].value

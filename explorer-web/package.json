@@ -4,22 +4,30 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "build:showdown": "node scripts/build-showdown.mjs",
+    "predev": "npm run build:showdown",
+    "prebuild": "npm run build:showdown",
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "test": "vitest run"
+    "test": "vitest run",
+    "check:replays": "node scripts/check-replays.mjs"
   },
   "dependencies": {
     "react": "19.2.0",
     "react-dom": "19.2.0"
   },
   "devDependencies": {
+    "@babel/core": "7.28.0",
+    "@babel/plugin-transform-typescript": "7.28.0",
     "@testing-library/jest-dom": "6.9.1",
     "@testing-library/react": "16.3.0",
     "@types/node": "24.10.1",
     "@types/react": "19.2.2",
     "@types/react-dom": "19.2.2",
     "@vitejs/plugin-react": "5.1.0",
+    "babel-plugin-remove-import-export": "1.1.1",
     "jsdom": "27.0.1",
+    "playwright": "1.62.1",
     "typescript": "5.9.3",
     "vite": "7.3.6",
     "vitest": "4.1.11"

@@ -45,7 +45,7 @@ export function CopyButton({value, label}: {value?: string; label: string}) {
 }
 
 export function BackToRuns({goHome}: {goHome: () => void}) {
-  return <button type="button" className="back-runs" onClick={goHome}>← Back to all runs</button>;
+  return <button type="button" className="back-runs" aria-label="Back to all runs" onClick={goHome}><span aria-hidden="true">←</span><span className="wide-label">Back to all runs</span><span className="compact-label" aria-hidden="true">All runs</span></button>;
 }
 
 export function Pager({page, total, limit, previous, next, onPrevious, onNext}: {

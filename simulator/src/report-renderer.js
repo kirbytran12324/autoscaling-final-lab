@@ -674,6 +674,7 @@ module.exports = {
   escapeHtml,
   formatDuration,
   formatNumber,
+  operationalStats,
   paginateStandings,
   paginateRows,
   renderPodAttribution,

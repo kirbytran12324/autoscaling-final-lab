@@ -1,0 +1,11 @@
+# Completed exports only. APIs may read this share from different nodes.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: tournament-archive
+spec:
+  accessModes: [ReadWriteMany]
+  storageClassName: azurefile-csi
+  resources:
+    requests:
+      storage: 5Gi

@@ -1,0 +1,9 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: metronome-azure
+resources:
+  - pod.yaml
+images:
+  - name: metronome-simulator
+    newName: metronomelab.azurecr.io/metronome-simulator
+    newTag: REPLACE_WITH_COMMIT_SHA

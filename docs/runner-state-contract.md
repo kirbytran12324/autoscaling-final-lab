@@ -290,8 +290,18 @@ writes can be repeated without executing another game.
 
 The other JSON state files use the same temporary-file, flush, and atomic-rename pattern. Temporary files must be created on the same PVC as their destination so the rename stays within one filesystem. A prior `standings.json` snapshot is derived evidence and never overrides standings recomputed from authoritative `results.jsonl` records after restart.
 
-## Deferred replay viewer
+## Verified online replay dialog
 
-The canonical result records retain the participants, seed, rule version, simulator version, and deterministic result fields needed to reproduce a battle. After the 32-species sample tournament, restart/resume validation, and offline report are complete, an optional replay command may re-simulate a selected `matchId`, verify its winner, turn count, termination, and `protocolHash`, and emit protocol for a pinned Pokémon Showdown client replay player.
+The canonical result records retain the participants, seed, rule version,
+simulator version, and deterministic result fields needed to reproduce a battle.
+The online report's **Watch replay** dialog now regenerates a selected `matchId`
+through the existing simulator and compares every deterministic result field,
+including `protocolHash`, before displaying a public spectator log with the
+pinned Showdown player. The comparison is shared with runner restart/resume
+validation; operational hostname and timing fields remain outside it.
 
-Replay protocols are generated on demand rather than stored for every simulation. Sampled or explicitly requested logs may be retained as evidence, but they do not replace `results.jsonl` as the tournament source of truth. Replay-viewer work is not part of the lab acceptance criteria and must not block the phase 5 exit condition.
+Replay protocols are generated on demand and successful verified logs are held
+only in a bounded temporary API cache. They never replace `results.jsonl` as the
+tournament source of truth. The offline report and runner persistence contracts
+remain unchanged. See [Verified battle replays](battle-replays.md) for the flow
+and controls. This online enhancement is not a lab phase gate.

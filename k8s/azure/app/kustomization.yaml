@@ -1,0 +1,42 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: metronome-azure
+resources:
+  - ../../hpa
+  - namespace.yaml
+  - archive.yaml
+  - explorer.yaml
+images:
+  - name: metronome-simulator
+    newName: metronomelab.azurecr.io/metronome-simulator
+    newTag: REPLACE_WITH_COMMIT_SHA
+  - name: metronome-explorer-api
+    newName: metronomelab.azurecr.io/metronome-explorer-api
+    newTag: REPLACE_WITH_COMMIT_SHA
+  - name: metronome-explorer-web
+    newName: metronomelab.azurecr.io/metronome-explorer-web
+    newTag: REPLACE_WITH_COMMIT_SHA
+patches:
+  - target:
+      kind: Namespace
+      name: autoscaling-lab
+    patch: |-
+      apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: autoscaling-lab
+      $patch: delete
+  - target:
+      kind: Deployment
+      name: metronome-simulator
+    patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: metronome-simulator
+      spec:
+        template:
+          spec:
+            automountServiceAccountToken: false
+            nodeSelector:
+              kubernetes.io/os: linux

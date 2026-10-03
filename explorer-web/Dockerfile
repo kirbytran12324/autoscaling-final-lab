@@ -5,7 +5,11 @@ COPY package.json package-lock.json ./
 RUN npm ci --ignore-scripts
 COPY tsconfig.json tsconfig.app.json tsconfig.node.json vite.config.ts index.html ./
 COPY src ./src
-RUN npm test && npm run build
+COPY scripts ./scripts
+COPY vendor ./vendor
+COPY public ./public
+ARG VITE_SHOWDOWN_ASSET_BASE_URL=https://play.pokemonshowdown.com/
+RUN npm run build
 
 FROM nginx:1.27.4-alpine AS runtime
 

@@ -44,6 +44,20 @@ async function invoke(app, url, method = 'GET') {
   return response;
 }
 
+test('readiness checks storage without taking down liveness or exposing errors', async () => {
+  let available = true;
+  const app = createApp({store: {}, readiness: async () => {
+    if (!available) throw new Error('private storage path');
+    return true;
+  }});
+  assert.equal((await invoke(app, '/health/ready')).status, 200);
+  available = false;
+  const readiness = await invoke(app, '/health/ready');
+  assert.equal(readiness.status, 503);
+  assert.deepEqual(readiness.json(), {status: 'not-ready'});
+  assert.equal((await invoke(app, '/health/live')).status, 200);
+});
+
 test('API exposes run detail, standings, bracket, matches and match detail', async t => {
   const {request} = await withApi(t);
   for (const [path, key] of [

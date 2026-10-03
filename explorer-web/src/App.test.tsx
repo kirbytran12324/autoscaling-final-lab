@@ -136,7 +136,7 @@ test('supports keyboard tabs and keyboard row selection, including canonical tie
   expect(within(detail).getByText('Draw')).toBeInTheDocument();
   expect(within(detail).getByText('Duration (ms)')).toBeInTheDocument();
   expect(within(detail).getByText('586.351')).toBeInTheDocument();
-  expect(within(detail).getByRole('button', {name: 'Watch replay'})).toBeDisabled();
+  expect(within(detail).getByRole('button', {name: 'Watch replay'})).toBeEnabled();
   expect(within(detail).getByRole('button', {name: 'Copy Reported hostname'})).toBeEnabled();
   expect(tieRow).toHaveAttribute('aria-selected', 'true');
 });

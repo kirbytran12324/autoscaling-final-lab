@@ -6,7 +6,7 @@ const {performance} = require('node:perf_hooks');
 
 const {version: showdownVersion} =
   require('pokemon-showdown/package.json');
-const {simulateBattle} = require('./battle');
+const {simulateBattle, simulateBattleReplay} = require('./battle');
 const {
   getBaseSpecies,
   listBaseSpecies,
@@ -185,6 +185,23 @@ async function handleBattle(request, response) {
 function createServer() {
   return http.createServer(async (request, response) => {
     try {
+      if (request.method === 'POST' && request.url === '/v1/battles/replay') {
+        if (!(request.headers['content-type'] || '').startsWith('application/json')) {
+          throw new RequestError(415, 'UNSUPPORTED_MEDIA_TYPE', 'Content-Type must be application/json');
+        }
+        const body = await readJson(request);
+        const input = validateBattleRequest(body);
+        if (body.rulesVersion !== 'metronome-singles-v1' ||
+            body.simulatorVersion !== `pokemon-showdown@${showdownVersion}` || input.maxTurns !== 100) {
+          throw new RequestError(422, 'REPLAY_UNSUPPORTED', 'This rule or simulator version is not supported for replay');
+        }
+        const {result, log} = await simulateBattleReplay(input);
+        sendJson(response, 200, {result: {
+          ...result, matchId: input.matchId, pokemon1: input.pokemon1, pokemon2: input.pokemon2,
+          simulatorVersion: `pokemon-showdown@${showdownVersion}`,
+        }, log});
+        return;
+      }
       if (
         request.method === 'GET' &&
         request.url === '/health/live'

@@ -1,17 +1,34 @@
 import type {
-  Bracket, MatchPage, MatchSort, RunDetail, RunSummary, SortDirection, StandingsPage,
+  Bracket, MatchPage, MatchSort, RunDetail, RunSummary, SortDirection, StandingsPage, VerifiedReplay,
 } from './types';
 
 interface ErrorPayload {error?: {code?: string; message?: string}}
+
+export class ApiRequestError extends Error {
+  constructor(message: string, public readonly code: string, public readonly status: number) {
+    super(message);
+  }
+}
 
 async function getJson<T>(path: string, signal?: AbortSignal): Promise<T> {
   const response = await fetch(path, {headers: {accept: 'application/json'}, signal});
   if (!response.ok) {
     let payload: ErrorPayload = {};
     try { payload = await response.json() as ErrorPayload; } catch { /* safe fallback */ }
-    throw new Error(payload.error?.message || `Request failed (${response.status}).`);
+    throw new ApiRequestError(payload.error?.message || `Request failed (${response.status}).`,
+      payload.error?.code || 'REQUEST_FAILED', response.status);
   }
   return response.json() as Promise<T>;
+}
+
+export async function loadReplay(runId: string, matchId: string, signal?: AbortSignal): Promise<VerifiedReplay> {
+  const {replay} = await getJson<{replay: VerifiedReplay}>(
+    `/api/runs/${encodeURIComponent(runId)}/matches/${encodeURIComponent(matchId)}/replay`, signal);
+  if (replay?.verified !== true || replay.runId !== runId || replay.matchId !== matchId ||
+      typeof replay.log !== 'string' || !replay.log.trim()) {
+    throw new ApiRequestError('The replay response could not be verified.', 'REPLAY_INVALID_RESPONSE', 502);
+  }
+  return replay;
 }
 
 export async function listRuns(signal?: AbortSignal): Promise<RunSummary[]> {

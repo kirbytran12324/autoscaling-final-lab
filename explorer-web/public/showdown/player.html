@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src https: data:; media-src https:; connect-src 'self'; object-src 'none'; base-uri 'none'">
+<title>Verified battle player</title><link rel="stylesheet" href="player.css">
+<script src="player-config.js"></script>
+<script src="vendor/jquery-1.11.0.min.js"></script>
+<script src="vendor/html-sanitizer-minified.js"></script>
+<script src="vendor/battle-data.js"></script>
+<script src="vendor/pokedex-mini.js"></script>
+<script src="vendor/pokedex-mini-bw.js"></script>
+<script src="vendor/engine.js"></script>
+</head><body>
+<main class="player-layout">
+  <section aria-label="Battle animation and playback controls" class="player-main">
+    <div class="battle-stage"><div class="battle"></div></div>
+    <div class="player-controls" aria-label="Playback controls">
+      <button id="play" type="button" disabled>Play</button>
+      <button id="reset" type="button" disabled>Reset</button>
+      <button id="previous" type="button" disabled>Previous turn</button>
+      <button id="next" type="button" disabled>Next turn</button>
+      <button id="sides" type="button" disabled>Switch sides</button>
+    </div>
+    <div class="player-settings">
+      <label>Go to turn <input id="turn" type="number" min="0" step="1" value="0"></label>
+      <button id="seek" type="button" disabled>Go</button>
+      <label>Speed <select id="speed"><option value="normal">Normal</option><option value="fast">Fast</option><option value="hyperfast">Very fast</option><option value="slow">Slow</option></select></label>
+      <label class="audio-setting"><input id="sound" type="checkbox"> Sound</label>
+    </div>
+    <p id="position" role="status">Preparing verified playback…</p>
+    <p id="asset-status" role="status" hidden>Some graphics could not load. The verified battle log and controls remain available.</p>
+    <p class="credits">Player powered by Pokémon Showdown · <a href="vendor/NOTICES.md" target="_blank" rel="noopener">Notices</a> · <a href="vendor/manifest.json" target="_blank" rel="noopener">Source manifest</a></p>
+  </section>
+  <section class="player-log" aria-label="Battle commentary"><div class="battle-log"></div></section>
+</main>
+<script src="player.js"></script>
+</body></html>

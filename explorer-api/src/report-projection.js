@@ -3,9 +3,8 @@
 const {
   aggregatePodAttribution,
   formatDuration,
+  operationalStats,
 } = require('../../simulator/src/report-renderer');
-
-const {operationalStats} = require('../../simulator/src/report/metrics');
 
 function stageForResult(artifacts, result) {
   if (typeof result.stage === 'string' && result.stage.trim() !== '') {

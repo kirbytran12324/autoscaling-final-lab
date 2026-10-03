@@ -1,0 +1,11 @@
+# Stronger than RWO: only one Pod may mount the runner's writable state.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: tournament-state
+spec:
+  accessModes: [ReadWriteOncePod]
+  storageClassName: managed-csi-premium
+  resources:
+    requests:
+      storage: 4Gi

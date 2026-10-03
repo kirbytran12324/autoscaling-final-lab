@@ -1,0 +1,42 @@
+# Run only after the singleton Job has completed and its Pods are removed.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: state-export
+spec:
+  restartPolicy: Never
+  automountServiceAccountToken: false
+  nodeSelector:
+    kubernetes.io/os: linux
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    runAsGroup: 1000
+    fsGroup: 1000
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+    - name: export
+      image: metronome-simulator
+      command: [sleep, '3600']
+      resources:
+        requests:
+          cpu: 50m
+          memory: 64Mi
+        limits:
+          cpu: 500m
+          memory: 2Gi
+      securityContext:
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        capabilities:
+          drop: [ALL]
+      volumeMounts:
+        - name: state
+          mountPath: /state
+          readOnly: true
+  volumes:
+    - name: state
+      persistentVolumeClaim:
+        claimName: tournament-state
+        readOnly: true

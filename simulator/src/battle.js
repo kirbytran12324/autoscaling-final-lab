@@ -2,6 +2,7 @@
 
 const {createHash} = require('node:crypto');
 const {BattleStream} = require('pokemon-showdown');
+const {extractChannelMessages} = require('pokemon-showdown/dist/sim/battle');
 const {getBaseSpecies} = require('./catalog');
 
 function makeTeam(speciesName) {
@@ -27,7 +28,7 @@ async function simulateBattle({
   pokemon2,
   seed,
   maxTurns = 100,
-}) {
+}, {captureReplay = false, maxReplayBytes = 1024 * 1024} = {}) {
   if (
     !Number.isInteger(maxTurns) ||
     maxTurns < 1 ||
@@ -49,6 +50,8 @@ async function simulateBattle({
   let completedTurns = 0;
   let capped = false;
   let protocolLineCount = 0;
+  const replayLines = captureReplay ? [] : null;
+  let replayBytes = 0;
 
   const completedBattle = (async () => {
     for await (const chunk of stream) {
@@ -71,6 +74,18 @@ async function simulateBattle({
           protocolHash.update(line);
           protocolHash.update('\n');
           protocolLineCount++;
+        }
+
+        if (replayLines) {
+          for (const line of extractChannelMessages(parts.join('\n'), [0])[0]) {
+            if (line.startsWith('|t:|')) continue;
+            replayBytes += Buffer.byteLength(line, 'utf8') + 1;
+            if (replayBytes > maxReplayBytes) {
+              stream.destroy();
+              throw new RangeError('Replay log exceeds its byte limit');
+            }
+            replayLines.push(line);
+          }
         }
 
         if (
@@ -109,7 +124,7 @@ async function simulateBattle({
             ? result.winner
             : null;
 
-        return {
+        const summary = {
           outcome: winnerSide ? 'win' : 'tie',
           winnerSide,
           winnerSpecies: winnerSide === 'p1'
@@ -123,6 +138,7 @@ async function simulateBattle({
           protocolHash: protocolHash.digest('hex'),
           protocolLineCount,
         };
+        return replayLines ? {result: summary, log: `${replayLines.join('\n')}\n`} : summary;
       }
     }
 
@@ -153,4 +169,8 @@ async function simulateBattle({
   return completedBattle;
 }
 
-module.exports = {makeTeam, simulateBattle};
+function simulateBattleReplay(input, options = {}) {
+  return simulateBattle(input, {...options, captureReplay: true});
+}
+
+module.exports = {makeTeam, simulateBattle, simulateBattleReplay};

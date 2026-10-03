@@ -92,4 +92,13 @@ async function getMatch(runId, matchId) {
   return enrichMatch(match, artifacts.matchContext);
 }
 
-module.exports = {listMatches, getMatch};
+async function getReplayContext(runId, matchId) {
+  validateMatchId(matchId);
+  const artifacts = await this.loadCompletedRun(runId);
+  const match = matchIndex(artifacts).byId.get(matchId);
+  if (!match) throw new ArtifactStoreError(404, 'MATCH_NOT_FOUND', 'Tournament match was not found.');
+  return {match, rulesVersion: artifacts.metadata.rulesVersion,
+    simulatorVersion: artifacts.metadata.simulatorVersion};
+}
+
+module.exports = {listMatches, getMatch, getReplayContext};

@@ -1,5 +1,15 @@
 import type {ReactNode} from 'react';
 
+export function AppHeader({children}: {children?: ReactNode}) {
+  return <>
+    <a className="skip-link" href="#main-content">Skip to content</a>
+    <header className="application-header">
+      <div className="app-identity"><span className="app-mark" aria-hidden="true">M</span><span><strong>METRONOME</strong><small>Tournament explorer</small></span></div>
+      <div className="app-actions">{children}</div>
+    </header>
+  </>;
+}
+
 export function LoadingState({label = 'Loading completed runs…'}: {label?: string}) {
   return <div className="state-card" role="status"><span className="spinner" />{label}</div>;
 }

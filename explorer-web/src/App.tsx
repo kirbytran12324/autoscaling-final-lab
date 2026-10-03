@@ -1,6 +1,6 @@
 import {useEffect, useState} from 'react';
 import {listRuns, loadRun} from './api';
-import {EmptyState, ErrorState, formatDate, formatDuration, LoadingState} from './components';
+import {AppHeader, EmptyState, ErrorState, formatDate, formatDuration, LoadingState} from './components';
 import ReportView from './ReportView';
 import type {Bracket, RunDetail, RunSummary} from './types';
 import './styles.css';
@@ -34,10 +34,6 @@ export default function App() {
     : <Dashboard openRun={id => navigate(`/runs/${encodeURIComponent(id)}`)} />;
 }
 
-function Brand() {
-  return <div className="dashboard-brand"><span>M</span><strong>METRONOME</strong><small>Tournament explorer</small></div>;
-}
-
 function Dashboard({openRun}: {openRun: (id: string) => void}) {
   const [reload, setReload] = useState(0);
   const [state, setState] = useState<
@@ -53,8 +49,8 @@ function Dashboard({openRun}: {openRun: (id: string) => void}) {
     return () => controller.abort();
   }, [reload]);
   return <div className="dashboard-shell">
-    <header className="dashboard-topbar"><Brand /><span className="read-only-badge">Read only</span></header>
-    <main className="dashboard">
+    <AppHeader><span className="read-only-badge">Read only</span></AppHeader>
+    <main id="main-content" className="dashboard" tabIndex={-1}>
       <div className="dashboard-hero"><div><p className="eyebrow">Completed-run archive</p><h1>Deterministic battles.<br /><span>Durable results.</span></h1><p>Explore validated tournament outcomes, standings, brackets, and every accepted simulation.</p></div></div>
       <div className="list-heading"><div><p className="eyebrow">Archive</p><h2>Completed tournaments</h2></div>{state.kind === 'ready' && <span>{state.runs.length} runs</span>}</div>
       {state.kind === 'loading' && <LoadingState />}
@@ -71,7 +67,7 @@ function RunCard({run, open}: {run: RunSummary; open: () => void}) {
     <div className="run-card-top"><span className="status-dot">Completed</span><span>{run.mode}</span></div>
     <div><p className="mono muted">{run.runId}</p><h3>{run.champion.species}</h3><p className="champion-label">Tournament champion</p></div>
     <dl className="mini-stats"><div><dt>Entrants</dt><dd>{run.entrantCount.toLocaleString()}</dd></div><div><dt>Matches</dt><dd>{run.matchCount.toLocaleString()}</dd></div><div><dt>Duration</dt><dd>{formatDuration(run.startedAt, run.completedAt)}</dd></div></dl>
-    <div className="run-card-bottom"><span>{formatDate(run.completedAt)}</span><button className="arrow-button" onClick={open} aria-label={`Open ${run.runId}`}>→</button></div>
+    <div className="run-card-bottom"><span>{formatDate(run.completedAt)}</span><button className="button open-run" onClick={open} aria-label={`Open ${run.runId}`}>Explore run <span aria-hidden="true">→</span></button></div>
   </article>;
 }
 
@@ -90,7 +86,12 @@ function TournamentPage({runId, goHome}: {runId: string; goHome: () => void}) {
     );
     return () => controller.abort();
   }, [runId, reload]);
-  if (state.kind === 'loading') return <main className="dashboard"><LoadingState label={`Loading ${runId}…`} /></main>;
-  if (state.kind === 'error') return <main className="dashboard"><ErrorState message={state.message} retry={() => setReload(value => value + 1)} /></main>;
+  if (state.kind !== 'ready') return <div className="dashboard-shell">
+    <AppHeader><button className="back-runs" onClick={goHome}>← Back to all runs</button></AppHeader>
+    <main id="main-content" className="dashboard" tabIndex={-1}>
+      {state.kind === 'loading' ? <LoadingState label={`Loading ${runId}…`} /> :
+        <ErrorState message={state.message} retry={() => setReload(value => value + 1)} />}
+    </main>
+  </div>;
   return <ReportView {...state} goHome={goHome} />;
 }

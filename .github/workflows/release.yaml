@@ -1,12 +1,18 @@
-name: Publish Simulator Image
+name: Publish Verified Images
 
-on: 
+on:
   push:
-    branches:
-      - main
+    branches: [main]
     paths:
       - 'simulator/**'
-      - '.github/workflows/release.yaml'
+      - 'explorer-api/**'
+      - 'explorer-web/**'
+      - 'load-test/**'
+      - 'k8s/**'
+      - 'scripts/validate-manifests.py'
+      - 'scripts/requirements-validation.txt'
+      - '.dockerignore'
+      - '.github/workflows/**'
   workflow_dispatch:
 
 permissions:
@@ -14,39 +20,7 @@ permissions:
   packages: write
 
 jobs:
-  build-and-publish:
-    timeout-minutes: 15
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v6
-        with: 
-          node-version: "24.20.0"
-          cache: npm
-          cache-dependency-path: simulator/package-lock.json
-
-      - name: Install dependencies
-        working-directory: simulator
-        run: npm ci --omit=dev --ignore-scripts
-
-      - name: Run tests
-        working-directory: simulator
-        run: npm test
-
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v6
-        with:
-          context: simulator
-          push: true
-          tags: ghcr.io/${{ github.repository_owner }}/metronome-simulator:${{ github.sha }}
-          labels: |
-            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+  verify-and-publish:
+    uses: ./.github/workflows/ci.yaml
+    with:
+      publish: true

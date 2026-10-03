@@ -13,19 +13,7 @@ const {
 const {basename, dirname, join} = require('node:path');
 const {isDeepStrictEqual} = require('node:util');
 
-const DETERMINISTIC_RESULT_FIELDS = Object.freeze([
-  'matchId',
-  'pokemon1',
-  'pokemon2',
-  'seed',
-  'simulatorVersion',
-  'outcome',
-  'winnerSide',
-  'winnerSpecies',
-  'turns',
-  'termination',
-  'protocolHash',
-]);
+const {DETERMINISTIC_RESULT_FIELDS, haveSameDeterministicResult} = require('./deterministic-result');
 
 const RUN_ID_PATTERN = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
 const RUN_IDENTITY_FIELDS = Object.freeze([
@@ -307,12 +295,6 @@ function validateRunRoster(roster, expectedIdentity) {
   }
 
   return roster;
-}
-
-function haveSameDeterministicResult(left, right) {
-  return DETERMINISTIC_RESULT_FIELDS.every(field =>
-    isDeepStrictEqual(left[field], right[field])
-  );
 }
 
 function buildCompletedMatchIndex(records) {

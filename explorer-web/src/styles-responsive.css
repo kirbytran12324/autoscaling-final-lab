@@ -1,0 +1,295 @@
+.dashboard-shell>footer {
+  padding:24px;
+  text-align:center;
+  color:var(--muted);
+  border-top:1px solid var(--line)
+}
+
+
+@media(max-width:1000px) {
+  .headline-metrics {
+  grid-template-columns:repeat(3,minmax(0,1fr))
+}
+.explorer-layout {
+  grid-template-columns:1fr
+}
+.record-detail {
+  position:static
+}
+.series>summary {
+  grid-template-columns:60px 1fr
+}
+.series>summary code,.series-winner {
+  grid-column:2
+}
+.run-grid {
+  grid-template-columns:repeat(2,1fr)
+}
+
+}
+
+@media(max-width:700px) {
+  :root {
+  --app-header-height:50px
+}
+.application-header {
+  padding-inline:14px
+}
+.app-identity small {
+  display:none
+}
+.report-download,.back-runs {
+  font-size:.74rem;
+  padding-inline:7px
+}
+.report-download {
+  max-width:112px;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis
+}
+.report-page .report-header,.report-page main,.report-page footer {
+  padding-inline:14px
+}
+.report-page .section-nav {
+  padding-inline:14px
+}
+.report-header {
+  padding-block:14px 10px
+}
+.headline-metrics {
+  grid-template-columns:1fr 1fr
+}
+.headline-metrics .metric:first-child {
+  grid-column:1/-1
+}
+.section-heading {
+  align-items:stretch;
+  flex-direction:column
+}
+.table-toolbar {
+  align-items:stretch
+}
+.table-toolbar>* {
+  flex:1 1 130px
+}
+.table-toolbar .pager {
+  flex:1 0 100%;
+  justify-content:space-between
+}
+.table-toolbar output {
+  margin-left:0
+}
+.pod-chart-row {
+  grid-template-columns:1fr;
+  gap:5px
+}
+.pod-table th:first-child,.pod-table td:first-child {
+  min-width:280px;
+  max-width:320px
+}
+.pod-hostname {
+  display:block
+}
+.copy-button {
+  margin:5px 0 0!important
+}
+.champion {
+  grid-template-columns:1fr;
+  text-align:center
+}
+.series>summary {
+  grid-template-columns:50px 1fr
+}
+.detail-metrics {
+  grid-template-columns:1fr
+}
+.report-page dl {
+  grid-template-columns:1fr
+}
+.report-page section {
+  padding:16px
+}
+.dashboard {
+  width:min(100% - 28px,1240px);
+  padding-top:35px
+}
+.run-grid {
+  grid-template-columns:1fr
+}
+.dashboard-hero h1 {
+  font-size:3rem
+}
+
+}
+
+@media print {
+  .application-header,.section-nav,.tabs,.table-toolbar,.back-top,.copy-button {
+  display:none!important
+}
+
+}
+
+
+/* Shared controls and navigation across archive, report and request states. */
+.button,.back-runs,.report-download {
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:8px;
+  min-height:42px;
+  margin:0;
+  padding:8px 12px;
+  border:1px solid var(--line);
+  border-radius:8px;
+  background:var(--surface);
+  color:var(--ink);
+  font:inherit;
+  text-decoration:none;
+  cursor:pointer
+}
+
+.button:hover,.back-runs:hover,.report-download:hover {
+  border-color:var(--accent);
+  background:var(--panel-strong)
+}
+
+.button:disabled {
+  cursor:default;
+  opacity:.45
+}
+
+.open-run {
+  color:var(--accent);
+  white-space:nowrap
+}
+
+.run-card-bottom {
+  gap:12px;
+  flex-wrap:wrap
+}
+
+.run-card .mono {
+  overflow-wrap:anywhere
+}
+
+.app-actions {
+  flex-wrap:wrap;
+  justify-content:flex-end
+}
+
+.application-header {
+  min-height:var(--app-header-height);
+  height:auto;
+  padding-block:8px;
+  gap:12px
+}
+
+.report-header h1 {
+  overflow-wrap:anywhere
+}
+
+.skip-link {
+  position:fixed;
+  top:8px;
+  left:16px;
+  z-index:100;
+  transform:translateY(-160%);
+  background:var(--accent);
+  color:var(--bg);
+  padding:10px 16px;
+  border-radius:8px;
+  font-weight:700;
+  text-decoration:none
+}
+
+.skip-link:focus {
+  transform:translateY(0)
+}
+
+.state-card {
+  background:var(--panel);
+  border-style:solid;
+  box-shadow:var(--shadow)
+}
+
+.error-state {
+  border-color:var(--danger)
+}
+
+.error-state .state-icon {
+  color:var(--danger)
+}
+
+@media(max-width:700px) {
+  :root {
+  --app-header-height:64px
+}
+.application-header {
+  padding-inline:14px
+}
+.app-identity strong {
+  font-size:.7rem
+}
+.app-actions {
+  gap:6px
+}
+.report-download,.back-runs {
+  font-size:.74rem
+}
+.dashboard-hero h1 {
+  font-size:2.7rem
+}
+.dashboard-hero {
+  min-height:220px
+}
+
+}
+
+@media(prefers-reduced-motion:reduce) {
+  html {
+  scroll-behavior:auto
+}
+*,*::before,*::after {
+  animation-duration:.01ms!important;
+  animation-iteration-count:1!important;
+  transition-duration:.01ms!important
+}
+
+}
+.compact-label { display: none; }
+.replay-dialog { width: min(1180px, calc(100vw - 32px)); max-width: none; max-height: calc(100dvh - 32px); padding: 0; border: 1px solid #b6c8c1; border-radius: 14px; color: #163a30; background: #f8fbf9; box-shadow: 0 24px 100px #062c3066; }
+.replay-dialog::backdrop { background: #062c30b3; }
+.replay-dialog-header { display: flex; align-items: start; justify-content: space-between; gap: 16px; padding: 20px 24px; }
+.replay-dialog-header h2 { font-size: 24px; margin: 4px 0; }
+.replay-dialog-header p { margin: 4px 0; }
+.replay-dialog-header button { flex-shrink: 0; border: 1px solid #a9bdb3; border-radius: 6px; padding: 8px 12px; background: white; color: #163a30; font: inherit; cursor: pointer; }
+.replay-state, .replay-verification { padding: 16px 24px; }
+.replay-verification { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px; border-block: 1px solid #d5e2dc; font-size: 13px; }
+.replay-frame { display: block; border: 0; width: 100%; height: 720px; background: #f8fbf9; }
+.replay-log-fallback { margin: 12px 24px 24px; }
+.replay-log-fallback pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 320px; overflow-y: auto; font-size: 12px; }
+.replay-log-fallback .mono { overflow-wrap: anywhere; }
+@media (max-width: 700px) {
+  .replay-dialog { width: calc(100vw - 12px); max-height: calc(100dvh - 12px); }
+  .replay-dialog-header, .replay-state, .replay-verification { padding: 12px; }
+  .replay-dialog-header h2 { font-size: 18px; }
+  .replay-frame { height: 840px; }
+  .replay-log-fallback { margin: 12px; }
+}
+@media (max-width: 700px) {
+  .wide-label { display: none; }
+  .compact-label { display: inline; }
+  .app-actions { flex-wrap: nowrap; }
+  .app-actions .back-runs, .app-actions .report-download { gap: 4px; padding-inline: 7px; white-space: nowrap; }
+}
+@media (max-width: 350px) {
+  .app-identity > span:last-child {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}

@@ -1,0 +1,12 @@
+**/node_modules/
+**/dist/
+**/*.tsbuildinfo
+**/__pycache__/
+**/.pytest_cache/
+**/coverage/
+.venv/
+.validation/
+.validation-linux-tests.txt
+npm-debug.log*
+explorer-web/public/showdown/vendor/
+*.log

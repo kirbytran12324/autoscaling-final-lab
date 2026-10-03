@@ -1,17 +1,10 @@
-FROM node:24.20.0-bookworm-slim AS test
+FROM node:24.20.0-bookworm-slim AS dependencies
 
 WORKDIR /app
 
 COPY package.json package-lock.json ./
 
 RUN npm ci --omit=dev --ignore-scripts
-
-COPY src ./src
-COPY test ./test
-COPY config ./config
-
-RUN npm test
-
 
 FROM node:24.20.0-bookworm-slim AS runtime
 
@@ -21,7 +14,7 @@ ENV PORT=3000
 
 WORKDIR /app
 
-COPY --from=test /app/node_modules ./node_modules
+COPY --from=dependencies /app/node_modules ./node_modules
 COPY --chown=node:node package.json ./
 COPY --chown=node:node src ./src
 COPY --chown=node:node config ./config

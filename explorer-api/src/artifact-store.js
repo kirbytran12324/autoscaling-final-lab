@@ -14,6 +14,7 @@ class FilesystemArtifactStore extends RunCache {
   async getStandings(...args) { return standings.getStandings.apply(this, args); }
   async listMatches(...args) { return matches.listMatches.apply(this, args); }
   async getMatch(...args) { return matches.getMatch.apply(this, args); }
+  async getReplayContext(...args) { return matches.getReplayContext.apply(this, args); }
   async getReport(...args) { return reports.getReport.apply(this, args); }
 }
 module.exports = {FilesystemArtifactStore, MATCH_SORTS, MATCH_ID_PATTERN, RUN_ID_PATTERN,

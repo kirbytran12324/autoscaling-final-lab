@@ -69,7 +69,7 @@ function publicError(error) {
   return new ApiError(500, 'INTERNAL_ERROR', 'An unexpected error occurred.');
 }
 
-function createApp({store, logger = console}) {
+function createApp({store, logger = console, readiness = async () => true, replays}) {
   if (!store) throw new TypeError('store is required');
 
   return async function app(request, response) {
@@ -78,6 +78,11 @@ function createApp({store, logger = console}) {
       if (url.pathname === '/health/live' || url.pathname === '/health/ready') {
         if (request.method !== 'GET') {
           throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Method is not allowed.');
+        }
+        if (url.pathname === '/health/ready') {
+          let ready = false;
+          try { ready = await readiness(); } catch { /* storage outage */ }
+          return sendJson(response, ready ? 200 : 503, {status: ready ? 'ok' : 'not-ready'});
         }
         return sendJson(response, 200, {status: 'ok'});
       }
@@ -139,6 +144,11 @@ function createApp({store, logger = console}) {
       if (parts.length === 5 && parts[3] === 'matches') {
         const matchId = decodeSegment(parts[4], 'Match ID');
         return sendJson(response, 200, {match: await store.getMatch(runId, matchId)});
+      }
+      if (parts.length === 6 && parts[3] === 'matches' && parts[5] === 'replay') {
+        assertAllowedParameters(url.searchParams, []);
+        if (!replays) throw new ApiError(503, 'REPLAY_UNAVAILABLE', 'Replay generation is unavailable.');
+        return sendJson(response, 200, await replays.getReplay(runId, decodeSegment(parts[4], 'Match ID')));
       }
       if (parts.length === 4 && parts[3] === 'report') {
         const report = await store.getReport(runId);

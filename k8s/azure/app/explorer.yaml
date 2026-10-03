@@ -1,0 +1,157 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: metronome-explorer-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: metronome-explorer-api
+  template:
+    metadata:
+      labels:
+        app: metronome-explorer-api
+    spec:
+      automountServiceAccountToken: false
+      nodeSelector:
+        kubernetes.io/os: linux
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: api
+          image: metronome-explorer-api
+          ports:
+            - name: http
+              containerPort: 3001
+          env:
+            - name: SIMULATOR_BASE_URL
+              value: http://metronome-simulator
+            - name: TOURNAMENT_STATE_ROOT
+              value: /data/tournaments
+            - name: NODE_OPTIONS
+              value: --max-old-space-size=1536
+          resources:
+            requests:
+              cpu: 100m
+              memory: 1Gi
+            limits:
+              cpu: '1'
+              memory: 2Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          startupProbe:
+            httpGet:
+              path: /health/ready
+              port: http
+            failureThreshold: 30
+            periodSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: http
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: http
+          volumeMounts:
+            - name: archive
+              mountPath: /data/tournaments
+              readOnly: true
+      volumes:
+        - name: archive
+          persistentVolumeClaim:
+            claimName: tournament-archive
+            readOnly: true
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: metronome-explorer-api
+spec:
+  selector:
+    app: metronome-explorer-api
+  ports:
+    - port: 3001
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: metronome-explorer-web
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: metronome-explorer-web
+  template:
+    metadata:
+      labels:
+        app: metronome-explorer-web
+    spec:
+      automountServiceAccountToken: false
+      nodeSelector:
+        kubernetes.io/os: linux
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 101
+        runAsGroup: 101
+        fsGroup: 101
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: web
+          image: metronome-explorer-web
+          ports:
+            - name: http
+              containerPort: 8080
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 250m
+              memory: 128Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          startupProbe:
+            httpGet:
+              path: /health/live
+              port: http
+            failureThreshold: 30
+            periodSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: http
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: http
+          volumeMounts:
+            - name: nginx-temp
+              mountPath: /tmp
+      volumes:
+        - name: nginx-temp
+          emptyDir:
+            sizeLimit: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: metronome-explorer-web
+spec:
+  selector:
+    app: metronome-explorer-web
+  ports:
+    - port: 80
+      targetPort: http

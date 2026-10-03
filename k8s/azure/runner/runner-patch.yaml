@@ -1,0 +1,27 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: tournament-runner
+spec:
+  template:
+    spec:
+      nodeSelector:
+        kubernetes.io/os: linux
+      containers:
+        - name: runner
+          command: [node]
+          args: [src/runner-cli.js]
+          env:
+            - name: TOURNAMENT_RUN_ID
+              value: azure-sample-001
+            - name: TOURNAMENT_SEED
+              value: azure-sample-seed-001
+            - name: NODE_OPTIONS
+              value: --max-old-space-size=1536
+          resources:
+            requests:
+              cpu: 100m
+              memory: 1Gi
+            limits:
+              cpu: 500m
+              memory: 2Gi
