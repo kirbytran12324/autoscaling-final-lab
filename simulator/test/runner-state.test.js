@@ -303,3 +303,29 @@ test('buildCompletedMatchIndex preserves input records', () => {
 
   assert.deepEqual(records, snapshot);
 });
+
+
+test('streaming JSONL handles UTF-8 and records crossing multiple chunks', async t => {
+  const directory = await createTestDirectory(t);
+  const filePath = join(directory, 'results.jsonl');
+  const records = [{text: 'é😀'.repeat(40000)}, {matchId: 'last'}];
+  await writeFile(filePath, records.map(record => JSON.stringify(record)).join('\n') + '\n');
+  assert.deepEqual(await readJsonLines(filePath, {required: true}), records);
+});
+
+test('streaming JSONL preserves line numbers and rejects long truncated evidence', async t => {
+  const directory = await createTestDirectory(t);
+  const filePath = join(directory, 'results.jsonl');
+  const firstLine = JSON.stringify({text: 'x'.repeat(150000)});
+  await writeFile(filePath, firstLine + '\ninvalid\n');
+  await assert.rejects(readJsonLines(filePath), /Malformed JSON on line 2/);
+  await writeFile(filePath, firstLine + '\n' + firstLine);
+  await assert.rejects(readJsonLines(filePath), /line 2 lacks a terminating newline/);
+  assert.equal(await readFile(filePath, 'utf8'), firstLine + '\n' + firstLine);
+});
+
+test('required JSONL rejects a missing result log', async t => {
+  const directory = await createTestDirectory(t);
+  await assert.rejects(readJsonLines(join(directory, 'missing.jsonl'), {required: true}),
+    error => error.code === 'ENOENT');
+});

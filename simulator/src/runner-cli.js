@@ -188,6 +188,9 @@ async function runCli(options = {}) {
       selectRoster(mode) {
         return selectTournamentRosterImpl(mode, sampleRosterConfiguration);
       },
+      onDiagnostic: env.RUNNER_DIAGNOSTICS === '1'
+        ? event => stdout(`Tournament diagnostic: ${JSON.stringify(event)}`)
+        : undefined,
       onProgress(progress) {
         const round = progress.round === undefined ? '' : ` round=${progress.round}`;
         stdout(
