@@ -40,8 +40,16 @@ class FakeClient:
                 "matchId": kwargs["json"]["matchId"],
                 "servedBy": self.served_by,
                 "durationMs": 10,
+                "simulatorVersion": "pokemon-showdown@0.11.11",
                 "outcome": "win",
-                "protocolHash": "abc123",
+                "protocolHash": "a" * 64,
+                "pokemon1": kwargs["json"]["pokemon1"],
+                "pokemon2": kwargs["json"]["pokemon2"],
+                "seed": kwargs["json"]["seed"],
+                "turns": 5,
+                "termination": "natural",
+                "winnerSide": "p1",
+                "winnerSpecies": kwargs["json"]["pokemon1"],
             }
         )
         self.responses.append(response)
@@ -99,6 +107,43 @@ class BattleUserTests(unittest.TestCase):
                     "HTTP 200 response field servedBy was not a non-empty string",
                 )
                 self.assertFalse(client.responses[0].was_successful)
+                self.assertEqual(locustfile._served_by_counts, {})
+
+    def test_invalid_results_are_not_counted(self):
+        for field, value in (("durationMs", None), ("durationMs", float("nan")),
+                             ("durationMs", True), ("durationMs", 10 ** 400),
+                             ("simulatorVersion", ""), ("outcome", "invalid"),
+                             ("protocolHash", "abc123"), ("seed", [0, 0, 0, 0]),
+                             ("pokemon1", "MissingNo"), ("turns", 0),
+                             ("winnerSide", "p2"), ("termination", "turn-cap")):
+            with self.subTest(field=field, value=value):
+                locustfile.reset_served_by_counts(None)
+                client = FakeClient("simulator-1")
+                original = client.post
+                def post(path, **kwargs):
+                    response = original(path, **kwargs)
+                    response._result[field] = value
+                    return response
+                client.post = post
+                battle_user(client).simulate_battle()
+                self.assertFalse(client.responses[0].was_successful)
+                self.assertIsNotNone(client.responses[0].failure_message)
+                self.assertEqual(locustfile._served_by_counts, {})
+
+    def test_required_result_fields_cannot_be_omitted(self):
+        for field in locustfile.REQUIRED_RESPONSE_FIELDS:
+            with self.subTest(field=field):
+                locustfile.reset_served_by_counts(None)
+                client = FakeClient("simulator-1")
+                original = client.post
+                def post(path, **kwargs):
+                    response = original(path, **kwargs)
+                    del response._result[field]
+                    return response
+                client.post = post
+                battle_user(client).simulate_battle()
+                self.assertFalse(client.responses[0].was_successful)
+                self.assertIn('omitted required fields', client.responses[0].failure_message)
                 self.assertEqual(locustfile._served_by_counts, {})
 
     def test_distribution_summary_is_sorted(self):

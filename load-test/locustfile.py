@@ -10,6 +10,8 @@ used for the low-, moderate-, and high-concurrency phases.
 from collections import Counter
 from itertools import count
 import logging
+import math
+import re
 import os
 import socket
 from uuid import uuid4
@@ -25,11 +27,9 @@ SPECIES_PAIRS = (
 )
 
 REQUIRED_RESPONSE_FIELDS = (
-    "matchId",
-    "servedBy",
-    "durationMs",
-    "outcome",
-    "protocolHash",
+    "matchId", "pokemon1", "pokemon2", "seed", "simulatorVersion",
+    "servedBy", "durationMs", "outcome", "protocolHash", "turns",
+    "termination", "winnerSide", "winnerSpecies",
 )
 
 BATTLE_REQUEST_TIMEOUT_SECONDS = float(
@@ -149,6 +149,51 @@ class BattleUser(HttpUser):
                 response.failure(
                     "HTTP 200 response field servedBy was not a non-empty string"
                 )
+                return
+
+            if result.get("pokemon1") != pokemon1 or result.get("pokemon2") != pokemon2 or result.get("seed") != payload["seed"]:
+                response.failure("HTTP 200 response participants or seed did not match the request")
+                return
+            seed = result["seed"]
+            if not isinstance(seed, list) or any(isinstance(word, bool) or not isinstance(word, int) or not 0 <= word <= 65535 for word in seed):
+                response.failure("HTTP 200 response seed was invalid")
+                return
+            version = result["simulatorVersion"]
+            if not isinstance(version, str) or not version.strip():
+                response.failure("HTTP 200 response simulatorVersion was invalid")
+                return
+            duration = result["durationMs"]
+            try:
+                valid_duration = not isinstance(duration, bool) and isinstance(duration, (int, float)) and math.isfinite(duration) and duration >= 0
+            except OverflowError:
+                valid_duration = False
+            if not valid_duration:
+                response.failure("HTTP 200 response durationMs was not finite and non-negative")
+                return
+            if result["outcome"] not in ("win", "tie"):
+                response.failure("HTTP 200 response outcome was not win or tie")
+                return
+            if not isinstance(result["protocolHash"], str) or not re.fullmatch(r"[0-9a-f]{64}", result["protocolHash"]):
+                response.failure("HTTP 200 response protocolHash was invalid")
+                return
+            turns = result.get("turns")
+            if isinstance(turns, bool) or not isinstance(turns, int) or not 1 <= turns <= payload["maxTurns"]:
+                response.failure("HTTP 200 response turns was invalid")
+                return
+            if result.get("termination") not in ("natural", "turn-cap"):
+                response.failure("HTTP 200 response termination was invalid")
+                return
+            if result["termination"] == "turn-cap" and (result["outcome"] != "tie" or turns != payload["maxTurns"]):
+                response.failure("HTTP 200 response turn-cap result was inconsistent")
+                return
+            side = result.get("winnerSide")
+            winner = result.get("winnerSpecies")
+            if result["outcome"] == "win":
+                if side not in ("p1", "p2") or winner != (pokemon1 if side == "p1" else pokemon2):
+                    response.failure("HTTP 200 response winner was inconsistent")
+                    return
+            elif side is not None or winner is not None:
+                response.failure("HTTP 200 response tie had a winner")
                 return
 
             response.success()
