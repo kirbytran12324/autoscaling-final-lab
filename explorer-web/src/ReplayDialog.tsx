@@ -2,6 +2,7 @@ import {useEffect, useMemo, useRef, useState} from 'react';
 import {createPortal} from 'react-dom';
 import {ApiRequestError, loadReplay} from './api';
 import type {Match, VerifiedReplay} from './types';
+import {showdownAssetBaseUrl} from './showdown-assets';
 
 type ReplayState = {kind: 'loading'} | {kind: 'error'; message: string; retryable: boolean} |
   {kind: 'ready'; replay: VerifiedReplay};
@@ -18,6 +19,7 @@ export default function ReplayDialog({runId, match, onClose}: {
   const [playerHeight, setPlayerHeight] = useState(520);
   const playerLoaded = useRef(false);
   const replayId = useMemo(() => crypto.randomUUID(), [runId, match.matchId, attempt]);
+  const assetBaseUrl = showdownAssetBaseUrl();
 
   useEffect(() => {
     const opener = document.activeElement as HTMLElement | null;
@@ -49,13 +51,14 @@ export default function ReplayDialog({runId, match, onClose}: {
 
   useEffect(() => {
     const receive = (event: MessageEvent) => {
-      if (event.origin !== window.location.origin || event.source !== frame.current?.contentWindow ||
+      // Sandbox messages have an opaque origin; bind them to this frame and replay.
+      if (event.origin !== 'null' || event.source !== frame.current?.contentWindow ||
           event.data?.replayId !== replayId) return;
       if (event.data.type === 'metronome-replay:ready' && state.kind === 'ready') {
         frame.current?.contentWindow?.postMessage({type: 'metronome-replay:init', replayId,
           replay: state.replay,
-          assetBaseUrl: import.meta.env.VITE_SHOWDOWN_ASSET_BASE_URL || 'https://play.pokemonshowdown.com/'},
-        window.location.origin);
+          assetBaseUrl},
+        '*'); // An opaque frame has no named target origin.
       } else if (event.data.type === 'metronome-replay:escape') onClose();
       else if (event.data.type === 'metronome-replay:loaded') playerLoaded.current = true;
       else if (event.data.type === 'metronome-replay:resize' &&
@@ -90,10 +93,10 @@ export default function ReplayDialog({runId, match, onClose}: {
       {playerError && <div className="replay-state"><p className="inline-error" role="alert">{playerError}</p>
         <button type="button" onClick={() => setAttempt(value => value + 1)}>Reload player</button></div>}
       <iframe ref={frame} key={replayId} className="replay-frame"
-        src={`/showdown/player.html?replayId=${encodeURIComponent(replayId)}&assetBaseUrl=${encodeURIComponent(import.meta.env.VITE_SHOWDOWN_ASSET_BASE_URL || 'https://play.pokemonshowdown.com/')}`}
+        src={`/showdown/player.html?replayId=${encodeURIComponent(replayId)}&assetBaseUrl=${encodeURIComponent(assetBaseUrl)}`}
         title={`Battle replay: ${match.pokemon1} vs ${match.pokemon2}`}
-        onLoad={() => frame.current?.contentWindow?.postMessage({type: 'metronome-replay:ping', replayId}, window.location.origin)}
-        sandbox="allow-scripts allow-same-origin" referrerPolicy="no-referrer"
+        onLoad={() => frame.current?.contentWindow?.postMessage({type: 'metronome-replay:ping', replayId}, '*')}
+        sandbox="allow-scripts" referrerPolicy="no-referrer"
         style={{height: playerHeight}}
         onError={() => setPlayerError('The battle player could not load. Read the verified log below.')} />
       <details className="replay-log-fallback"><summary>Verified battle log and protocol hash</summary>

@@ -6,5 +6,6 @@ namespace: autoscaling-lab
 resources:
   - api-deployment.yaml
   - api-service.yaml
+  - web-runtime-config.yaml
   - web-deployment.yaml
   - web-service.yaml

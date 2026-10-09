@@ -49,10 +49,15 @@ for (const name of scripts) {
     name === 'battle-log-misc.js' ? ['MD5'] : []);
   if (name === 'battle-dex.ts') {
     // Upstream uses a scheme-relative fx URL on HTTP pages. Set the configured
-    // HTTPS base before animation tables precompute their URLs.
+    // asset base before animation tables precompute their URLs.
     engine += 'Dex.resourcePrefix=window.ShowdownAssetBase;Dex.fxPrefix=new URL("fx/",window.ShowdownAssetBase).href;\n';
   }
 }
+const upstreamAssetPrefix = 'https://${Config.routes.client}/';
+const upstreamAssetPrefixCount = engine.split(upstreamAssetPrefix).length - 1;
+if (!upstreamAssetPrefixCount) throw new Error('Pinned Showdown asset-prefix adapter found no inputs');
+engine = engine.replaceAll(upstreamAssetPrefix, '${Dex.resourcePrefix}');
+if (engine.includes(upstreamAssetPrefix)) throw new Error('Pinned Showdown asset-prefix adapter was incomplete');
 await writeFile(path.join(output, 'engine.js'), engine);
 const data = JSON.parse(await readFile(path.join(source, 'snapshots/battle-data.json'), 'utf8'));
 data.BattleText.en = normalizeReplayText(data.BattleText.en);

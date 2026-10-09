@@ -8,7 +8,9 @@ The completed-run explorer provides a browser interface over canonical tournamen
 
 ```text
 Browser
-  │ HTTP (local port-forward now; Gateway API later)
+  ├─ HTTP assets → read-only workstation server now; Azure Blob later
+  │
+  │ HTTP application/API (local port-forward now; Gateway API later)
   ▼
 metronome-explorer-web Deployment + ClusterIP Service
   ├─ Nginx serves the compiled React application
@@ -37,6 +39,7 @@ The API keeps at most one validated run in an in-memory cache and invalidates it
 | `explorer-api/test/` | Temporary-directory fixture tests using a copied committed completed run |
 | `explorer-web/src/` | React/TypeScript dashboard and offline-report-parity tournament view |
 | `explorer-web/nginx.conf` | Static serving and same-origin `/api` proxy |
+| `scripts/serve-replay-assets.mjs` | Loopback-only, read-only delivery of the ignored pinned replay snapshot |
 | `k8s/explorer/` | Additive Deployments and ClusterIP Services only |
 
 ## API
@@ -77,21 +80,27 @@ npm ci --omit=dev --ignore-scripts
 cd ..
 ```
 
-Terminal 1 (simulator):
+Terminal 1 (pinned replay assets, from the repository root):
+
+```powershell
+node scripts/serve-replay-assets.mjs
+```
+
+Terminal 2 (simulator):
 
 ```sh
 cd simulator
 npm start
 ```
 
-Terminal 2 (API):
+Terminal 3 (API):
 
 ```sh
 cd explorer-api
 TOURNAMENT_STATE_ROOT="$PWD/../evidence/tournaments" SIMULATOR_BASE_URL=http://127.0.0.1:3000 npm start
 ```
 
-Terminal 3 (frontend):
+Terminal 4 (frontend):
 
 ```sh
 cd explorer-web
@@ -110,7 +119,7 @@ curl 'http://127.0.0.1:3001/api/runs/sample-32-002/matches?limit=5&q=kyogre&stag
 
 ## Test and build
 
-```sh
+```powershell
 cd explorer-api
 npm test
 
@@ -121,7 +130,8 @@ npm run build
 
 cd ..
 docker build -f explorer-api/Dockerfile -t metronome-explorer-api:0.1.0 .
-docker build -t metronome-explorer-web:0.1.0 explorer-web
+$localWebTag = "local-$(Get-Date -Format yyyyMMddHHmmss)"
+docker build -t "metronome-explorer-web:$localWebTag" explorer-web
 ```
 
 The API image uses the repository root as its build context because it reuses the simulator's strict artifact validator. The web image uses only `explorer-web/` as its context.
@@ -134,27 +144,43 @@ Prerequisites:
 
 - the `autoscaling-lab` namespace already exists;
 - the existing `tournament-state` PVC already exists in that namespace; and
-- the two image tags above are available to the local cluster.
+- `.local-assets/showdown/c0f6bfc-2026-10-05` contains the validated pinned
+  replay snapshot; and
+- the images above are available to the local cluster.
 
 Render and apply only this milestone:
 
-```sh
+```powershell
+node scripts/serve-replay-assets.mjs
+
+# In another terminal:
 kubectl kustomize k8s/explorer
 kubectl apply -k k8s/explorer
+kubectl -n autoscaling-lab set image deployment/metronome-explorer-web "web=metronome-explorer-web:$localWebTag"
 kubectl -n autoscaling-lab rollout status deployment/metronome-explorer-api
 kubectl -n autoscaling-lab rollout status deployment/metronome-explorer-web
 kubectl -n autoscaling-lab port-forward service/metronome-explorer-web 8080:80
 ```
 
-Open `http://127.0.0.1:8080`. No accepted baseline kustomization references `k8s/explorer`; applying it is an explicit, independent operation. Both Services are `ClusterIP`. The frontend mounts only an ephemeral `/tmp`, while the API mounts `tournament-state` read-only. Both Pods disable ServiceAccount token automounting.
+Open `http://127.0.0.1:8080`. No accepted baseline kustomization references
+`k8s/explorer`; applying it is an explicit, independent operation. Both Services
+are `ClusterIP`. The frontend mounts only an ephemeral `/tmp` and a small runtime
+configuration file; the API mounts `tournament-state` read-only. Both Pods disable
+ServiceAccount token automounting. The browser fetches the ignored asset snapshot
+directly from the loopback server, while `/api/*` continues through Nginx to the
+ClusterIP API and simulator. The snapshot is never copied into the cluster, an
+image, frontend build output, or Git.
 
-Delete only the additive workloads with:
+Delete only the additive workloads while preserving the imported asset PVC with:
 
 ```sh
-kubectl delete -k k8s/explorer
+kubectl -n autoscaling-lab delete deployment/metronome-explorer-api deployment/metronome-explorer-web
+kubectl -n autoscaling-lab delete service/metronome-explorer-api service/metronome-explorer-web
 ```
 
-This does not delete the namespace, PVC, simulator, runner Jobs, HPA, VPA, or Locust resources.
+This does not delete the namespace, persistent data, simulator, runner Jobs, HPA,
+VPA, or Locust resources. A `replay-assets` PVC created by the earlier local design
+is not referenced by these manifests and is intentionally left untouched.
 
 ## Verified replays
 

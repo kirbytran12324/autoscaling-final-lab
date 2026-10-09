@@ -1,7 +1,14 @@
 'use strict';
 window.ShowdownAssetBase = (() => {
-  const url = new URL(new URLSearchParams(location.search).get('assetBaseUrl') || 'https://play.pokemonshowdown.com/');
-  if (url.protocol !== 'https:' || url.username || url.password || url.search || url.hash) throw new Error('Invalid graphics host');
+  const value = new URLSearchParams(location.search).get('assetBaseUrl');
+  if (!value) throw new Error('Graphics host is not configured');
+  const url = new URL(value, location.origin);
+  const sameOrigin = url.origin === location.origin;
+  const loopback = ['127.0.0.1', 'localhost'].includes(url.hostname);
+  const allowedTransport = url.protocol === 'https:' ||
+    (url.protocol === 'http:' && (sameOrigin || loopback));
+  if (!allowedTransport ||
+      url.username || url.password || url.search || url.hash) throw new Error('Invalid graphics host');
   if (!url.pathname.endsWith('/')) url.pathname += '/';
   return url.href;
 })();

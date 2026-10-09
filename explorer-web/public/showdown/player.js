@@ -40,8 +40,13 @@
         typeof replay.matchId !== 'string' || replay.log.length > 1024 * 1024) return;
     initializing = true;
     try {
-      const assetBase = new URL(event.data.assetBaseUrl);
-      if (assetBase.protocol !== 'https:' || assetBase.username || assetBase.password || assetBase.search || assetBase.hash) {
+      const assetBase = new URL(event.data.assetBaseUrl, location.origin);
+      const sameOrigin = assetBase.origin === location.origin;
+      const loopback = ['127.0.0.1', 'localhost'].includes(assetBase.hostname);
+      const allowedTransport = assetBase.protocol === 'https:' ||
+        (assetBase.protocol === 'http:' && (sameOrigin || loopback));
+      if (!allowedTransport ||
+          assetBase.username || assetBase.password || assetBase.search || assetBase.hash) {
         throw new Error('Invalid graphics host');
       }
       if (!assetBase.pathname.endsWith('/')) assetBase.pathname += '/';

@@ -35,7 +35,9 @@ test('opens paused-player dialog only after verification and restores focus on c
   expect(screen.getByRole('status')).toHaveTextContent('Recreating and verifying');
   expect(screen.queryByTitle(/Battle replay:/)).not.toBeInTheDocument();
   const frame = await screen.findByTitle(/Battle replay:/);
-  expect(frame).toHaveAttribute('sandbox', 'allow-scripts allow-same-origin');
+  expect(frame).toHaveAttribute('sandbox', 'allow-scripts');
+  expect(new URL((frame as HTMLIFrameElement).src).searchParams.get('assetBaseUrl'))
+    .toBe('http://127.0.0.1:4174/c0f6bfc-2026-10-05/');
   expect(screen.getByText('Verified against the saved result')).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', {name: 'Close replay'}));
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
@@ -76,11 +78,13 @@ test('message bridge checks origin, sender and replay identity, and supports fra
     act(() => window.dispatchEvent(new MessageEvent('message', {origin, source, data: {type, replayId: id}})));
   };
   message('https://untrusted.invalid', frame.contentWindow!);
-  message(window.location.origin, window);
-  message(window.location.origin, frame.contentWindow!, 'wrong-id');
-  expect(post).not.toHaveBeenCalled();
   message(window.location.origin, frame.contentWindow!);
-  expect(post).toHaveBeenCalledWith(expect.objectContaining({type: 'metronome-replay:init', replayId, replay}), window.location.origin);
-  message(window.location.origin, frame.contentWindow!, replayId, 'metronome-replay:escape');
+  message('null', window);
+  message('null', frame.contentWindow!, 'wrong-id');
+  expect(post).not.toHaveBeenCalled();
+  message('null', frame.contentWindow!);
+  expect(post).toHaveBeenCalledWith(expect.objectContaining({type: 'metronome-replay:init', replayId, replay,
+    assetBaseUrl: 'http://127.0.0.1:4174/c0f6bfc-2026-10-05/'}), '*');
+  message('null', frame.contentWindow!, replayId, 'metronome-replay:escape');
   await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
 });

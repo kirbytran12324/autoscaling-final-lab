@@ -12,6 +12,10 @@ Use Node 24.20.0. Install simulator and frontend dependencies with
 `npm ci --ignore-scripts` in their respective directories. From the repository
 root, start each service in its own terminal:
 
+```powershell
+node scripts/serve-replay-assets.mjs
+```
+
 ```sh
 node simulator/src/server.js
 ```
@@ -28,7 +32,10 @@ npm --prefix explorer-web run dev
 Open `http://localhost:5173/runs/sample-32-002`. Frontend development proxies
 `/api` to port 3001; the API delegates replay generation to port 3000. The archive
 root must contain a `runs` directory. For a different archive, use an absolute
-`TOURNAMENT_STATE_ROOT`. All canonical artifacts remain read-only.
+`TOURNAMENT_STATE_ROOT`. The read-only asset server exposes the ignored pinned
+snapshot from `.local-assets/showdown/c0f6bfc-2026-10-05` at
+`http://127.0.0.1:4174/c0f6bfc-2026-10-05/`; it does not copy those files into
+the frontend build or cluster. All canonical artifacts remain read-only.
 
 ## Regenerate, verify, display
 
@@ -38,6 +45,7 @@ sequenceDiagram
   participant API as Explorer API
   participant Simulator
   participant Player as Local Showdown frame
+  participant Assets as Pinned asset host
   Browser->>API: GET /api/runs/:runId/matches/:matchId/replay
   API->>API: Load validated canonical match and metadata
   alt Verified log is cached
@@ -49,6 +57,7 @@ sequenceDiagram
     API-->>Browser: Verified replay or explicit failure
   end
   Browser->>Player: Structured message with verified log
+  Player->>Assets: Fetch sprites, effects, and audio as needed
   Player->>Player: Render and control battle playback
 ```
 
@@ -87,22 +96,38 @@ it automatically without network downloads. The data adapter converts the old
 simulator's text placeholders to the pinned client's syntax without modifying
 battle inputs or logs.
 
-JavaScript, supporting data, and styles are served locally. Graphics and audio
-are fetched from the HTTPS asset base, initially `https://play.pokemonshowdown.com/`.
-Set `VITE_SHOWDOWN_ASSET_BASE_URL` when building to change that base; it must be an
-HTTPS directory URL without credentials, query, or fragment. Preserve the host's
-`sprites/`, `fx/`, and `audio/` paths when migrating assets later.
+JavaScript, supporting data, and styles are packaged with the frontend. Graphics,
+sprites, effects, and audio are fetched from the pinned snapshot only when the
+browser needs them. The dashboard also uses that snapshot's Gen 5 sprites beside
+Pokémon names. `/runtime-config.js` supplies the snapshot directory URL. Local
+configuration permits HTTP only on loopback; non-loopback asset hosts must use
+HTTPS. URLs with credentials, a query, or a fragment are rejected. Preserve the
+snapshot's `sprites/`, `fx/`, and `audio/` paths.
 
-For the production image, pass
-`--build-arg VITE_SHOWDOWN_ASSET_BASE_URL=https://your-host.example/assets/`
-to `docker build -f explorer-web/Dockerfile explorer-web`. This is a build-time
-frontend setting; changing it requires rebuilding the web image.
+The runtime file is deliberately outside the hashed application bundle. The same
+tested web image can therefore be promoted unchanged: the local ConfigMap points
+at `http://127.0.0.1:4174/c0f6bfc-2026-10-05/`, while the prepared Azure ConfigMap
+points at the versioned Azure Blob directory. Do not add the snapshot or its URL
+as a Docker build argument.
 
-The frame accepts structured messages only from its same-origin parent with the
-matching replay identity. It cannot submit forms, navigate the parent, or load
+The frame accepts structured messages only from its application-origin parent with
+the matching replay identity. Its sandbox gives it an opaque origin and prevents
+access to the parent's DOM and storage. The parent checks the frame window, opaque
+origin, and replay identity before accepting messages; messages sent to that frame
+use `*` because opaque origins cannot be named as a target origin. It cannot submit forms, navigate the parent, or load
 remote executable scripts. Only `/showdown/player.html` permits same-origin
-framing; the rest of the production frontend retains `X-Frame-Options: DENY`.
+framing through CSP `frame-ancestors 'self'`; the rest of the production frontend
+retains `X-Frame-Options: DENY`. The player uses an HTTP CSP sandbox (also supplied
+by the development server), so scripts cannot remove it by changing the iframe's
+attributes. Only the packaged viewer styles permit CORS for the opaque frame's
+stylesheet fetches. The player response omits the redundant `X-Frame-Options` header.
 Missing player assets show an error or warning with a readable verified log.
+
+If local sprites and replay graphics fail with connection-refused errors, check
+`http://127.0.0.1:4174/health/ready` and start `node scripts/serve-replay-assets.mjs`.
+The port-forward serves the application; the workstation asset server must also
+be running while the browser is open. Asset URLs must use HTTP or HTTPS, never
+`file:///` or a Windows filesystem path.
 
 Upstream distinguishes the MIT battle engine from the full AGPLv3 client, and
 styles/artwork have separate terms. Original source, headers, full license texts,
@@ -118,9 +143,10 @@ cache expiry/eviction/invalidation, coalescing, concurrency, timeout, and limits
 
 The maintained browser smoke check exercises a real sample through Nginx: all controls,
 commentary, frame Escape, focus restoration, narrow screens, production framing
-headers, missing asset 404s, and remote requests limited to images/audio. It uses
-`sample-32-002`, with a simulator and explorer API serving that completed run.
-With those services running and Nginx serving the built web app on port 8080:
+headers, missing asset 404s, and a strict prohibition on requests to any
+cross-origin host except the configured pinned asset host. It uses `sample-32-002`,
+with a simulator and explorer API serving that completed run. With those services,
+the asset server, and Nginx serving the built web app on port 8080:
 
 ```sh
 cd explorer-web
@@ -128,11 +154,26 @@ npx playwright install chromium
 npm run check:replays
 ```
 
-Use `REPLAY_CHECK_URL` for a different production origin, or
+Use `REPLAY_CHECK_URL` for a different production origin,
+`REPLAY_ASSET_URL` for a different pinned asset directory, or
 `REPLAY_CHECK_BROWSER=msedge` / `chrome` for an installed browser channel.
-Screenshots are written to the ignored `.validation` directory. This check
-requires HTTPS access to the configured graphics/audio host.
+Screenshots are written to the ignored `.validation` directory.
 
 For Kubernetes, the API uses `SIMULATOR_BASE_URL=http://metronome-simulator`.
-The Azure reference overlay supplies this environment value and keeps archive
-mounts read-only. No Azure resources are provisioned by this feature.
+The API and simulator remain internal ClusterIP services. Start the workstation
+asset server, apply the explorer resources, and port-forward only the web Service:
+
+```powershell
+node scripts/serve-replay-assets.mjs
+
+# In another terminal:
+kubectl apply -k k8s/explorer
+kubectl -n autoscaling-lab rollout status deployment/metronome-explorer-web --timeout=300s
+kubectl -n autoscaling-lab port-forward service/metronome-explorer-web 8080:80
+```
+
+The browser gets the application and `/api/*` through that one port-forward, then
+gets replay assets directly from loopback. The host server is not part of the
+cluster. The Azure reference overlay keeps archive mounts read-only and receives
+the Blob snapshot URL through `scripts/prepare-azure.py`; no web image rebuild is
+needed. No Azure resources are provisioned by this feature.

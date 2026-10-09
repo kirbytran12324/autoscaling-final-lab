@@ -8,7 +8,6 @@ COPY src ./src
 COPY scripts ./scripts
 COPY vendor ./vendor
 COPY public ./public
-ARG VITE_SHOWDOWN_ASSET_BASE_URL=https://play.pokemonshowdown.com/
 RUN npm run build
 
 FROM nginx:1.27.4-alpine AS runtime

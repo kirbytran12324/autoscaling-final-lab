@@ -62,6 +62,13 @@ spec:
           volumeMounts:
             - name: runtime-temp
               mountPath: /tmp
+            - name: runtime-config
+              mountPath: /usr/share/nginx/html/runtime-config.js
+              subPath: runtime-config.js
+              readOnly: true
       volumes:
         - name: runtime-temp
           emptyDir: {}
+        - name: runtime-config
+          configMap:
+            name: metronome-explorer-web-runtime
