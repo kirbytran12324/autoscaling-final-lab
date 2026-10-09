@@ -61,6 +61,8 @@ export function EmptyRow({columns, children}: {columns: number; children: ReactN
 }
 
 export function DetailPair({label, value, copy = false}: {label: string; value?: ReactNode; copy?: boolean}) {
-  const text = value === undefined || value === null || value === '' ? 'Not reported' : String(value);
-  return <><dt>{label}</dt><dd><span title={text}>{text}</span>{copy && <CopyButton value={text === 'Not reported' ? undefined : text} label={label} />}</dd></>;
+  const missing = value === undefined || value === null || value === '';
+  const text = !missing && (typeof value === 'string' || typeof value === 'number') ? String(value) : undefined;
+  return <><dt>{label}</dt><dd><span title={text}>{missing ? 'Not reported' : value}</span>
+    {copy && <CopyButton value={text} label={label} />}</dd></>;
 }

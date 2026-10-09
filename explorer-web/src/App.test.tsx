@@ -93,6 +93,7 @@ test('restores the complete offline report section structure and evidence', asyn
     expect(screen.getByRole('heading', {name: heading})).toBeInTheDocument();
   }
   expect(await screen.findByRole('tab', {name: 'Group A'})).toHaveAttribute('aria-selected', 'true');
+  expect(document.querySelector('img[src$="/sprites/gen5/blastoise.png"]')).toBeInTheDocument();
   for (const column of ['Rank', 'Species', 'Mini pts', 'SB', 'Tie key']) expect(screen.getByRole('columnheader', {name: column})).toBeInTheDocument();
   expect(screen.getByText('Garchomp')).toBeInTheDocument();
   expect(screen.getByText('Configuration and timing')).toBeInTheDocument();
@@ -130,6 +131,8 @@ test('supports keyboard tabs and keyboard row selection, including canonical tie
   const disclosure = screen.getByText(/Search and browse 146 accepted simulations/);
   fireEvent.click(disclosure);
   const tieRow = await screen.findByRole('row', {name: 'Open details for group-B-000007'});
+  expect(tieRow.querySelector('img[src$="/sprites/gen5/mew.png"]')).toBeInTheDocument();
+  expect(tieRow.querySelector('img[src$="/sprites/gen5/ditto.png"]')).toBeInTheDocument();
   tieRow.focus(); fireEvent.keyDown(tieRow, {key: 'Enter'});
   const detail = screen.getByRole('complementary');
   expect(within(detail).getByText('tie')).toBeInTheDocument();

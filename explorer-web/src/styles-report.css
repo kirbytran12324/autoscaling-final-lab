@@ -354,6 +354,38 @@ tr.advancing:nth-child(even),tr.advancing:nth-child(even) td:first-child {
   color:var(--danger)
 }
 
+.pokemon-name {
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  min-width:0;
+  vertical-align:middle
+}
+.pokemon-name img {
+  width:40px;
+  height:40px;
+  flex:0 0 40px;
+  object-fit:contain;
+  image-rendering:pixelated
+}
+.pokemon-name-compact {
+  gap:5px
+}
+.pokemon-name-compact img {
+  width:28px;
+  height:28px;
+  flex-basis:28px
+}
+.pokemon-matchup {
+  display:inline-flex;
+  align-items:center;
+  gap:8px
+}
+.pokemon-matchup>span:not(.pokemon-name) {
+  color:var(--muted);
+  font-size:.78rem
+}
+
 
 .dashboard-shell {
   min-height:100vh

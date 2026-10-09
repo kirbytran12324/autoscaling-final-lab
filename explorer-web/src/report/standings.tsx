@@ -4,6 +4,7 @@ import {listStandings} from '../api';
 import {formatNumber} from '../formatters';
 import {ReportSection, Pager, EmptyRow} from './shared';
 import {PAGE_SIZES} from './constants';
+import {PokemonName} from '../PokemonName';
 
 export function Standings({runId}: {runId: string}) {
   const [group, setGroup] = useState('');
@@ -43,7 +44,7 @@ export function Standings({runId}: {runId: string}) {
         <div className="section-heading"><h3>Group {page.selectedGroup}</h3><p>{formatNumber(selectedSummary?.completedMatches || 0)} / {formatNumber(selectedSummary?.expectedMatches || 0)} matches · top {formatNumber(page.advancingCount)} advance</p></div>
         <div className="table-wrap large-table-wrap"><table className="data-table primary-sticky"><thead><tr><th>Rank</th><th>Species</th><th>P</th><th>W</th><th>D</th><th>L</th><th>Pts</th><th>Mini pts</th><th>SB</th><th>Tie key</th></tr></thead><tbody>
           {page.items.length === 0 && <EmptyRow columns={10}>No standings match this search.</EmptyRow>}
-          {page.items.map(item => <tr key={item.speciesId} className={`${item.rank <= page.advancingCount ? 'advancing' : ''} ${item.rank === page.advancingCount ? 'cutoff-row' : ''}`.trim()}><td>{item.rank}</td><td>{item.species}</td><td>{item.played}</td><td>{item.wins}</td><td>{item.draws}</td><td>{item.losses}</td><td>{item.points}</td><td>{item.miniTablePoints}</td><td>{item.sonnebornBerger}</td><td><code className="truncate" title={item.tieKey}>{item.tieKey}</code></td></tr>)}
+          {page.items.map(item => <tr key={item.speciesId} className={`${item.rank <= page.advancingCount ? 'advancing' : ''} ${item.rank === page.advancingCount ? 'cutoff-row' : ''}`.trim()}><td>{item.rank}</td><td><PokemonName name={item.species} speciesId={item.speciesId} /></td><td>{item.played}</td><td>{item.wins}</td><td>{item.draws}</td><td>{item.losses}</td><td>{item.points}</td><td>{item.miniTablePoints}</td><td>{item.sonnebornBerger}</td><td><code className="truncate" title={item.tieKey}>{item.tieKey}</code></td></tr>)}
         </tbody></table></div>
       </article>
     </>}
