@@ -13,3 +13,5 @@ explorer-web/public/showdown/vendor/
 
 **/vite.config.js
 **/vite.config.d.ts
+**/.local-assets/
+**/.local-app/
