@@ -17,6 +17,7 @@ and Node 24 are prerequisites. Use WSL/Bash for the existing evidence scripts.
 | Local Metrics Server TLS workaround | AKS-managed metrics service | No addon installation in Azure overlays |
 | Local node capacity is fixed | VM pool capacity, optionally cluster autoscaler | Configure AKS separately |
 | Workstation access by port-forward | Keep port-forward initially; optional Gateway API later | `azure/gateway` |
+| Loopback replay asset server | Versioned, read-only Azure Blob snapshot URL in runtime ConfigMap | `azure/app/explorer.yaml` |
 | Argo CD owns local dev/prod environments | Manual Azure promotion first; choose one owner later | Existing local GitOps files remain separate |
 
 `k8s/azure/app` deploys simulator + HPA + explorer API/web + archive PVC.
@@ -107,7 +108,8 @@ Use a fresh output directory for each preparation; it refuses overwrites.
 
 ```powershell
 $labReleaseDirectory = ".validation/azure-$labRevision"
-python scripts/prepare-azure.py --registry $labLoginServer --image-tag $labRevision --output $labReleaseDirectory
+$labReplayAssetBaseUrl = 'https://<storage-account>.blob.core.windows.net/replay-assets/c0f6bfc-2026-10-05/'
+python scripts/prepare-azure.py --registry $labLoginServer --image-tag $labRevision --asset-base-url $labReplayAssetBaseUrl --output $labReleaseDirectory
 $labAzureDirectory = "$labReleaseDirectory/k8s/azure"
 kubectl kustomize "$labAzureDirectory/app"
 kubectl apply --dry-run=server -k "$labAzureDirectory/app"
@@ -131,6 +133,12 @@ The API runs with a 2Gi memory ceiling because full-run validation loads large
 canonical artifacts. Measure cold and warm requests before lowering it. One
 replica is the initial baseline; the RWX archive permits readers on different
 nodes when you later scale it. The runner remains a singleton.
+
+The Blob snapshot and its public-read/CORS policy must already be prepared and
+validated before deployment; this helper does not create or upload it. Preserve
+the versioned `sprites/`, `fx/`, and `audio/` paths, MIME types, immutable cache
+headers, and byte-range behavior. The asset URL is runtime configuration, so the
+tested web image digest is unchanged between local and Azure environments.
 
 ## Import a committed sample export
 

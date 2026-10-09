@@ -81,6 +81,17 @@ spec:
     - port: 3001
       targetPort: http
 ---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: metronome-explorer-web-runtime
+data:
+  runtime-config.js: |
+    'use strict';
+    window.METRONOME_CONFIG = Object.freeze({
+      showdownAssetBaseUrl: "REPLACE_WITH_REPLAY_ASSET_BASE_URL",
+    });
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -140,10 +151,17 @@ spec:
           volumeMounts:
             - name: nginx-temp
               mountPath: /tmp
+            - name: runtime-config
+              mountPath: /usr/share/nginx/html/runtime-config.js
+              subPath: runtime-config.js
+              readOnly: true
       volumes:
         - name: nginx-temp
           emptyDir:
             sizeLimit: 128Mi
+        - name: runtime-config
+          configMap:
+            name: metronome-explorer-web-runtime
 ---
 apiVersion: v1
 kind: Service
