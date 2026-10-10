@@ -198,8 +198,9 @@ No extra replay page or publicly exposed simulator is needed for this exercise.
 
 Later, study Azure Blob Storage by hosting graphics/audio under the same
 `sprites/`, `fx/`, and `audio/` directory structure. Check artwork credits and
-redistribution terms before uploading the assets. Set
-`VITE_SHOWDOWN_ASSET_BASE_URL` for the web build and inspect the browser requests.
+redistribution terms before uploading the assets. Supply the versioned HTTPS
+directory to `scripts/prepare-azure.py --asset-base-url`; it writes the small
+runtime ConfigMap without rebuilding the tested web image. Inspect the browser requests.
 Explore cache headers and a CDN only after direct Blob delivery works.
 
 **Checkpoint:** verify a replay still matches its recorded hash, explain which
