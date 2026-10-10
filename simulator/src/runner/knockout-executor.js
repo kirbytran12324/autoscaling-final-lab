@@ -2,6 +2,7 @@
 
 const {createAcceptanceQueue} = require('./acceptance');
 const {createDiagnostics} = require('./diagnostics');
+const {emitRunnerEvent} = require('./events');
 
 const {join} = require('node:path');
 const {appendJsonLine, atomicWriteJson, validateCheckpoint, validateRunMetadata} = require('../runner-state');
@@ -221,6 +222,10 @@ async function executeKnockoutPlan(plan, options = {}) {
       throw new KnockoutStorageFailure('checkpoint write', error);
     }
 
+    emitRunnerEvent(options, {type: 'battle-accepted', stage: 'knockout',
+      round: activeRound.round, acceptedResultCount, matchId: request.matchId,
+      pokemon1: response.pokemon1, pokemon2: response.pokemon2,
+      outcome: response.outcome, winnerSpecies: response.winnerSpecies, turns: response.turns});
     return nextEvaluation;
   }
 
@@ -237,7 +242,7 @@ async function executeKnockoutPlan(plan, options = {}) {
     acceptanceQueue.enqueue(request, response, seriesState);
 
   async function executeSeries(seriesState) {
-    while (!stopAssigning &&
+    while (!stopAssigning && !options.shouldStop?.() &&
         seriesState.evaluation.status !== 'complete') {
       const request = seriesState.nextRequest;
 
@@ -280,7 +285,7 @@ async function executeKnockoutPlan(plan, options = {}) {
   }
 
   async function worker() {
-    while (!stopAssigning) {
+    while (!stopAssigning && !options.shouldStop?.()) {
       const seriesIndex = nextSeriesIndex;
 
       if (seriesIndex >= pendingSeriesStates.length) {
@@ -338,6 +343,9 @@ async function executeKnockoutPlan(plan, options = {}) {
       {cause: requestFailure.cause}
     );
   }
+
+  if (options.shouldStop?.()) return {interrupted: true, stage: 'knockout',
+    round: activeRound.round, acceptedResultCount};
 
   const completedEvaluations = validation.activeRoundState.seriesStates
     .map(state => state.evaluation);

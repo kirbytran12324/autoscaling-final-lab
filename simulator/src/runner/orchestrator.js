@@ -9,6 +9,7 @@ const {reconstructGroupStage} = require('./group-recovery');
 const {buildKnockoutPlanFromReconstruction} = require('./knockout-recovery');
 const {executeGroupStagePlan} = require('./group-executor');
 const {executeKnockoutPlan} = require('./knockout-executor');
+const {emitRunnerEvent} = require('./events');
 
 async function planTournamentRun(options) {
   requireObject(options, 'Tournament runner options');
@@ -106,7 +107,10 @@ async function runTournament(options) {
   }
 
   while (true) {
+    if (options.shouldStop?.()) return {interrupted: true, status: 'interrupted'};
     const plan = await planTournamentRun(options);
+    emitRunnerEvent(options, {type: 'stage', stage: plan.stage || plan.status,
+      ...(plan.acceptedResultCount === undefined ? {} : {acceptedResultCount: plan.acceptedResultCount})});
 
     if (plan.terminal === true) {
       if (plan.status !== 'completed' && plan.status !== 'failed') {
@@ -135,12 +139,14 @@ async function runTournament(options) {
     if (plan.stage === 'groups') {
       const progress = await executeGroupStagePlan(plan, options);
       await onProgress(progress);
+      if (progress.interrupted) return {...progress, status: 'interrupted'};
       continue;
     }
 
     if (plan.stage === 'knockout') {
       const progress = await executeKnockoutPlan(plan, options);
       await onProgress(progress);
+      if (progress.interrupted) return {...progress, status: 'interrupted'};
       continue;
     }
 
