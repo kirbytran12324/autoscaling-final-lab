@@ -10,7 +10,8 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "test": "vitest run",
-    "check:replays": "node scripts/check-replays.mjs"
+    "check:replays": "node scripts/check-replays.mjs",
+    "check:controls": "node scripts/check-controls.mjs"
   },
   "dependencies": {
     "react": "19.2.0",
