@@ -9,9 +9,11 @@ on:
       - 'explorer-web/**'
       - 'load-test/**'
       - 'k8s/**'
+      - '!k8s/gitops/**'
       - 'scripts/validate-manifests.py'
       - 'scripts/requirements-validation.txt'
       - 'scripts/check-web-image.mjs'
+      - 'scripts/*dev-promotion.py'
       - '.dockerignore'
       - '.github/workflows/**'
       - 'control-api/**'
@@ -26,3 +28,77 @@ jobs:
     uses: ./.github/workflows/ci.yaml
     with:
       publish: true
+
+  promote-dev:
+    name: Promote verified digests to development
+    needs: verify-and-publish
+    if: >-
+      vars.AUTO_PROMOTE_DEV == 'true' &&
+      github.repository == 'kirbytran12324/autoscaling-final-lab' &&
+      github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      actions: read
+    concurrency:
+      group: dev-digest-promotion
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - name: Reject an outdated release
+        id: current
+        shell: bash
+        run: |
+          git fetch --no-tags origin main:refs/remotes/origin/main
+          if [[ "$(git rev-parse origin/main)" == "$GITHUB_SHA" ]]; then
+            echo 'eligible=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'eligible=false' >> "$GITHUB_OUTPUT"
+            echo 'Promotion skipped: main advanced after this release started.' >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - uses: actions/setup-python@v6
+        if: steps.current.outputs.eligible == 'true'
+        with:
+          python-version: '3.13'
+      - uses: azure/setup-kubectl@v4
+        if: steps.current.outputs.eligible == 'true'
+        with:
+          version: 'v1.36.1'
+      - uses: actions/download-artifact@v4
+        if: steps.current.outputs.eligible == 'true'
+        with:
+          name: verified-release-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/verified-release
+      - name: Prepare and verify the promotion
+        if: steps.current.outputs.eligible == 'true'
+        env:
+          RELEASE_FILE: ${{ runner.temp }}/verified-release/release.json
+        run: |
+          python -m pip install -r scripts/requirements-validation.txt
+          python scripts/prepare-dev-promotion.py "$RELEASE_FILE" \
+            --expected-commit "$GITHUB_SHA" --expected-run "$GITHUB_RUN_ID" \
+            --expected-attempt "$GITHUB_RUN_ATTEMPT" --write --record
+          python scripts/validate-dev-promotion.py
+          git diff --check
+      - name: Commit and publish development desired state
+        if: steps.current.outputs.eligible == 'true'
+        shell: bash
+        run: |
+          git add -- k8s/gitops/overlays/dev/kustomization.yaml k8s/gitops/overlays/dev/release-selection.json
+          if git diff --cached --quiet; then
+            echo 'Development already selects this release.' >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m "chore(dev): promote verified release $GITHUB_SHA"
+          # A normal push rejects a concurrent main update. Never force or rebase.
+          git push origin HEAD:refs/heads/main
+          {
+            echo "Development desired state committed: $(git rev-parse HEAD)"
+            echo 'Deployment verification is pending in Argo CD: require successful sync, Healthy rollout and PostSync smoke Job.'
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,50 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: metronome-dev-smoke
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 120
+  template:
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: smoke
+          image: metronome-simulator:phase5
+          env:
+            - name: SMOKE_BASE_URL
+              value: http://metronome-simulator
+          command: [node, -e]
+          args:
+            - |
+              (async () => {
+                for (const path of ['/health/live', '/health/ready']) {
+                  const response = await fetch(`${process.env.SMOKE_BASE_URL}${path}`, {
+                    signal: AbortSignal.timeout(10000)
+                  });
+                  if (!response.ok) throw new Error(`${path}: HTTP ${response.status}`);
+                  console.log(`PASS ${path}`);
+                }
+              })().catch(error => { console.error(error.message); process.exitCode = 1; });
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi
+          securityContext:
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]

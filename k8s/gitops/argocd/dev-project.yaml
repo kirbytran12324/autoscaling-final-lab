@@ -21,3 +21,5 @@ spec:
       kind: Service
     - group: apps
       kind: Deployment
+    - group: batch
+      kind: Job
