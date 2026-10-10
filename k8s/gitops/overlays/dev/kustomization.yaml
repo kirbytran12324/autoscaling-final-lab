@@ -6,10 +6,12 @@ namespace: metronome-dev
 resources:
   - ../../common
   - namespace.yaml
+  - ../../checks
 
 images:
   - name: metronome-simulator
-    newTag: 80fd0c0
+    newName: ghcr.io/kirbytran12324/metronome-simulator
+    digest: sha256:4961280918ae27070786b90b5e9963c3a74eabd285b74cea6b036207a1091d6c
 
 patches:
   - target:

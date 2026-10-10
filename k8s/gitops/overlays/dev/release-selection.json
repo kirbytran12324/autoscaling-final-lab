@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "environment": "metronome-dev",
+  "release": {
+    "schemaVersion": 1,
+    "commit": "b8c05ba1160ec26c46e2a0f7e805c229f18acb21",
+    "workflowRun": "https://github.com/kirbytran12324/autoscaling-final-lab/actions/runs/38050394681",
+    "workflowAttempt": "1",
+    "images": {
+      "control-api": "ghcr.io/kirbytran12324/metronome-control-api@sha256:35ffa59e3b8091f1cac0f0a059540bf8d7ecf9a9ff18b3b1c1cce150633fb75b",
+      "explorer-api": "ghcr.io/kirbytran12324/metronome-explorer-api@sha256:9da60798dc97a14667b3285af4f46900509337ec3055e658bf42352279479470",
+      "explorer-web": "ghcr.io/kirbytran12324/metronome-explorer-web@sha256:0bbca573626b9ee54260fbea2bdd3790bf7a2d40ec4d7d23c1c5cef8581c2cbe",
+      "load-test": "ghcr.io/kirbytran12324/metronome-load-test@sha256:c33d8e92af53ddb55595e517d1e8a49bf212f7e5dc0b04358a3f683ea15f6317",
+      "simulator": "ghcr.io/kirbytran12324/metronome-simulator@sha256:4961280918ae27070786b90b5e9963c3a74eabd285b74cea6b036207a1091d6c"
+    }
+  },
+  "previous": {
+    "image": "metronome-simulator:80fd0c0",
+    "release": null
+  }
+}
