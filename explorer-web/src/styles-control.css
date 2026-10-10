@@ -1,0 +1,20 @@
+.control-page form,.control-page section { margin-block:24px; padding:20px; border:1px solid var(--line); border-radius:12px }
+.control-page input,.control-page select,.control-page button { min-height:42px; border:1px solid var(--line); border-radius:7px; padding:8px 12px; background:#081321; color:var(--ink); font:inherit }
+.control-page input,.control-page select { display:block; margin-top:6px }
+.control-page input[type=checkbox] { min-height:auto; margin:0 }
+.control-page button { cursor:pointer }
+.control-page button:hover { border-color:var(--accent) }
+.control-page button:disabled { opacity:.5; cursor:wait }
+.control-page button:focus-visible,.control-page input:focus-visible,.control-page select:focus-visible { outline:3px solid var(--gold); outline-offset:2px }
+.control-page p { color:var(--muted) }
+.run-form { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px }
+.run-form input,.run-form select { width:100% }
+.run-form p { grid-column:1/-1 }
+.control-actions,.control-metrics { display:flex; gap:16px; flex-wrap:wrap }
+.control-metrics strong { display:block; color:var(--accent); font-size:1.4rem }
+.control-logs { max-height:360px; overflow:auto; padding:16px; background:#081321; color:var(--ink); white-space:pre-wrap; overflow-wrap:anywhere }
+.control-runs { padding:0; list-style:none; display:grid; gap:8px }
+.battle-events { max-height:280px; overflow:auto }
+.battle-events li { margin-block:8px }
+.control-page label:has(input[type=checkbox]) { display:flex; align-items:center; gap:8px }
+@media(max-width:600px) { .run-form { grid-template-columns:1fr } }

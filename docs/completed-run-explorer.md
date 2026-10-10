@@ -2,7 +2,11 @@
 
 Status: local completed-run explorer with verified, in-page battle replays.
 
-The completed-run explorer provides a browser interface over canonical tournament artifacts. It does not start, resume, cancel, or modify tournaments, and it does not query Kubernetes. Replay requests regenerate battles through the internal simulator and verify them against completed tournament evidence before displaying the local Showdown player.
+The completed-run explorer provides a browser interface over canonical tournament artifacts. Its API does not start, resume, cancel, or modify tournaments, and it does not query Kubernetes. Replay requests regenerate battles through the internal simulator and verify them against completed tournament evidence before displaying the local Showdown player.
+
+An optional operator page at `/operate` uses a separate Kubernetes control API.
+It is disabled by default. See [tournament controls and platform handoff](tournament-controls.md)
+for enabling it, runtime configuration, permissions, recovery, and archive publication.
 
 ## Architecture and trust boundaries
 

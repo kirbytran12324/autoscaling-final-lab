@@ -27,6 +27,7 @@ export default defineConfig({
     host: '0.0.0.0',
     port: 5173,
     proxy: {
+      '/api/control': process.env.VITE_CONTROL_TARGET || 'http://127.0.0.1:3002',
       '/api': process.env.VITE_API_TARGET || 'http://127.0.0.1:3001',
     },
   },

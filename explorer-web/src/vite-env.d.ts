@@ -3,5 +3,6 @@
 interface Window {
   METRONOME_CONFIG?: {
     showdownAssetBaseUrl?: string;
+    controlEnabled?: boolean;
   };
 }

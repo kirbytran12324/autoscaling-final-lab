@@ -5,7 +5,7 @@ const {readdirSync, readFileSync} = require('node:fs');
 const {join, relative, resolve} = require('node:path');
 const root = resolve(__dirname, '..');
 const scopes = ['simulator/src', 'simulator/test', 'simulator/test-support',
-  'explorer-api/src', 'explorer-api/test', 'explorer-web/src', 'load-test', 'scripts'];
+  'explorer-api/src', 'explorer-api/test', 'control-api/src', 'control-api/test', 'explorer-web/src', 'load-test', 'scripts'];
 const sourceExtension = /\.(?:js|cjs|mjs|ts|tsx|css|py|sh)$/;
 const excluded = new Set(['node_modules', 'dist', '__pycache__', '.venv', 'vendor', 'generated']);
 const large = [], oversized = [];

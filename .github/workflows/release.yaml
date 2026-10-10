@@ -11,8 +11,10 @@ on:
       - 'k8s/**'
       - 'scripts/validate-manifests.py'
       - 'scripts/requirements-validation.txt'
+      - 'scripts/check-web-image.mjs'
       - '.dockerignore'
       - '.github/workflows/**'
+      - 'control-api/**'
   workflow_dispatch:
 
 permissions:

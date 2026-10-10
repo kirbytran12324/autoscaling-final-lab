@@ -1,0 +1,126 @@
+import {useEffect, useRef, useState} from 'react';
+import {AppHeader} from './components';
+import {ApiRequestError} from './api';
+import {controlRequest} from './control-api';
+import type {ControlRun, RunInput} from './control-api';
+import {RunProgress} from './RunProgress';
+import './styles-control.css';
+
+const labels = {pending: 'Waiting to start', running: 'Running', pausing: 'Pausing', paused: 'Paused',
+  resuming: 'Resuming', publishing: 'Tournament finished · archiving', 'publication-failed': 'Archive publication failed',
+  failed: 'Runner failed', completed: 'Archive ready'};
+
+export default function ControlPage({goHome, openArchive}: {goHome: () => void; openArchive: (id: string) => void}) {
+  const [credential, setCredential] = useState('');
+  const [token, setToken] = useState('');
+  const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [limit, setLimit] = useState(16);
+  const [input, setInput] = useState<RunInput>({runId: '', mode: 'sample', seed: '', concurrency: 2});
+  const [runs, setRuns] = useState<ControlRun[]>([]);
+  const [selected, setSelected] = useState('');
+  const [run, setRun] = useState<ControlRun | null>(null);
+  const [logs, setLogs] = useState('');
+  const [follow, setFollow] = useState(true);
+  const logElement = useRef<HTMLPreElement>(null);
+
+  useEffect(() => {
+    if (!token) return;
+    let stopped = false;
+    let timer: ReturnType<typeof setTimeout>;
+    const controller = new AbortController();
+    async function refresh() {
+      try {
+        const options = {signal: controller.signal};
+        const result = await controlRequest<{runs: ControlRun[]}>('runs', token, options);
+        if (stopped) return;
+        setRuns(result.runs);
+        if (selected) {
+          const [status, log] = await Promise.all([
+            controlRequest<{run: ControlRun}>(`runs/${selected}`, token, options),
+            controlRequest<{logs: string}>(`runs/${selected}/logs`, token, options),
+          ]);
+          if (stopped) return;
+          setRun(status.run); setLogs(log.logs);
+        }
+        setError('');
+      } catch (failure) {
+        if (stopped) return;
+        setError(failure instanceof Error ? failure.message : 'Could not refresh runs.');
+        if (failure instanceof ApiRequestError && failure.status === 401) setToken('');
+      } finally { if (!stopped) timer = setTimeout(refresh, 3000); }
+    }
+    void refresh();
+    return () => { stopped = true; clearTimeout(timer); controller.abort(); };
+  }, [token, selected]);
+  useEffect(() => { if (follow) logElement.current?.scrollTo?.({top: logElement.current.scrollHeight}); }, [logs, follow]);
+
+  async function unlock() {
+    setBusy(true); setError('');
+    try {
+      const result = await controlRequest<{maxConcurrency: number}>('options', credential);
+      setLimit(result.maxConcurrency); setToken(credential); setCredential('');
+    } catch (failure) { setError(failure instanceof Error ? failure.message : 'Could not unlock controls.'); }
+    finally { setBusy(false); }
+  }
+  async function create() {
+    setBusy(true); setError(''); setNotice('');
+    try {
+      const result = await controlRequest<{run: ControlRun}>('runs', token, {method: 'POST', body: input});
+      setRun(result.run); setSelected(result.run.runId); setLogs('');
+    } catch (failure) { setError(failure instanceof Error ? failure.message : 'Could not create tournament.'); }
+    finally { setBusy(false); }
+  }
+  async function action(name: string) {
+    if (!run) return;
+    setBusy(true); setError(''); setNotice('');
+    try {
+      const result = await controlRequest<{run: ControlRun}>(`runs/${run.runId}/${name}`, token, {method: 'POST'});
+      setRun(result.run);
+      if (name === 'release-failed') setNotice('Runner slot release requested. Saved tournament evidence is retained.');
+    } catch (failure) { setError(failure instanceof Error ? failure.message : 'Could not update tournament.'); }
+    finally { setBusy(false); }
+  }
+  return <div className="dashboard-shell"><AppHeader><button className="back-runs" onClick={goHome}>← Completed tournaments</button></AppHeader>
+    <main className="dashboard control-page" id="main-content" tabIndex={-1}><h1>Run a tournament</h1>
+      {!window.METRONOME_CONFIG?.controlEnabled ? <p>Run controls have not been enabled for this deployment.</p> : <>
+        {error && <p role="alert" className="inline-error">{error}</p>}
+        {notice && <p role="status">{notice}</p>}
+        {!token ? <form onSubmit={event => { event.preventDefault(); void unlock(); }}>
+          <p>Enter the operator token to create and manage tournaments. It is kept in memory until you lock controls or leave the page.</p>
+          <label>Operator token <input type="password" required autoComplete="off" value={credential} onChange={event => setCredential(event.target.value)} /></label>
+          <button disabled={busy}>Unlock controls</button>
+        </form> : <>
+          <button onClick={() => {setToken(''); setCredential(''); setRun(null); setSelected(''); setRuns([]); setLogs('');}}>Lock controls</button>
+          <form className="run-form" onSubmit={event => {event.preventDefault(); void create();}}>
+            <label>Run ID <input required pattern="[a-z0-9]+(-[a-z0-9]+)*" maxLength={40} value={input.runId}
+              placeholder="friday-sample-001" onChange={event => setInput({...input, runId: event.target.value})} /></label>
+            <label>Tournament type <select value={input.mode} onChange={event => setInput({...input, mode: event.target.value as RunInput['mode']})}>
+              <option value="sample">Sample · 32 Pokémon</option><option value="full">Full · 1,025 Pokémon</option></select></label>
+            <label>Seed <input required maxLength={128} value={input.seed} onChange={event => setInput({...input, seed: event.target.value})} /></label>
+            <label>Concurrent battles <input type="number" required min={1} max={limit} value={input.concurrency}
+              onChange={event => setInput({...input, concurrency: Number(event.target.value)})} /></label>
+            <p>One tournament runs at a time. Full tournaments can take substantially longer.</p>
+            <button disabled={busy}>Create tournament</button>
+          </form>
+          <section><h2>Tournament runs</h2><ul className="control-runs">{runs.map(item => <li key={item.runId}>
+            <button onClick={() => {setSelected(item.runId); setRun(null); setLogs('');}}>{item.runId} · {labels[item.phase]}</button>
+          </li>)}</ul></section>
+          {run && <section><h2>{run.runId}</h2><p role="status">{labels[run.phase]}</p>
+            {run.error && <p role="alert">{run.error}</p>}
+            <div className="control-actions">
+              {['running', 'pending', 'resuming'].includes(run.phase) && <button disabled={busy} onClick={() => void action('pause')}>Pause</button>}
+              {run.phase === 'paused' && <button disabled={busy} onClick={() => void action('resume')}>Resume</button>}
+              {run.phase === 'publication-failed' && <button disabled={busy} onClick={() => void action('retry-publication')}>Retry archive publication</button>}
+              {run.phase === 'failed' && <button disabled={busy} onClick={() => void action('release-failed')}>Release runner slot · keep saved evidence</button>}
+              {run.archiveReady && <button onClick={() => openArchive(run.runId)}>Explore completed run</button>}
+            </div>
+            <RunProgress run={run} />
+            <h3>Recent runner and publisher logs</h3><label><input type="checkbox" checked={follow} onChange={event => setFollow(event.target.checked)} /> Follow logs</label>
+            <pre ref={logElement} className="control-logs" aria-label="Recent logs">{logs || 'Waiting for logs…'}</pre>
+          </section>}
+        </>}
+      </>}
+    </main></div>;
+}

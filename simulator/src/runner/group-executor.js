@@ -2,6 +2,7 @@
 
 const {createAcceptanceQueue} = require('./acceptance');
 const {createDiagnostics} = require('./diagnostics');
+const {emitRunnerEvent} = require('./events');
 
 const {join} = require('node:path');
 const {appendJsonLine, atomicWriteJson, validateCheckpoint, validateRunMetadata} = require('../runner-state');
@@ -181,6 +182,10 @@ async function executeGroupStagePlan(plan, options = {}) {
         throw new StorageFailure('provisional standings write', error);
       }
     }
+    emitRunnerEvent(options, {type: 'battle-accepted', stage: 'groups',
+      acceptedResultCount, matchId: match.matchId, pokemon1: response.pokemon1,
+      pokemon2: response.pokemon2, outcome: response.outcome,
+      winnerSpecies: response.winnerSpecies, turns: response.turns});
   }
 
   const acceptanceQueue = createAcceptanceQueue({
@@ -195,7 +200,7 @@ async function executeGroupStagePlan(plan, options = {}) {
   const queueAcceptance = (match, response) => acceptanceQueue.enqueue(match, response);
 
   async function worker() {
-    while (!stopAssigning) {
+    while (!stopAssigning && !options.shouldStop?.()) {
       const matchIndex = nextMatchIndex;
 
       if (matchIndex >= plan.missingGroupMatches.length) {
@@ -297,6 +302,8 @@ async function executeGroupStagePlan(plan, options = {}) {
       {cause: requestFailure.cause}
     );
   }
+
+  if (options.shouldStop?.()) return {interrupted: true, stage: 'groups', acceptedResultCount};
 
   if (acceptedResultCount === expectedResultCount) {
     let transitionCheckpoint;

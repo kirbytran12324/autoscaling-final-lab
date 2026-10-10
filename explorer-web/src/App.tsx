@@ -4,6 +4,7 @@ import {AppHeader, EmptyState, ErrorState, formatDate, formatDuration, LoadingSt
 import ReportView from './ReportView';
 import type {Bracket, RunDetail, RunSummary} from './types';
 import './styles.css';
+import ControlPage from './ControlPage';
 
 function pathRunId(pathname: string) {
   const match = /^\/runs\/([^/]+)\/?$/.exec(pathname);
@@ -29,12 +30,13 @@ function useLocationPath() {
 export default function App() {
   const {path, navigate} = useLocationPath();
   const runId = pathRunId(path);
+  if (path === '/operate') return <ControlPage goHome={() => navigate('/')} openArchive={id => navigate(`/runs/${encodeURIComponent(id)}`)} />;
   return runId
     ? <TournamentPage runId={runId} goHome={() => navigate('/')} />
-    : <Dashboard openRun={id => navigate(`/runs/${encodeURIComponent(id)}`)} />;
+    : <Dashboard openRun={id => navigate(`/runs/${encodeURIComponent(id)}`)} openControls={() => navigate('/operate')} />;
 }
 
-function Dashboard({openRun}: {openRun: (id: string) => void}) {
+function Dashboard({openRun, openControls}: {openRun: (id: string) => void; openControls: () => void}) {
   const [reload, setReload] = useState(0);
   const [state, setState] = useState<
     {kind: 'loading'} | {kind: 'error'; message: string} | {kind: 'ready'; runs: RunSummary[]}
@@ -51,6 +53,7 @@ function Dashboard({openRun}: {openRun: (id: string) => void}) {
   return <div className="dashboard-shell">
     <AppHeader><span className="read-only-badge">Read only</span></AppHeader>
     <main id="main-content" className="dashboard" tabIndex={-1}>
+      {window.METRONOME_CONFIG?.controlEnabled && <button className="button" onClick={openControls}>Run a tournament</button>}
       <div className="dashboard-hero"><div><p className="eyebrow">Completed-run archive</p><h1>Deterministic battles.<br /><span>Durable results.</span></h1><p>Explore validated tournament outcomes, standings, brackets, and every accepted simulation.</p></div></div>
       <div className="list-heading"><div><p className="eyebrow">Archive</p><h2>Completed tournaments</h2></div>{state.kind === 'ready' && <span>{state.runs.length} runs</span>}</div>
       {state.kind === 'loading' && <LoadingState />}

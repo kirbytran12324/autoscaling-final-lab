@@ -5,6 +5,7 @@ const {runTournament} = require('./runner');
 const {resolveRunDirectory} = require('./runner-state');
 const {createSimulatorClient} = require('./simulator-client');
 const {selectTournamentRoster} = require('./tournament');
+const {startStatusServer} = require('./runner/status-server');
 
 const REQUIRED_ENVIRONMENT = Object.freeze([
   'TOURNAMENT_RUN_ID',
@@ -166,7 +167,17 @@ async function runCli(options = {}) {
     }
   }
 
+  const live = {stopping: false, events: []};
+  const stop = () => { live.stopping = true; };
+  const signalSource = options.signalSource === undefined ? process : options.signalSource;
+  let statusServer;
   try {
+    if (env.RUNNER_STATUS_PORT !== undefined) {
+      statusServer = await startStatusServer({configuration, state: live,
+        port: Number(env.RUNNER_STATUS_PORT), token: env.RUNNER_STATUS_TOKEN});
+    }
+    signalSource.on('SIGTERM', stop);
+    signalSource.on('SIGINT', stop);
     const clientOptions = {
       baseUrl: configuration.simulatorBaseUrl,
       expectedSimulatorVersion: configuration.identity.simulatorVersion,
@@ -182,6 +193,13 @@ async function runCli(options = {}) {
         `mode=${configuration.identity.mode}`
     );
     const summary = await runTournamentImpl({
+      shouldStop: () => live.stopping,
+      onEvent(event) {
+        const value = {...event, runId: configuration.identity.runId, at: new Date().toISOString()};
+        live.events.push(value);
+        if (live.events.length > 100) live.events.shift();
+        stdout(`Tournament event: ${JSON.stringify(value)}`);
+      },
       stateRoot: configuration.stateRoot,
       identity: configuration.identity,
       simulatorClient,
@@ -200,6 +218,10 @@ async function runCli(options = {}) {
       },
     });
 
+    if (summary.interrupted) {
+      stdout('Tournament interrupted: accepted results preserved for recovery');
+      return 130;
+    }
     if (summary.terminal === true && summary.status === 'completed' &&
         summary.tournamentComplete === true) {
       stdout(
@@ -217,6 +239,10 @@ async function runCli(options = {}) {
   } catch (error) {
     stderr(`Tournament failed: ${error.message}`);
     return 1;
+  } finally {
+    signalSource.removeListener('SIGTERM', stop);
+    signalSource.removeListener('SIGINT', stop);
+    if (statusServer) await new Promise(resolve => statusServer.close(resolve));
   }
 }
 

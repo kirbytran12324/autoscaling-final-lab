@@ -27,6 +27,30 @@ runner minutes. If cost becomes material, add path-aware conditional jobs with
 an always-running aggregate gate; include shared simulator report-code changes
 in the API dependency set.
 
+## AWS lab CI follow-up: October 10, 2026
+
+The current workflow extends the original four-image pipeline with the control
+API. It builds each of the five images once, tests the loaded image and then
+publishes that same image when requested by the release workflow. Packaged
+Node tests cover the control API, simulator/runner/publisher and explorer API.
+The web runtime check exercises Nginx and its optional control proxy; packaged
+Locust tests use fake responses with networking disabled. Frontend CI also runs
+the controls browser fixture, and operations CI validates workflow syntax with
+actionlint. Full commands, local verification and limitations are recorded in
+`docs/tournament-controls.md` under the CI follow-up.
+
+Each publishing image job records its GHCR repository digest and source commit
+in an artifact. The `release-ready` job requires every image job to succeed,
+then validates the five records and saves one `release.json`. Records must have
+the expected image names, source commit, repositories and SHA-256 digests.
+Artifact selection is scoped to the current run attempt; retry publication with
+"Re-run all jobs" so all five records come from that attempt.
+
+This extends CI and publication, not deployment. Local workflow and dummy-record
+checks passed; actual GitHub artifact transfer and GHCR digest capture remain
+unverified. Deployment promotion remains separate work. Existing Azure reference
+configuration and Argo CD application ownership are preserved.
+
 ## Remaining performance decisions
 
 The runner opens, writes, flushes, and closes each accepted JSONL result.
@@ -53,9 +77,9 @@ disconnects, file replacement, error handling, and content-length behavior.
 
 ## Deployment boundary
 
-The prepared manifests remain reference templates until registry and commit
-placeholders are resolved. `scripts/prepare-azure.py` creates reviewable copies
-without changing the local lab or contacting a cloud service. The runner,
+The prepared manifests remain reference templates until registry, commit, and
+versioned replay-asset URL placeholders are resolved. `scripts/prepare-azure.py`
+creates reviewable copies without changing the local lab or contacting a cloud service. The runner,
 load generator, import/export tools, and gateway are separate opt-in overlays.
 The initial explorer is reachable through port-forwarding. Completed exports
 are promoted into its archive; live state is never used as an API write target.

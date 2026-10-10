@@ -22,7 +22,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        package: [simulator, explorer-api, explorer-web]
+        package: [simulator, explorer-api, explorer-web, control-api]
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
@@ -33,6 +33,7 @@ jobs:
             simulator/package-lock.json
             explorer-api/package-lock.json
             explorer-web/package-lock.json
+            control-api/package-lock.json
       - name: Install simulator dependency for API validation
         if: matrix.package == 'explorer-api'
         run: npm ci --prefix simulator --omit=dev --ignore-scripts
@@ -46,6 +47,14 @@ jobs:
         if: matrix.package == 'explorer-web'
         working-directory: explorer-web
         run: npm run build
+      - name: Install browser for controls validation
+        if: matrix.package == 'explorer-web'
+        working-directory: explorer-web
+        run: npx playwright install --with-deps chromium
+      - name: Check browser controls with isolated Kubernetes fixtures
+        if: matrix.package == 'explorer-web'
+        working-directory: explorer-web
+        run: npm run check:controls
 
   load-test:
     runs-on: ubuntu-latest
@@ -97,6 +106,9 @@ jobs:
           - name: load-test
             context: load-test
             file: load-test/Dockerfile
+          - name: control-api
+            context: control-api
+            file: control-api/Dockerfile
     steps:
       - uses: actions/checkout@v6
       - uses: docker/setup-buildx-action@v3
@@ -111,18 +123,101 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build verified image
+      - name: Build image for testing
         uses: docker/build-push-action@v6
         with:
           context: ${{ matrix.context }}
           file: ${{ matrix.file }}
-          push: ${{ inputs.publish == true }}
+          load: true
+          push: false
           tags: ghcr.io/${{ steps.registry.outputs.owner }}/metronome-${{ matrix.name }}:${{ github.sha }}
           cache-from: type=gha,scope=${{ matrix.name }}
           cache-to: type=gha,mode=max,scope=${{ matrix.name }}
           labels: |
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
+      - name: Test packaged control API
+        if: matrix.name == 'control-api'
+        env:
+          IMAGE_REF: ghcr.io/${{ steps.registry.outputs.owner }}/metronome-${{ matrix.name }}:${{ github.sha }}
+        run: |
+          docker run --rm --read-only --tmpfs /tmp \
+            --mount "type=bind,source=$GITHUB_WORKSPACE/control-api/test,target=/app/test,readonly" \
+            "$IMAGE_REF" node --test
+      - name: Test packaged simulator, runner and publisher
+        if: matrix.name == 'simulator'
+        env:
+          IMAGE_REF: ghcr.io/${{ steps.registry.outputs.owner }}/metronome-${{ matrix.name }}:${{ github.sha }}
+        run: |
+          docker run --rm --read-only --tmpfs /tmp \
+            --mount "type=bind,source=$GITHUB_WORKSPACE/simulator/test,target=/app/test,readonly" \
+            --mount "type=bind,source=$GITHUB_WORKSPACE/simulator/test-support,target=/app/test-support,readonly" \
+            --mount "type=bind,source=$GITHUB_WORKSPACE/evidence,target=/evidence,readonly" \
+            "$IMAGE_REF" node --test
+      - name: Test packaged explorer API
+        if: matrix.name == 'explorer-api'
+        env:
+          IMAGE_REF: ghcr.io/${{ steps.registry.outputs.owner }}/metronome-${{ matrix.name }}:${{ github.sha }}
+        run: |
+          docker run --rm --read-only --tmpfs /tmp \
+            --mount "type=bind,source=$GITHUB_WORKSPACE/explorer-api/test,target=/app/explorer-api/test,readonly" \
+            --mount "type=bind,source=$GITHUB_WORKSPACE/evidence,target=/app/evidence,readonly" \
+            --workdir /app/explorer-api \
+            "$IMAGE_REF" node --test
+      - name: Check packaged web server and control proxy
+        if: matrix.name == 'explorer-web'
+        env:
+          IMAGE_REF: ghcr.io/${{ steps.registry.outputs.owner }}/metronome-${{ matrix.name }}:${{ github.sha }}
+        run: node scripts/check-web-image.mjs "$IMAGE_REF"
+      - name: Test packaged load generator without sending traffic
+        if: matrix.name == 'load-test'
+        env:
+          IMAGE_REF: ghcr.io/${{ steps.registry.outputs.owner }}/metronome-${{ matrix.name }}:${{ github.sha }}
+        run: |
+          docker run --rm --read-only --tmpfs /tmp --network none \
+            --env PYTHONDONTWRITEBYTECODE=1 \
+            --mount "type=bind,source=$GITHUB_WORKSPACE/load-test/test_locustfile.py,target=/home/locust/test_locustfile.py,readonly" \
+            --workdir /home/locust --entrypoint python \
+            "$IMAGE_REF" -m unittest discover -s /home/locust -p 'test_*.py'
+      - name: Publish tested image
+        if: inputs.publish == true
+        env:
+          IMAGE_REF: ghcr.io/${{ steps.registry.outputs.owner }}/metronome-${{ matrix.name }}:${{ github.sha }}
+        run: docker push "$IMAGE_REF"
+      - name: Record published image
+        if: inputs.publish == true
+        shell: bash
+        env:
+          IMAGE_NAME: ${{ matrix.name }}
+          IMAGE_REF: ghcr.io/${{ steps.registry.outputs.owner }}/metronome-${{ matrix.name }}:${{ github.sha }}
+        run: |
+          published_ref="$(
+            docker image inspect "$IMAGE_REF" --format '{{json .RepoDigests}}' |
+              jq -er --arg prefix "${IMAGE_REF%:*}@" '
+                map(select(startswith($prefix))) |
+                if length == 1 then .[0]
+                else error("Expected exactly one digest for this repository")
+                end
+              '
+          )"
+
+          [[ "$published_ref" =~ @sha256:[0-9a-f]{64}$ ]]
+
+          mkdir -p release-images
+          jq -n \
+            --arg name "$IMAGE_NAME" \
+            --arg commit "$GITHUB_SHA" \
+            --arg image "$published_ref" \
+            '{name: $name, commit: $commit, image: $image}' \
+            > "release-images/$IMAGE_NAME.json"
+      - name: Save published image record
+        if: inputs.publish == true
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-image-${{ matrix.name }}-${{ github.run_attempt }}
+          path: release-images/${{ matrix.name }}.json
+          if-no-files-found: error
+          retention-days: 30
 
   operations:
     timeout-minutes: 10
@@ -136,6 +231,62 @@ jobs:
       - name: Validate maintained files and capture policies
         run: |
           node scripts/check-file-size.js
+          docker run --rm --network none \
+            --mount "type=bind,source=$GITHUB_WORKSPACE,target=/repo,readonly" \
+            --workdir /repo rhysd/actionlint:1.7.12
           for script in scripts/*.sh scripts/lib/*.sh; do bash -n "$script"; done
           shellcheck -x -P SCRIPTDIR scripts/*.sh
           python3 -m unittest discover -s scripts/test -p 'test_*.py'
+
+  release-ready:
+    name: Assemble verified release
+    needs: images
+    if: inputs.publish == true
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Download image records from this attempt
+        uses: actions/download-artifact@v4
+        with:
+          pattern: release-image-*-${{ github.run_attempt }}
+          path: release-images
+          merge-multiple: true
+
+      - name: Validate and assemble release record
+        shell: bash
+        run: |
+          jq -es \
+            --arg commit "$GITHUB_SHA" \
+            --arg owner "${GITHUB_REPOSITORY_OWNER,,}" \
+            --arg run "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            --arg attempt "$GITHUB_RUN_ATTEMPT" '
+              ["control-api", "explorer-api", "explorer-web",
+               "load-test", "simulator"] as $expected |
+
+              if (map(.name) | sort) == $expected
+                and all(.[];
+                  .commit == $commit and
+                  (. as $record | .image |
+                    test("^ghcr.io/" + $owner + "/metronome-" +
+                         $record.name + "@sha256:[0-9a-f]{64}$"))
+                )
+              then {
+                schemaVersion: 1,
+                commit: $commit,
+                workflowRun: $run,
+                workflowAttempt: $attempt,
+                images: (map({key: .name, value: .image}) | from_entries)
+              }
+              else error("Missing, duplicate, or mismatched image records")
+              end
+            ' release-images/*.json > release.json
+
+      - name: Save complete release record
+        uses: actions/upload-artifact@v4
+        with:
+          name: verified-release-${{ github.run_attempt }}
+          path: release.json
+          if-no-files-found: error
+          retention-days: 30
