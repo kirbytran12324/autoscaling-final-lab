@@ -47,6 +47,21 @@ discovery, or teardown. Future tests must preserve this offline contract. Local
 provider-process communication may require execution outside an application
 sandbox; that is distinct from requesting cloud access.
 
+When selecting or updating a provider, generate content checksums for both the
+Linux CI runner and Windows development before committing the lock file:
+
+```powershell
+terraform -chdir=infra/aws/lab providers lock -platform=linux_amd64 -platform=windows_amd64
+```
+
+This command downloads packages from their origin registry and updates dependency
+metadata without configuring AWS. Review the selected version and signed package
+checksums, then commit `.terraform.lock.hcl`. Preserve both platforms' `h1:`
+content hashes: CI's read-only initialization cannot save a newly computed hash
+for later validation of the unpacked provider. A verified archive download alone
+does not establish that subsequent cached-package validation will pass. Keep
+`-lockfile=readonly` in CI rather than allowing jobs to silently repair the lock.
+
 ## Pinned manifest schema checks
 
 ```powershell
