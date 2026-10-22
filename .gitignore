@@ -15,3 +15,10 @@ explorer-web/public/showdown/vendor/
 **/vite.config.d.ts
 **/.local-assets/
 **/.local-app/
+
+# Terraform local providers, state, and saved plans (keep the dependency lock file).
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+/infra/aws/lab/lab.auto.tfvars
