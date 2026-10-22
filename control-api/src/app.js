@@ -45,14 +45,15 @@ function createApp({manager, token, auth = {mode: 'bearer', token}, verifier, ma
       if (request.method === 'GET' && parts.length === 3) return send(200, {runs: await manager.list()});
       if (request.method === 'POST' && parts.length === 3) {
         if (!request.headers['content-type']?.startsWith('application/json')) throw new ControlError(415, 'JSON_REQUIRED', 'Use application/json.');
-        let body = '', size = 0;
+        const chunks = [];
+        let size = 0;
         for await (const chunk of request) {
           size += chunk.length;
           if (size > 4096) throw new ControlError(413, 'BODY_TOO_LARGE', 'Run request is too large.');
-          body += chunk;
+          chunks.push(chunk);
         }
         let value;
-        try { value = JSON.parse(body); } catch { throw new ControlError(400, 'INVALID_JSON', 'Request body is not valid JSON.'); }
+        try { value = JSON.parse(Buffer.concat(chunks).toString('utf8')); } catch { throw new ControlError(400, 'INVALID_JSON', 'Request body is not valid JSON.'); }
         return send(202, {run: await manager.create(value)});
       }
       const id = parts[3];

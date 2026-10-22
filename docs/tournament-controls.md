@@ -70,6 +70,15 @@ ConfigMap `mt-run-<id>` keeps the run record and desired pause state. These have
 no owner reference to the API Pod. A restart resumes reconciliation. Keep these
 records and the slot; deleting them manually bypasses admission/history.
 
+Kubernetes lists use bounded pages and opaque continuation tokens internally;
+the public managed-history response remains unchanged. Each transport response
+is capped at 4 MiB. Oversized pages restart the listing with smaller page sizes
+down to one item, discarding partial snapshots. UTF-8 request bodies, persisted
+identities and logs are decoded across complete byte sequences. No registry
+records or completed archives are deleted by pagination; aggregate history
+memory still grows with retained records, so a future retention policy must
+remain separate from immutable archive retention.
+
 Runner Job `mt-runner-<id>-1` starts suspended, then reconciliation applies its
 desired state. Generated Pods run non-root, drop capabilities, use a read-only
 root filesystem, and disable ServiceAccount automounting. Seed, versions, image,
