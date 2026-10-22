@@ -7,7 +7,10 @@ The required-rule eviction/Pending/recovery sequence was observed on
 2026-10-13. Preferred placement, topology spread, and actual rejection of a
 second eviction remain untested. Interview explanation is pending.
 
-See [the experiment record](../../evidence/experiments/resilience-required-20261013-073311/README.md).
+Experiment captures remain local under
+`evidence/experiments/resilience-required-20261013-073311/`; they are intentionally
+excluded from this change. The observations above describe that local exercise,
+not a cloud deployment or a newly repeated validation.
 
 This overlay reuses the stateless simulator Deployment and Service, existing
 probes, and existing resource requests/limits. It pins the simulator digest
