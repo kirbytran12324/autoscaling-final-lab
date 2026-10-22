@@ -1,8 +1,11 @@
-"""Render every Kustomization and verify the Azure workload boundaries offline."""
+"""Render Kustomizations, verify workload boundaries and optionally validate schemas."""
+import argparse
 from pathlib import Path
 import subprocess
 
 import yaml
+
+from schema_validation import validate_schemas
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -69,14 +72,21 @@ def validate_azure(directory, objects):
 
 
 def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--schema", action="store_true", help="Require the pinned strict validator and core schemas")
+    args = parser.parse_args()
     count = 0
+    all_objects = []
     for source in sorted((ROOT / "k8s").rglob("kustomization.yaml")):
         directory = source.parent
         objects = render(directory)
         if directory.is_relative_to(ROOT / "k8s" / "azure"):
             validate_azure(directory, objects)
+        all_objects.extend(objects)
         count += 1
         print(f"OK {directory.relative_to(ROOT)} ({len(objects)} resources)")
+    if args.schema:
+        validate_schemas(all_objects)
     print(f"Validated {count} Kustomizations; cluster API validation is still required before deployment.")
 
 

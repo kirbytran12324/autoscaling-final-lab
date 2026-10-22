@@ -133,7 +133,7 @@ class PromotionTests(unittest.TestCase):
     def test_smoke_requires_both_http_endpoints(self):
         job = yaml.safe_load((PROMOTION.ROOT / "k8s/gitops/checks/dev-smoke.yaml").read_text(encoding="utf-8"))
         script = job["spec"]["template"]["spec"]["containers"][0]["args"][0]
-        for failing_path in (None, "/health/live", "/health/ready"):
+        for failing_path in (None, "/health/live", "/health/ready", "/v1/battles", "golden"):
             requested = []
 
             class Handler(BaseHTTPRequestHandler):
@@ -141,6 +141,17 @@ class PromotionTests(unittest.TestCase):
                     requested.append(self.path)
                     self.send_response(503 if self.path == failing_path else 200)
                     self.end_headers()
+
+                def do_POST(self):
+                    requested.append(self.path)
+                    body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+                    response = {**body, "outcome": "win", "winnerSide": "p1", "winnerSpecies": "Snorlax",
+                                "turns": 6 if failing_path == "golden" else 5, "termination": "natural",
+                                "simulatorVersion": "pokemon-showdown@0.11.11",
+                                "protocolHash": "51889bae250badd20a432969b994b9aa9bf12818e4fe90afc60394c4d618f3e9"}
+                    self.send_response(503 if self.path == failing_path else 200)
+                    self.end_headers()
+                    self.wfile.write(json.dumps(response).encode())
 
                 def log_message(self, *args):
                     pass
@@ -153,7 +164,7 @@ class PromotionTests(unittest.TestCase):
                     result = subprocess.run(["node", "-e", script], env=env, capture_output=True, text=True, timeout=15)
                     self.assertEqual(result.returncode, 1 if failing_path else 0)
                     if not failing_path:
-                        self.assertEqual(requested, ["/health/live", "/health/ready"])
+                        self.assertEqual(requested, ["/health/live", "/health/ready", "/v1/battles"])
                 finally:
                     server.shutdown()
                     thread.join()

@@ -35,6 +35,29 @@ spec:
                   if (!response.ok) throw new Error(`${path}: HTTP ${response.status}`);
                   console.log(`PASS ${path}`);
                 }
+                // Pinned pokemon-showdown@0.11.11 golden vector from battle.test.js.
+                const input = {
+                  matchId: 'deployment-smoke', pokemon1: 'Snorlax', pokemon2: 'Clefable',
+                  seed: [12345, 23456, 34567, 45678], maxTurns: 100
+                };
+                const response = await fetch(`${process.env.SMOKE_BASE_URL}/v1/battles`, {
+                  method: 'POST', headers: {'content-type': 'application/json'},
+                  body: JSON.stringify(input), signal: AbortSignal.timeout(30000)
+                });
+                if (!response.ok) throw new Error(`battle: HTTP ${response.status}`);
+                const result = await response.json();
+                const expected = {
+                  matchId: input.matchId, pokemon1: input.pokemon1, pokemon2: input.pokemon2,
+                  seed: input.seed, outcome: 'win', winnerSide: 'p1', winnerSpecies: 'Snorlax',
+                  turns: 5, termination: 'natural', simulatorVersion: 'pokemon-showdown@0.11.11',
+                  protocolHash: '51889bae250badd20a432969b994b9aa9bf12818e4fe90afc60394c4d618f3e9'
+                };
+                for (const [key, value] of Object.entries(expected)) {
+                  if (JSON.stringify(result[key]) !== JSON.stringify(value)) {
+                    throw new Error(`battle golden mismatch: ${key}`);
+                  }
+                }
+                console.log('PASS deterministic battle golden');
               })().catch(error => { console.error(error.message); process.exitCode = 1; });
           resources:
             requests:
