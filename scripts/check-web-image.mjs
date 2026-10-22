@@ -7,6 +7,10 @@ import {fileURLToPath} from 'node:url';
 import {promisify} from 'node:util';
 import {setTimeout as delay} from 'node:timers/promises';
 import path from 'node:path';
+import {createRequire} from 'node:module';
+
+const require = createRequire(import.meta.url);
+const {auth: albAuth, signed, kid, keys} = require('../control-api/test/alb-fixture.js');
 
 const execute = promisify(execFile);
 const image = process.argv[2];
@@ -59,10 +63,23 @@ const fixture = `
   const {createApp} = require('/fixture/control-api/src/app');
   const {RunManager} = require('/fixture/control-api/src/manager');
   const {FakeKube, config} = require('/fixture/control-api/test/helpers');
+  const {createAlbVerifier} = require('/fixture/control-api/src/auth');
+  const {AlbJwksCache} = require('node:module').createRequire('/fixture/control-api/package.json')('aws-jwt-verify/alb-cache');
   const manager = new RunManager(new FakeKube(), config,
     {fetchImpl: async () => { throw new Error('Isolated fixture'); }});
-  createServer(createApp({manager, token: 'proxy-fixture-token-0000000000000000',
-    maxConcurrency: 16})).listen(3002, '0.0.0.0');
+  const bearer = createApp({manager, token: 'proxy-fixture-token-0000000000000000', maxConcurrency: 16});
+  const auth = ${JSON.stringify(albAuth)};
+  const cache = new AlbJwksCache();
+  cache.addJwks(auth.jwksUri, ${JSON.stringify({keys: [{...keys.publicKey.export({format: 'jwk'}), kid, alg: 'ES256', use: 'sig'}]})});
+  const managed = createApp({manager, auth, verifier: createAlbVerifier(auth, {jwksCache: cache}), maxConcurrency: 16});
+  createServer((request, response) => {
+    if (request.headers['x-fixture-mode'] !== 'alb') return bearer(request, response);
+    response.setHeader('X-Fixture-Proto', request.headers['x-forwarded-proto'] || 'missing');
+    response.setHeader('X-Fixture-Host', request.headers['x-forwarded-host'] || 'missing');
+    response.setHeader('X-Fixture-Uri', request.headers['x-original-uri'] || 'missing');
+    response.setHeader('X-Fixture-Unsigned', request.headers['x-amzn-oidc-identity'] || request.headers['x-amzn-oidc-accesstoken'] ? 'present' : 'removed');
+    return managed(request, response);
+  }).listen(3002, '0.0.0.0');
 `;
 
 try {
@@ -122,9 +139,34 @@ try {
     JSON.stringify({runId: 'proxy-check', mode: 'sample', seed: 'proxy-fixture', concurrency: 1}));
   assert.equal(created.status, 202, created.body);
   assert.equal(JSON.parse(created.body).run.runId, 'proxy-check');
+  const managedHeaders = ['X-Fixture-Mode: alb', `X-Amzn-Oidc-Data: ${signed()}`,
+    'X-Amzn-Oidc-Identity: forged-unsigned', 'X-Amzn-Oidc-Accesstoken: unused',
+    'X-Forwarded-Proto: https', 'Host: lab.example'];
+  const session = await request(controlWeb, '/api/control/session', managedHeaders);
+  assert.equal(session.status, 200, session.body);
+  assert.equal(JSON.parse(session.body).mode, 'alb');
+  assert.match(session.headers, /x-fixture-proto:\s*https/i);
+  assert.match(session.headers, /x-fixture-host:\s*lab.example/i);
+  assert.match(session.headers, /x-fixture-uri:\s*\/api\/control\/session/i);
+  assert.match(session.headers, /x-fixture-unsigned:\s*removed/i);
+  assert.equal((await request(controlWeb, '/api/control', ['X-Fixture-Mode: alb'])).status, 401);
+  assert.equal((await request(controlWeb, '/api/control/runs', managedHeaders, '{}')).status, 403);
+  const accepted = await request(controlWeb, '/api/control/runs', [...managedHeaders,
+    'Origin: https://lab.example', 'X-Control-CSRF: 1', 'Content-Type: application/json'],
+    JSON.stringify({runId: 'proxy-check', mode: 'sample', seed: 'proxy-fixture', concurrency: 1}));
+  assert.equal(accepted.status, 202, accepted.body);
+  const forbidden = await request(controlWeb, '/api/control/session', ['X-Fixture-Mode: alb',
+    `X-Amzn-Oidc-Data: ${signed({}, {sub: 'unapproved'})}`]);
+  assert.equal(forbidden.status, 403);
+  const logout = await request(controlWeb, '/auth/logout', ['X-Fixture-Mode: alb',
+    'Origin: https://lab.example', 'X-Control-CSRF: 1'], '');
+  assert.equal(logout.status, 200, logout.body);
+  assert.match(logout.headers, /set-cookie:.*AWSELBAuthSessionCookie-3=;.*Max-Age=0/i);
+  assert.equal(JSON.parse(logout.body).logoutUrl, albAuth.logoutUrl);
   console.log(JSON.stringify({verified: true, nginx: true, readOnly: true,
     frontendAssets: assets.length, playerAssets: playerAssets.length,
     controlProxy: true, missingAuth: 401, foreignOrigin: 403, sameOriginWithPort: 202,
+    signedAlbIdentity: true, originalHttps: true, csrf: true, managedLogout: true,
     kubernetes: 'simulated'}));
 } catch (error) {
   for (const name of containers) {

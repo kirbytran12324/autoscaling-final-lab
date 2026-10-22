@@ -11,7 +11,7 @@ function startServer(config = readConfig()) {
   const reconcile = () => manager.reconcile().catch(error => console.error('Run reconciliation failed', {code: error.code || 'CONTROL_UNAVAILABLE'}));
   const timer = setInterval(reconcile, 3000);
   timer.unref();
-  const server = createServer(createApp({manager, token: config.operatorToken,
+  const server = createServer(createApp({manager, auth: config.auth,
     maxConcurrency: config.maxConcurrency,
     readiness: async () => { try { await kube.get('configmaps', SLOT); return true; } catch { return false; } }}));
   server.requestTimeout = 15000;

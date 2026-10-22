@@ -4,5 +4,6 @@ interface Window {
   METRONOME_CONFIG?: {
     showdownAssetBaseUrl?: string;
     controlEnabled?: boolean;
+    controlAuthMode?: 'bearer' | 'alb';
   };
 }

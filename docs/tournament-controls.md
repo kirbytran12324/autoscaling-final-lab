@@ -4,6 +4,10 @@ The application supports authenticated creation, progress/log monitoring,
 pause/resume, and validated archive publication. The existing explorer API stays
 GET-only and archive-only. Application deployment does not start a tournament.
 
+For AWS managed login, required configuration, the proxy trust boundary, logout,
+and the later Terraform handoff, see [Operator authentication](control-authentication.md).
+The bearer instructions below describe the separately selected local mode.
+
 ## Components and boundaries
 
 - `control-api/`: Node 24 service, port 3002. Calls Kubernetes with its projected
@@ -16,20 +20,25 @@ GET-only and archive-only. Application deployment does not start a tournament.
   token. Reads the runner's own state and returns up to 100 recent events.
   Standings follow existing persistence cadence: 10 sample results / 1,000 full
   results. Brackets update at round boundaries; these are provisional snapshots.
-- Browser `/operate`: controls enabled by runtime configuration. Operator token
-  stays in memory; reloading, leaving the page, or locking requires unlocking
-  again. Status and bounded recent logs refresh every three seconds.
+- Browser `/operate` and `/operate/runs/:id`: controls enabled by runtime
+  configuration. Entering from the public archive uses full browser navigation.
+  In bearer mode the operator token stays in memory; reloading, leaving the page,
+  or locking requires unlocking again. ALB mode uses the managed browser session.
+  Status and bounded recent logs refresh every three seconds.
 
 ## API contract
 
-All `/api/control/*` requests require `Authorization: Bearer <operator-token>`.
+In `CONTROL_AUTH_MODE=bearer`, all `/api/control/*` requests require
+`Authorization: Bearer <operator-token>`.
 Tokens never belong in runtime configuration, JavaScript, URLs, or browser
-storage. Cross-origin requests are rejected; there is no cookie authentication.
+storage. Cross-origin requests are rejected. `CONTROL_AUTH_MODE=alb` instead
+uses verified ALB identity and explicit CSRF protection, with no bearer fallback.
 POST requests are limited to 20/minute/connection address, and JSON bodies to
 4 KiB. Health endpoints expose only live/ready status without authentication.
 
 | Endpoint | Purpose |
 | --- | --- |
+| `GET /api/control/session` | Minimal authorized identity, mode and maximum concurrency |
 | `GET /api/control/options` | Configured maximum concurrency |
 | `GET /api/control/runs` | Managed history |
 | `POST /api/control/runs` | Reserve and create tournament |
@@ -103,8 +112,9 @@ additional recovery after exhaustion remains an operator procedure.
 Write and review these resources in order; none are provisioned by these app changes:
 
 1. Dedicated ServiceAccount, namespace-scoped Role and RoleBinding.
-2. Secret with distinct `operator-token` and `runner-status-token`, each at least
-   32 characters. Provision values outside Git and audit evidence.
+2. Secret with `runner-status-token` (at least 32 characters). Local bearer mode
+   also requires a distinct `operator-token` of at least 32 characters. AWS ALB
+   mode does not use an operator token. Provision values outside Git and evidence.
 3. Active RWOP and archive RWX claims with independent lifecycles. Azure Disk
    and Azure Files respectively; keep completed explorer mounts read-only.
 4. Control Deployment (one replica initially) and ClusterIP Service named
@@ -140,8 +150,9 @@ objects but do not authorize them.
 
 | Control Deployment variable | Value/source |
 | --- | --- |
+| `CONTROL_AUTH_MODE` | Required: `bearer` locally, `alb` behind AWS ALB |
 | `CONTROL_NAMESPACE` | Application namespace |
-| `CONTROL_OPERATOR_TOKEN` | Secret `operator-token` |
+| `CONTROL_OPERATOR_TOKEN` | Secret `operator-token`; required only in bearer mode |
 | `RUNNER_STATUS_TOKEN` | Secret `runner-status-token` |
 | `RUNNER_STATUS_SECRET` | Name of that Secret |
 | `RUNNER_IMAGE` | Tested runner/simulator image; use digest for releases |

@@ -51,9 +51,18 @@ jobs:
         if: matrix.package == 'explorer-web'
         working-directory: explorer-web
         run: npx playwright install --with-deps chromium
+      - name: Install control verifier for signed browser fixtures
+        if: matrix.package == 'explorer-web'
+        run: npm ci --prefix control-api --ignore-scripts
       - name: Check browser controls with isolated Kubernetes fixtures
         if: matrix.package == 'explorer-web'
         working-directory: explorer-web
+        run: npm run check:controls
+      - name: Check managed controls with signed ALB fixtures
+        if: matrix.package == 'explorer-web'
+        working-directory: explorer-web
+        env:
+          CONTROL_CHECK_AUTH_MODE: alb
         run: npm run check:controls
 
   load-test:
@@ -172,7 +181,9 @@ jobs:
         if: matrix.name == 'explorer-web'
         env:
           IMAGE_REF: ghcr.io/${{ steps.registry.outputs.owner }}/metronome-${{ matrix.name }}:${{ github.sha }}
-        run: node scripts/check-web-image.mjs "$IMAGE_REF"
+        run: |
+          npm ci --prefix control-api --ignore-scripts
+          node scripts/check-web-image.mjs "$IMAGE_REF"
       - name: Test packaged load generator without sending traffic
         if: matrix.name == 'load-test'
         env:

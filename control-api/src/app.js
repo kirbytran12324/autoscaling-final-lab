@@ -1,9 +1,9 @@
 'use strict';
-const {timingSafeEqual} = require('node:crypto');
 const {ControlError} = require('./errors');
+const {createAuthenticator, checkBrowserRequest, logout} = require('./auth');
 
-function createApp({manager, token, maxConcurrency, readiness = async () => true, logger = console}) {
-  const expected = Buffer.from(`Bearer ${token}`);
+function createApp({manager, token, auth = {mode: 'bearer', token}, verifier, maxConcurrency, readiness = async () => true, logger = console}) {
+  const authenticate = createAuthenticator(auth, verifier);
   const windows = new Map();
   return async (request, response) => {
     const send = (status, value) => {
@@ -17,14 +17,12 @@ function createApp({manager, token, maxConcurrency, readiness = async () => true
         const ready = url.pathname.endsWith('/live') || await readiness();
         return send(ready ? 200 : 503, {status: ready ? 'ok' : 'not-ready'});
       }
-      const actual = Buffer.from(request.headers.authorization || '');
-      if (actual.length !== expected.length || !timingSafeEqual(actual, expected)) {
-        throw new ControlError(401, 'UNAUTHORIZED', 'Enter a valid operator token.');
+      if (auth.mode === 'alb' && url.pathname === '/auth/logout' && request.method === 'POST') {
+        checkBrowserRequest(request, auth);
+        return send(200, logout(response, auth));
       }
-      if (request.headers.origin) {
-        const origin = new URL(request.headers.origin);
-        if (origin.host !== request.headers.host) throw new ControlError(403, 'INVALID_ORIGIN', 'Cross-origin control requests are rejected.');
-      }
+      const identity = await authenticate(request);
+      checkBrowserRequest(request, auth);
       if (request.method === 'POST') {
         const key = request.socket.remoteAddress;
         const now = Date.now();
@@ -35,6 +33,13 @@ function createApp({manager, token, maxConcurrency, readiness = async () => true
       }
       const parts = url.pathname.split('/').filter(Boolean);
       if (parts[0] !== 'api' || parts[1] !== 'control') throw new ControlError(404, 'NOT_FOUND', 'Endpoint was not found.');
+      // Reject noncanonical variants after authentication; never normalize a
+      // path into a control operation that listener rules might not protect.
+      if (url.pathname !== request.url.split('?')[0] || !/^\/api\/control\/[a-z0-9/-]+$/.test(url.pathname) ||
+          url.pathname.includes('//') || url.pathname.endsWith('/')) {
+        throw new ControlError(404, 'NOT_FOUND', 'Endpoint was not found.');
+      }
+      if (request.method === 'GET' && parts.length === 3 && parts[2] === 'session') return send(200, {...identity, maxConcurrency});
       if (request.method === 'GET' && parts.length === 3 && parts[2] === 'options') return send(200, {maxConcurrency});
       if (parts[2] !== 'runs') throw new ControlError(404, 'NOT_FOUND', 'Endpoint was not found.');
       if (request.method === 'GET' && parts.length === 3) return send(200, {runs: await manager.list()});

@@ -1,4 +1,5 @@
 'use strict';
+const {readAuthConfig} = require('./auth');
 const {ControlError} = require('./errors');
 const NAME = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/;
 
@@ -35,7 +36,7 @@ function readConfig(env = process.env) {
     stateClaim: name('RUNNER_STATE_CLAIM'), archiveClaim: name('ARCHIVE_CLAIM'),
     secretName: name('RUNNER_STATUS_SECRET'), simulatorUrl: required('SIMULATOR_BASE_URL'),
     rulesVersion: required('RULES_VERSION'), simulatorVersion: required('SIMULATOR_VERSION'),
-    operatorToken: required('CONTROL_OPERATOR_TOKEN'), statusToken: required('RUNNER_STATUS_TOKEN'),
+    auth: readAuthConfig(env), statusToken: required('RUNNER_STATUS_TOKEN'),
     statusUrl: required('RUNNER_STATUS_URL'), statusPort: integer('RUNNER_STATUS_PORT', 3003),
     maxConcurrency: integer('CONTROL_MAX_CONCURRENCY', 16, 64), port: integer('PORT', 3002),
     host: env.HOST || '0.0.0.0'};
@@ -45,7 +46,7 @@ function readConfig(env = process.env) {
       throw new Error('Service URLs must be HTTP(S) without credentials or query parameters');
     }
   }
-  if (config.operatorToken.length < 32 || config.statusToken.length < 32 || config.operatorToken === config.statusToken) {
+  if (config.statusToken.length < 32 || config.auth.token === config.statusToken) {
     throw new Error('Use two distinct tokens, each at least 32 characters long');
   }
   if (!/^[a-zA-Z0-9./:_@-]+$/.test(config.image)) throw new Error('RUNNER_IMAGE is invalid');
