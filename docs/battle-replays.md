@@ -123,6 +123,13 @@ attributes. Only the packaged viewer styles permit CORS for the opaque frame's
 stylesheet fetches. The player response omits the redundant `X-Frame-Options` header.
 Missing player assets show an error or warning with a readable verified log.
 
+Missing or invalid `showdownAssetBaseUrl` also shows an actionable warning
+without interrupting archive browsing or operator controls. Pokemon names remain
+readable without sprites. A verified replay log can still be opened, but no
+player iframe is created until the configured pinned asset URL is valid. The
+strict asset resolver does not fall back to public Showdown servers. Correct
+the runtime configuration and reload the page to restore graphics and playback.
+
 If local sprites and replay graphics fail with connection-refused errors, check
 `http://127.0.0.1:4174/health/ready` and start `node scripts/serve-replay-assets.mjs`.
 The port-forward serves the application; the workstation asset server must also

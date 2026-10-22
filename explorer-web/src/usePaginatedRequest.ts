@@ -6,26 +6,30 @@ export function usePaginatedRequest<T>(key: string,
   load: (signal: AbortSignal) => Promise<T>, onSuccess?: (page: T) => void) {
   const loader = useRef(load);
   const success = useRef(onSuccess);
+  const [attempt, setAttempt] = useState(0);
   loader.current = load;
   success.current = onSuccess;
-  const [state, setState] = useState<{key: string; page: T | null; loading: boolean; error: string}>(
-    {key: '', page: null, loading: true, error: ''});
+  const [state, setState] = useState<{key: string; attempt: number; page: T | null; loading: boolean; error: string}>(
+    {key: '', attempt: 0, page: null, loading: true, error: ''});
   useEffect(() => {
     const controller = new AbortController();
     const invoke = loader.current;
+    const onLoaded = success.current;
     setState(current => ({...current, loading: true, error: ''}));
     Promise.resolve().then(() => invoke(controller.signal)).then(page => {
       if (controller.signal.aborted) return;
-      setState({key, page, loading: false, error: ''});
-      success.current?.(page);
+      setState({key, attempt, page, loading: false, error: ''});
+      onLoaded?.(page);
     }, error => {
       if (controller.signal.aborted) return;
-      setState({key, page: null, loading: false,
+      setState({key, attempt, page: null, loading: false,
         error: error instanceof Error ? error.message : 'Request failed.'});
     });
     return () => controller.abort();
-  }, [key]);
-  return {page: state.page, pending: state.loading || state.key !== key, error: state.key === key ? state.error : ''};
+  }, [key, attempt]);
+  const current = state.key === key && state.attempt === attempt;
+  return {page: state.page, pending: state.loading || !current,
+    error: current ? state.error : '', retry: () => setAttempt(value => value + 1)};
 }
 
 export function usePagination() {

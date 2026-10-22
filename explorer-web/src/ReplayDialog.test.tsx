@@ -88,3 +88,20 @@ test('message bridge checks origin, sender and replay identity, and supports fra
   message('null', frame.contentWindow!, replayId, 'metronome-replay:escape');
   await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
 });
+
+test.each([undefined, 'https://assets.example/snapshot/?redirect=bad'])('graphics configuration %s keeps the player closed and the verified log available', async value => {
+  const config = window.METRONOME_CONFIG;
+  window.METRONOME_CONFIG = {...config, showdownAssetBaseUrl: value};
+  vi.spyOn(api, 'loadReplay').mockResolvedValue(replay);
+  try {
+    const opener = open();
+    expect(await screen.findByText('Verified against the saved result')).toBeInTheDocument();
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(screen.queryByTitle(/Battle replay:/)).not.toBeInTheDocument();
+    expect(screen.getByText(/Configure/)).toHaveTextContent('showdownAssetBaseUrl');
+    expect(screen.getByRole('dialog').querySelector('.replay-log-fallback .mono')).toHaveTextContent(replay.protocolHash);
+    expect(document.querySelector('pre')).toHaveTextContent('|turn|4');
+    fireEvent.click(screen.getByRole('button', {name: 'Close replay'}));
+    expect(opener).toHaveFocus();
+  } finally {window.METRONOME_CONFIG = config;}
+});

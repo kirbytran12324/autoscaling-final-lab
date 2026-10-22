@@ -4,6 +4,7 @@ import {ApiRequestError} from './api';
 import {controlRequest, managedLogout, safeOperatorPath} from './control-api';
 import type {ControlRun, ControlSession, RunInput} from './control-api';
 import {RunProgress} from './RunProgress';
+import {ShowdownAssetsWarning} from './ShowdownAssetsWarning';
 import './styles-control.css';
 
 const labels = {pending: 'Waiting to start', running: 'Running', pausing: 'Pausing', paused: 'Paused',
@@ -37,7 +38,16 @@ export default function ControlPage({goHome, openArchive}: {goHome: () => void; 
   const [logs, setLogs] = useState('');
   const [follow, setFollow] = useState(true);
   const logElement = useRef<HTMLPreElement>(null);
+  // Selection changes and mutations invalidate every older read or action result.
+  const requestVersion = useRef(0);
+  const mounted = useRef(false);
   const authorized = managed ? session === 'operator' : Boolean(token);
+
+  useEffect(() => {
+    mounted.current = true;
+    return () => {mounted.current = false; requestVersion.current++;};
+  }, []);
+  const isCurrent = (version: number) => mounted.current && requestVersion.current === version;
 
   function failureState(failure: unknown) {
     setError(failure instanceof Error ? failure.message : 'Control service is unavailable.');
@@ -67,6 +77,7 @@ export default function ControlPage({goHome, openArchive}: {goHome: () => void; 
     try { sessionStorage.setItem('operator-draft', JSON.stringify(input)); } catch { /* optional */ }
   }
   function selectRun(id: string) {
+    requestVersion.current++;
     setSelected(id);
     window.history.replaceState({}, '', safeOperatorPath(`/operate/runs/${id}`));
   }
@@ -81,33 +92,34 @@ export default function ControlPage({goHome, openArchive}: {goHome: () => void; 
   }
 
   useEffect(() => {
-    if (!authorized) return;
+    if (!authorized || busy) return;
     let stopped = false;
     let timer: ReturnType<typeof setTimeout>;
     const controller = new AbortController();
     async function refresh() {
+      const version = requestVersion.current;
       try {
         const options = {signal: controller.signal};
         const result = await controlRequest<{runs: ControlRun[]}>('runs', token, options);
-        if (stopped) return;
+        if (stopped || !isCurrent(version)) return;
         setRuns(result.runs);
         if (selected) {
           const [status, log] = await Promise.all([
             controlRequest<{run: ControlRun}>(`runs/${selected}`, token, options),
             controlRequest<{logs: string}>(`runs/${selected}/logs`, token, options),
           ]);
-          if (stopped) return;
+          if (stopped || !isCurrent(version)) return;
           setRun(status.run); setLogs(log.logs);
         }
         setError('');
       } catch (failure) {
-        if (stopped) return;
+        if (stopped || !isCurrent(version)) return;
         failureState(failure);
       } finally { if (!stopped) timer = setTimeout(refresh, 3000); }
     }
     void refresh();
     return () => { stopped = true; clearTimeout(timer); controller.abort(); };
-  }, [authorized, token, selected]);
+  }, [authorized, token, selected, busy]);
   useEffect(() => { if (follow) logElement.current?.scrollTo?.({top: logElement.current.scrollHeight}); }, [logs, follow]);
 
   async function unlock() {
@@ -119,25 +131,30 @@ export default function ControlPage({goHome, openArchive}: {goHome: () => void; 
     finally { setBusy(false); }
   }
   async function create() {
+    const version = ++requestVersion.current;
     setBusy(true); setError(''); setNotice('');
     try {
       const result = await controlRequest<{run: ControlRun}>('runs', token, {method: 'POST', body: input});
+      if (!isCurrent(version)) return;
       setRun(result.run); selectRun(result.run.runId); setLogs('');
-    } catch (failure) { failureState(failure); }
-    finally { setBusy(false); }
+    } catch (failure) { if (isCurrent(version)) failureState(failure); }
+    finally { if (mounted.current) setBusy(false); }
   }
   async function action(name: string) {
     if (!run) return;
+    const version = ++requestVersion.current;
     setBusy(true); setError(''); setNotice('');
     try {
       const result = await controlRequest<{run: ControlRun}>(`runs/${run.runId}/${name}`, token, {method: 'POST'});
+      if (!isCurrent(version)) return;
       setRun(result.run);
       if (name === 'release-failed') setNotice('Runner slot release requested. Saved tournament evidence is retained.');
-    } catch (failure) { failureState(failure); }
-    finally { setBusy(false); }
+    } catch (failure) { if (isCurrent(version)) failureState(failure); }
+    finally { if (mounted.current) setBusy(false); }
   }
   return <div className="dashboard-shell"><AppHeader><button className="back-runs" onClick={goHome}>← Completed tournaments</button></AppHeader>
     <main className="dashboard control-page" id="main-content" tabIndex={-1}><h1>Run a tournament</h1>
+      <ShowdownAssetsWarning />
       {!window.METRONOME_CONFIG?.controlEnabled ? <p>Run controls have not been enabled for this deployment.</p> : <>
         {error && <p role="alert" className="inline-error">{error}</p>}
         {notice && <p role="status">{notice}</p>}
@@ -155,7 +172,7 @@ export default function ControlPage({goHome, openArchive}: {goHome: () => void; 
           <label>Operator token <input type="password" required autoComplete="off" value={credential} onChange={event => setCredential(event.target.value)} /></label>
           <button disabled={busy}>Unlock controls</button>
         </form> : authorized ? <>
-          {!managed && <button onClick={() => {setToken(''); setCredential(''); setRun(null); setSelected(''); setRuns([]); setLogs('');}}>Lock controls</button>}
+          {!managed && <button onClick={() => {requestVersion.current++; setToken(''); setCredential(''); setRun(null); setSelected(''); setRuns([]); setLogs('');}}>Lock controls</button>}
           <form className="run-form" onSubmit={event => {event.preventDefault(); void create();}}>
             <label>Run ID <input required pattern="[a-z0-9]+(-[a-z0-9]+)*" maxLength={40} value={input.runId}
               placeholder="friday-sample-001" onChange={event => setInput({...input, runId: event.target.value})} /></label>

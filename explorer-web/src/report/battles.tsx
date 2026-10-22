@@ -16,7 +16,7 @@ export function BattleExplorer({run}: {run: RunDetail}) {
   const {cursor, history, resetPage, previous, next} = usePagination();
   const [selected, setSelected] = useState<Match | null>(null);
   const requestKey = JSON.stringify([run.runId, filters, limit, sort, direction, cursor]);
-  const {page, pending, error} = usePaginatedRequest(requestKey,
+  const {page, pending, error, retry} = usePaginatedRequest(requestKey,
     signal => listMatches(run.runId, {...filters, limit, sort, direction, cursor}, signal));
   const updateFilter = (name: keyof MatchFilters, value: string) => { setFilters(current => ({...current, [name]: value})); resetPage(); };
   const reset = () => { setFilters({query: '', stage: '', result: '', hostname: ''}); setSort('matchId'); setDirection('asc'); resetPage(); };
@@ -34,7 +34,8 @@ export function BattleExplorer({run}: {run: RunDetail}) {
         <output aria-live="polite">{!pending && page ? `${formatNumber(page.total)} matching battles` : 'Loading…'}</output>
         <Pager page={history.length + 1} total={page?.total || 0} limit={limit} previous={!pending && history.length > 0} next={!pending && Boolean(page?.nextCursor)} onPrevious={previous} onNext={() => next(page?.nextCursor)} />
       </div>
-      {error && <p className="inline-error" role="alert">{error}</p>}
+      {error && <div><p className="inline-error" role="alert">{error}</p>
+        <button type="button" onClick={retry} disabled={pending}>Retry battles</button></div>}
       <div className="explorer-layout"><div className="table-wrap large-table-wrap"><table id="simulation-table" className="data-table primary-sticky selectable-table"><thead><tr>{columns.map(([key, label]) => <th key={key} aria-sort={sort === key ? (direction === 'asc' ? 'ascending' : 'descending') : 'none'}><button type="button" className="sort-button" onClick={() => sortBy(key)}>{label}<span aria-hidden="true">{sort === key ? direction === 'asc' ? ' ↑' : ' ↓' : ''}</span></button></th>)}</tr></thead><tbody>
         {page?.items.length === 0 && <EmptyRow columns={6}>No accepted battles match these filters.</EmptyRow>}
         {page?.items.map(match => { const outcome = matchOutcome(match); return <tr key={match.matchId} tabIndex={0} aria-selected={selected?.matchId === match.matchId} aria-label={`Open details for ${match.matchId}`} onClick={() => setSelected(match)} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setSelected(match); } }}><td><code className="truncate" title={match.matchId}>{match.matchId}</code></td><td>{match.stage}</td><td><span className="pokemon-matchup"><PokemonName name={match.pokemon1} compact /><span>vs</span><PokemonName name={match.pokemon2} compact /></span></td><td>{outcome.result}</td><td>{outcome.winner}</td><td>{match.turns}</td></tr>; })}
