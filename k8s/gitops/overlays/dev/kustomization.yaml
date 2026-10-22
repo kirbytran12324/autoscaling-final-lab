@@ -11,7 +11,7 @@ resources:
 images:
   - name: metronome-simulator
     newName: ghcr.io/kirbytran12324/metronome-simulator
-    digest: sha256:4961280918ae27070786b90b5e9963c3a74eabd285b74cea6b036207a1091d6c
+    digest: sha256:75618a5f113543a208c9e0ec3bf1e9a1532e984637fe450f4ba5dfad0d7a52fd
 
 patches:
   - target:
