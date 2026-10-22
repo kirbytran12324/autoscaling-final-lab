@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: metronome-simulator
+spec:
+  replicas: 3
+  # A hard one-Pod-per-host rule cannot accommodate a fourth surge Pod
+  # on three workers. Replace one Pod at a time for this learning overlay.
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
+  template:
+    metadata:
+      labels:
+        lab: worker-resilience
+    spec:
+      automountServiceAccountToken: false
+      # Learner task: add affinity here, alongside automountServiceAccountToken.
+      # Use podAntiAffinity, a required scheduling rule, and a Pod label selector.
+      # Match app=metronome-simulator within this namespace.
+      # Choose the node label that makes each hostname a separate domain.
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values:
+                        - metronome-simulator
+                topologyKey: kubernetes.io/hostname
