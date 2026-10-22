@@ -9,7 +9,7 @@ const {
   writeFile,
 } = require('node:fs/promises');
 const {tmpdir} = require('node:os');
-const {join} = require('node:path');
+const {basename, join} = require('node:path');
 const test = require('node:test');
 const {
   buildKnockoutRecoveryPlan,
@@ -226,7 +226,7 @@ test('knockout acceptance appends before checkpoints with absolute counts', asyn
       events.push({kind: 'append', path, value: structuredClone(value)});
     },
     async atomicWriteJson(path, value) {
-      events.push({kind: path.split('/').at(-1), value: structuredClone(value)});
+      events.push({kind: basename(path), value: structuredClone(value)});
     },
     now: () => INITIAL_TIME,
   });

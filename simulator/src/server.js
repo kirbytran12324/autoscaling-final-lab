@@ -7,6 +7,7 @@ const {performance} = require('node:perf_hooks');
 const {version: showdownVersion} =
   require('pokemon-showdown/package.json');
 const {simulateBattle, simulateBattleReplay} = require('./battle');
+const {createBattleAdmission, SimulatorBusyError} = require('./battle-admission');
 const {
   getBaseSpecies,
   listBaseSpecies,
@@ -31,6 +32,7 @@ class RequestError extends Error {
 }
 
 function sendJson(response, statusCode, payload) {
+  if (response.destroyed || response.writableEnded) return;
   response.writeHead(statusCode, {
     'Content-Type': 'application/json',
     'Cache-Control': 'no-store',
@@ -141,7 +143,7 @@ function validateBattleRequest(body) {
   };
 }
 
-async function handleBattle(request, response) {
+async function handleBattle(request, response, runSimulation, simulate) {
   const contentType = request.headers['content-type'] || '';
 
   if (!contentType.startsWith('application/json')) {
@@ -154,9 +156,11 @@ async function handleBattle(request, response) {
 
   const body = await readJson(request);
   const input = validateBattleRequest(body);
-  const started = performance.now();
-
-  const result = await simulateBattle(input);
+  let started;
+  const result = await runSimulation(response, () => {
+    started = performance.now();
+    return simulate(input);
+  });
 
   sendJson(response, 200, {
     matchId: input.matchId,
@@ -182,7 +186,23 @@ async function handleBattle(request, response) {
   });
 }
 
-function createServer() {
+function createServer({
+  maxConcurrentBattles = Number(process.env.SIMULATOR_MAX_CONCURRENT_BATTLES ?? 2),
+  maxQueuedBattles = Number(process.env.SIMULATOR_MAX_QUEUED_BATTLES ?? 8),
+  simulateBattleImpl = simulateBattle,
+  simulateReplayImpl = simulateBattleReplay,
+} = {}) {
+  const admission = createBattleAdmission({maxConcurrent: maxConcurrentBattles,
+    maxQueued: maxQueuedBattles});
+  async function runSimulation(response, invoke) {
+    const controller = new AbortController();
+    const disconnect = () => {
+      if (!response.writableEnded) controller.abort();
+    };
+    response.once('close', disconnect);
+    try { return await admission.run(invoke, {signal: controller.signal}); }
+    finally { response.removeListener('close', disconnect); }
+  }
   return http.createServer(async (request, response) => {
     try {
       if (request.method === 'POST' && request.url === '/v1/battles/replay') {
@@ -195,7 +215,7 @@ function createServer() {
             body.simulatorVersion !== `pokemon-showdown@${showdownVersion}` || input.maxTurns !== 100) {
           throw new RequestError(422, 'REPLAY_UNSUPPORTED', 'This rule or simulator version is not supported for replay');
         }
-        const {result, log} = await simulateBattleReplay(input);
+        const {result, log} = await runSimulation(response, () => simulateReplayImpl(input));
         sendJson(response, 200, {result: {
           ...result, matchId: input.matchId, pokemon1: input.pokemon1, pokemon2: input.pokemon2,
           simulatorVersion: `pokemon-showdown@${showdownVersion}`,
@@ -216,7 +236,7 @@ function createServer() {
       ) {
         const ready =
           catalogStatus.speciesCount === 1025 &&
-          catalogStatus.metronomeMoveCount === 581;
+          catalogStatus.metronomeMoveCount === 581 && admission.available;
 
         sendJson(response, ready ? 200 : 503, {
           status: ready ? 'ready' : 'not-ready',
@@ -229,7 +249,7 @@ function createServer() {
         request.method === 'POST' &&
         request.url === '/v1/battles'
       ) {
-        await handleBattle(request, response);
+        await handleBattle(request, response, runSimulation, simulateBattleImpl);
         return;
       }
 
@@ -240,6 +260,12 @@ function createServer() {
         },
       });
     } catch (error) {
+      if (response.destroyed) return;
+      if (error instanceof SimulatorBusyError) {
+        response.setHeader('Retry-After', '1');
+        sendJson(response, 503, {error: {code: error.code, message: error.message}});
+        return;
+      }
       if (error instanceof RequestError) {
         sendJson(response, error.statusCode, {
           error: {

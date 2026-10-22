@@ -210,3 +210,66 @@ test('failed filter updates clear obsolete pagination in both views', async () =
   }
   await waitFor(() => expect(screen.getAllByText('Filtering unavailable.')).toHaveLength(2));
 });
+
+test('standings and battles can retry an unchanged failed query after a transient outage', async () => {
+  window.history.replaceState({}, '', '/runs/sample-32-002');
+  const requests = installFixtureApi();
+  const original = vi.mocked(fetch).getMockImplementation()!;
+  const failed = new Set<string>();
+  const attempted = new Map<string, string[]>();
+  vi.mocked(fetch).mockImplementation((input, init) => {
+    const url = String(input);
+    const kind = url.includes('/standings?') ? 'standings' : url.includes('/matches?') ? 'battles' : '';
+    if (kind) {
+      attempted.set(kind, [...attempted.get(kind) || [], url]);
+      if (!failed.has(kind)) {
+        failed.add(kind);
+        return Promise.resolve(new Response(JSON.stringify({error: {message: 'Temporary outage.'}}), {status: 503}));
+      }
+    }
+    return original(input, init);
+  });
+  render(<App />);
+  fireEvent.click(await screen.findByText(/Search and browse 146 accepted simulations/));
+  for (const kind of ['standings', 'battles']) {
+    fireEvent.click(await screen.findByRole('button', {name: `Retry ${kind}`}));
+    await waitFor(() => expect(screen.queryByRole('button', {name: `Retry ${kind}`})).not.toBeInTheDocument());
+    expect(attempted.get(kind)).toHaveLength(2);
+    expect(attempted.get(kind)![0]).toBe(attempted.get(kind)![1]);
+  }
+  expect(await screen.findByRole('tab', {name: 'Group A'})).toBeInTheDocument();
+  expect(screen.getByRole('row', {name: `Open details for ${win.matchId}`})).toBeInTheDocument();
+  expect(requests.filter(url => url.includes('/standings?'))).toHaveLength(1);
+});
+
+test.each([undefined, 'javascript:alert(1)'])('invalid graphics configuration %s preserves the report and names', async value => {
+  const config = window.METRONOME_CONFIG;
+  window.METRONOME_CONFIG = {...config, showdownAssetBaseUrl: value};
+  window.history.replaceState({}, '', '/runs/sample-32-002');
+  installFixtureApi();
+  try {
+    render(<App />);
+    expect(await screen.findByRole('heading', {name: 'sample-32-002'})).toBeInTheDocument();
+    expect(await screen.findByText('Blastoise')).toBeInTheDocument();
+    expect(screen.getByText(/Configure/)).toHaveTextContent('showdownAssetBaseUrl');
+    expect(document.querySelector('img')).not.toBeInTheDocument();
+  } finally {window.METRONOME_CONFIG = config;}
+});
+
+test('standings keep keyboard focus on the selected group while its request is pending', async () => {
+  window.history.replaceState({}, '', '/runs/sample-32-002');
+  installFixtureApi();
+  const original = vi.mocked(fetch).getMockImplementation()!;
+  let complete!: (response: Response) => void;
+  vi.mocked(fetch).mockImplementation((input, init) => String(input).includes('/standings?group=B')
+    ? new Promise(resolve => {complete = resolve;}) : original(input, init));
+  render(<App />);
+  const first = await screen.findByRole('tab', {name: 'Group A'});
+  first.focus(); fireEvent.keyDown(first, {key: 'ArrowRight'});
+  await waitFor(() => expect(complete).toBeTypeOf('function'));
+  expect(screen.getByRole('tab', {name: 'Group B'})).toHaveFocus();
+  const response = await original('/api/runs/sample-32-002/standings?group=B', {});
+  await act(async () => complete(response));
+  expect(screen.getByRole('tab', {name: 'Group B'})).toHaveFocus();
+  expect(screen.getByRole('tab', {name: 'Group B'})).toHaveAttribute('aria-selected', 'true');
+});

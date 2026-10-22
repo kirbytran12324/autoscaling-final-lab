@@ -19,6 +19,13 @@ export function showdownAssetBaseUrl(value = window.METRONOME_CONFIG?.showdownAs
   return url.href;
 }
 
+// Asset configuration must not prevent reading saved evidence or controlling a run.
+// The strict resolver above remains the only way to accept an asset destination.
+export function showdownAssetConfiguration() {
+  try { return {baseUrl: showdownAssetBaseUrl()}; }
+  catch { return {baseUrl: null}; }
+}
+
 export function toShowdownId(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, '');
 }

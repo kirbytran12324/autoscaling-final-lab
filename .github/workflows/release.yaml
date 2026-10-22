@@ -11,6 +11,8 @@ on:
       - 'k8s/**'
       - '!k8s/gitops/**'
       - 'scripts/validate-manifests.py'
+      - 'scripts/schema_validation.py'
+      - 'scripts/install-kubeconform.py'
       - 'scripts/requirements-validation.txt'
       - 'scripts/check-web-image.mjs'
       - 'scripts/*dev-promotion.py'
@@ -37,7 +39,7 @@ jobs:
       github.repository == 'kirbytran12324/autoscaling-final-lab' &&
       github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 5
     permissions:
       contents: write
       actions: read
@@ -101,4 +103,5 @@ jobs:
           {
             echo "Development desired state committed: $(git rev-parse HEAD)"
             echo 'Deployment verification is pending in Argo CD: require successful sync, Healthy rollout and PostSync smoke Job.'
+            echo 'Run the separate Verify Development Deployment workflow with this promotion commit after configuring its read-only runner/context.'
           } >> "$GITHUB_STEP_SUMMARY"

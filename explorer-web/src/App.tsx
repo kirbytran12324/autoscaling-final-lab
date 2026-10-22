@@ -15,11 +15,18 @@ function pathRunId(pathname: string) {
 function useLocationPath() {
   const [path, setPath] = useState(window.location.pathname);
   useEffect(() => {
-    const update = () => setPath(window.location.pathname);
+    const update = () => {
+      // Back/forward entry into operator pages must cross the ALB too.
+      if (window.location.pathname === '/operate' || window.location.pathname.startsWith('/operate/')) {
+        window.location.reload(); return;
+      }
+      setPath(window.location.pathname);
+    };
     window.addEventListener('popstate', update);
     return () => window.removeEventListener('popstate', update);
   }, []);
   const navigate = (next: string) => {
+    if (next === '/operate' || next.startsWith('/operate/')) {window.location.assign(next); return;}
     window.history.pushState({}, '', next);
     setPath(next);
     window.scrollTo({top: 0});
@@ -30,13 +37,13 @@ function useLocationPath() {
 export default function App() {
   const {path, navigate} = useLocationPath();
   const runId = pathRunId(path);
-  if (path === '/operate') return <ControlPage goHome={() => navigate('/')} openArchive={id => navigate(`/runs/${encodeURIComponent(id)}`)} />;
+  if (path === '/operate' || path.startsWith('/operate/')) return <ControlPage goHome={() => navigate('/')} openArchive={id => navigate(`/runs/${encodeURIComponent(id)}`)} />;
   return runId
     ? <TournamentPage runId={runId} goHome={() => navigate('/')} />
-    : <Dashboard openRun={id => navigate(`/runs/${encodeURIComponent(id)}`)} openControls={() => navigate('/operate')} />;
+    : <Dashboard openRun={id => navigate(`/runs/${encodeURIComponent(id)}`)} />;
 }
 
-function Dashboard({openRun, openControls}: {openRun: (id: string) => void; openControls: () => void}) {
+function Dashboard({openRun}: {openRun: (id: string) => void}) {
   const [reload, setReload] = useState(0);
   const [state, setState] = useState<
     {kind: 'loading'} | {kind: 'error'; message: string} | {kind: 'ready'; runs: RunSummary[]}
@@ -53,7 +60,7 @@ function Dashboard({openRun, openControls}: {openRun: (id: string) => void; open
   return <div className="dashboard-shell">
     <AppHeader><span className="read-only-badge">Read only</span></AppHeader>
     <main id="main-content" className="dashboard" tabIndex={-1}>
-      {window.METRONOME_CONFIG?.controlEnabled && <button className="button" onClick={openControls}>Run a tournament</button>}
+      {window.METRONOME_CONFIG?.controlEnabled && <a className="button" href="/operate">Run a tournament</a>}
       <div className="dashboard-hero"><div><p className="eyebrow">Completed-run archive</p><h1>Deterministic battles.<br /><span>Durable results.</span></h1><p>Explore validated tournament outcomes, standings, brackets, and every accepted simulation.</p></div></div>
       <div className="list-heading"><div><p className="eyebrow">Archive</p><h2>Completed tournaments</h2></div>{state.kind === 'ready' && <span>{state.runs.length} runs</span>}</div>
       {state.kind === 'loading' && <LoadingState />}

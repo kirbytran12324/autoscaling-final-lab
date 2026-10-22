@@ -68,7 +68,10 @@ Confirms that the HTTP server process is running.
 
 ## `GET /health/ready`
 
-Confirms that the Pokémon Showdown engine data loaded successfully with the expected tournament invariants.
+Confirms that the Pokémon Showdown engine data loaded successfully with the
+expected tournament invariants and that the local admission queue has capacity.
+It returns `503` with `status: "not-ready"` while that queue is full. Liveness
+continues to report process health independently of admission capacity.
 
 ### Response — `200 OK`
 
@@ -79,3 +82,28 @@ Confirms that the Pokémon Showdown engine data loaded successfully with the exp
   "metronomeMoveCount": 581
 }
 ```
+
+## Simulator admission and overload
+
+Both battle routes share a bounded, per-replica execution budget. The defaults
+are two concurrent simulations and eight queued simulations. Configure these
+with `SIMULATOR_MAX_CONCURRENT_BATTLES` (positive integer) and
+`SIMULATOR_MAX_QUEUED_BATTLES` (non-negative integer, including zero for immediate
+rejection when busy). Invalid values stop startup. Increasing replica count
+adds independent capacity without changing seeds or tournament results.
+
+When capacity is full, valid battle requests receive `503`, `Retry-After: 1`,
+and error code `SIMULATOR_BUSY`. Retry the same match ID, participants and seed;
+overload is never a draw or an accepted result. The existing runner retries
+operational failures using its bounded retry policy. Disconnected queued
+requests are removed; already executing simulations retain their slot until
+they finish, and their abandoned responses are discarded.
+`durationMs` continues to measure execution time after admission, excluding
+queue wait; client-observed latency also includes that wait and transport time.
+
+Queued batches yield to the event loop between executions. This limits backlog
+and lets health requests run between batches, but does not isolate a single
+CPU-bound battle from the HTTP event loop. Container CPU throttling, probe
+latency, throughput and recovery still require a sustained Kubernetes load test
+before changing probe budgets or claiming new autoscaling acceptance evidence.
+The historical load-test results predate this admission policy.

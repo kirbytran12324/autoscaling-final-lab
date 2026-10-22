@@ -221,6 +221,14 @@
   color:var(--danger)
 }
 
+.asset-configuration-warning {
+  margin:16px 0;
+  padding:12px 16px;
+  border:1px solid var(--line);
+  border-radius:8px;
+  overflow-wrap:anywhere
+}
+
 @media(max-width:700px) {
   :root {
   --app-header-height:64px

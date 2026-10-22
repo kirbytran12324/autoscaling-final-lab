@@ -2,7 +2,8 @@ import {useEffect, useMemo, useRef, useState} from 'react';
 import {createPortal} from 'react-dom';
 import {ApiRequestError, loadReplay} from './api';
 import type {Match, VerifiedReplay} from './types';
-import {showdownAssetBaseUrl} from './showdown-assets';
+import {showdownAssetConfiguration} from './showdown-assets';
+import {ShowdownAssetsWarning} from './ShowdownAssetsWarning';
 
 type ReplayState = {kind: 'loading'} | {kind: 'error'; message: string; retryable: boolean} |
   {kind: 'ready'; replay: VerifiedReplay};
@@ -19,7 +20,7 @@ export default function ReplayDialog({runId, match, onClose}: {
   const [playerHeight, setPlayerHeight] = useState(520);
   const playerLoaded = useRef(false);
   const replayId = useMemo(() => crypto.randomUUID(), [runId, match.matchId, attempt]);
-  const assetBaseUrl = showdownAssetBaseUrl();
+  const {baseUrl: assetBaseUrl} = showdownAssetConfiguration();
 
   useEffect(() => {
     const opener = document.activeElement as HTMLElement | null;
@@ -50,6 +51,7 @@ export default function ReplayDialog({runId, match, onClose}: {
   }, [runId, match.matchId, attempt]);
 
   useEffect(() => {
+    if (!assetBaseUrl) return;
     const receive = (event: MessageEvent) => {
       // Sandbox messages have an opaque origin; bind them to this frame and replay.
       if (event.origin !== 'null' || event.source !== frame.current?.contentWindow ||
@@ -74,7 +76,7 @@ export default function ReplayDialog({runId, match, onClose}: {
       if (!playerLoaded.current) setPlayerError('The battle player did not finish loading. Retry or read the verified log below.');
     }, 15000) : undefined;
     return () => {window.removeEventListener('message', receive); window.clearTimeout(timeout);};
-  }, [state, replayId, onClose]);
+  }, [state, replayId, onClose, assetBaseUrl]);
 
   return createPortal(<dialog ref={dialog} className="replay-dialog" aria-labelledby="replay-title"
     onCancel={event => {event.preventDefault(); onClose();}}
@@ -92,13 +94,14 @@ export default function ReplayDialog({runId, match, onClose}: {
         <span>{match.turns} turns · {match.termination === 'turn-cap' ? 'Draw at the 100-turn cap' : 'Natural finish'}</span></div>
       {playerError && <div className="replay-state"><p className="inline-error" role="alert">{playerError}</p>
         <button type="button" onClick={() => setAttempt(value => value + 1)}>Reload player</button></div>}
-      <iframe ref={frame} key={replayId} className="replay-frame"
+      <ShowdownAssetsWarning />
+      {assetBaseUrl && <iframe ref={frame} key={replayId} className="replay-frame"
         src={`/showdown/player.html?replayId=${encodeURIComponent(replayId)}&assetBaseUrl=${encodeURIComponent(assetBaseUrl)}`}
         title={`Battle replay: ${match.pokemon1} vs ${match.pokemon2}`}
         onLoad={() => frame.current?.contentWindow?.postMessage({type: 'metronome-replay:ping', replayId}, '*')}
         sandbox="allow-scripts" referrerPolicy="no-referrer"
         style={{height: playerHeight}}
-        onError={() => setPlayerError('The battle player could not load. Read the verified log below.')} />
+        onError={() => setPlayerError('The battle player could not load. Read the verified log below.')} />}
       <details className="replay-log-fallback"><summary>Verified battle log and protocol hash</summary>
         <p className="mono">{state.replay.protocolHash}</p><pre>{state.replay.log}</pre></details>
     </>}

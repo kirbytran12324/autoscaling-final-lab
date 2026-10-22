@@ -1,0 +1,9 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: simulator-availability
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      lab: worker-resilience

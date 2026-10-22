@@ -637,28 +637,46 @@ documented in the
 
 ### CI and GitOps
 
-Repository CI tests the simulator, explorer API, frontend, and Locust, builds
-the frontend, and renders all Kustomizations on pull requests. Image builds
-run after those checks, with separate Buildx caches for each component. On
-relevant pushes to `main`, or manual release dispatch, the same reusable
-workflow verifies and publishes four immutable full-commit-SHA tags to GHCR:
-`metronome-simulator`, `metronome-explorer-api`, `metronome-explorer-web`, and
-`metronome-load-test` under `ghcr.io/<repository-owner>/`.
+Repository CI runs the simulator, explorer API, frontend and control API native
+test suites on Linux and Windows, builds the frontend, and tests Locust on
+Linux. Browser controls use Chrome already installed on the Linux runner,
+without browser/system-dependency installation. Each authentication-mode browser
+check has a one-minute limit, and every workflow job has a five-minute limit.
+Container checks run on Linux. Every Kustomization
+is rendered and its core resources checked with a checksum-pinned strict schema
+validator; controller-specific CRD exceptions are reported explicitly. Terraform
+formatting, locked-provider initialization without a backend, validation, mocked
+plans and offline lifecycle guard tests require no AWS credentials or deployment.
 
-Tests are explicit CI gates rather than repeated inside Docker builds. Run
-the appropriate test suites before building images manually.
+On relevant pushes to `main`, or manual release dispatch, the reusable workflow
+builds each image once, tests that packaged image, and pushes the same image to
+GHCR with the full source-commit tag. Five images are published:
+`metronome-simulator`, `metronome-explorer-api`, `metronome-explorer-web`,
+`metronome-control-api`, and `metronome-load-test` under
+`ghcr.io/<repository-owner>/`. The verified release artifact records all five
+immutable digests, source commit and workflow run/attempt. Run the appropriate
+test suites and packaged runtime checks before building images manually.
 
 The GitOps extension defines separate dev and prod Kustomize overlays and Argo
 CD Applications with automated synchronization, pruning, and self-healing. The
 committed [GitOps lab record](docs/gitops-lab.md) covers initial sync, live-drift
 correction, and recovery by reverting a broken Git change.
 
-CI tests and publishes immutable images, while Argo CD reconciles the Kustomize
-overlays. In the current local extension, image promotion into an overlay is a
-deliberate Git change rather than an automated CI-to-CD handoff. In particular,
-the release workflow publishes a full-SHA GHCR tag, while the current overlays
-refer to local-style tags `80fd0c0` and `phase10`; no workflow updates an overlay
-to a newly published GHCR tag.
+Setting the repository variable `AUTO_PROMOTE_DEV=true` permits the release
+workflow to commit the verified simulator digest to the development overlay.
+It refuses an outdated source revision and records the previous selection for
+recovery. The development PostSync smoke checks health and a known-seed battle
+against the pinned engine's golden result. The production-named local learning
+overlay retains its manual `phase10` image selection; it is not a shared
+production deployment or an AWS migration path.
+
+Publishing and desired-state promotion do not prove deployment succeeded. The
+separate **Verify Development Deployment** workflow is an explicit manual,
+read-only observation step. It requires a deliberately configured existing
+runner/context and the exact promotion commit, then checks Argo sync, rollout,
+image digest and the successful PostSync smoke from that revision. It never
+applies or syncs resources. See [delivery verification](docs/delivery-verification.md)
+for setup, local checks, CRD exceptions and recovery.
 
 ## Test
 

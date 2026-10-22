@@ -13,9 +13,8 @@ export function Standings({runId}: {runId: string}) {
   const {cursor, history, resetPage, previous, next} = usePagination();
   const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const requestKey = JSON.stringify([runId, group, query, limit, cursor]);
-  const {page, pending, error} = usePaginatedRequest(requestKey,
-    signal => listStandings(runId, {group, query, limit, cursor}, signal),
-    result => { if (!group) setGroup(result.selectedGroup); });
+  const {page, pending, error, retry} = usePaginatedRequest(requestKey,
+    signal => listStandings(runId, {group, query, limit, cursor}, signal));
   const selectGroup = (next: string) => { setGroup(next); resetPage(); };
   const onTabKey = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
     if (!page) return;
@@ -37,7 +36,8 @@ export function Standings({runId}: {runId: string}) {
       <output aria-live="polite">{!pending && page ? `${formatNumber(page.total)} matching entrants` : 'Loading…'}</output>
       <Pager page={history.length + 1} total={page?.total || 0} limit={limit} previous={!pending && history.length > 0} next={!pending && Boolean(page?.nextCursor)} onPrevious={previous} onNext={() => next(page?.nextCursor)} />
     </div>
-    {error && <p className="inline-error" role="alert">{error}</p>}
+    {error && <div><p className="inline-error" role="alert">{error}</p>
+      <button type="button" onClick={retry} disabled={pending}>Retry standings</button></div>}
     {page && <>
       <div className="tabs" role="tablist" aria-label="Tournament groups">{page.groups.map((item, index) => <button key={item.group} ref={node => { tabRefs.current[index] = node; }} id={`standings-tab-${index}`} role="tab" type="button" aria-selected={item.group === page.selectedGroup} aria-controls="standings-panel" tabIndex={item.group === page.selectedGroup ? 0 : -1} onClick={() => selectGroup(item.group)} onKeyDown={event => onTabKey(event, index)}>Group {item.group}</button>)}</div>
       <article id="standings-panel" className="tab-panel" role="tabpanel" aria-labelledby={`standings-tab-${page.groups.findIndex(item => item.group === page.selectedGroup)}`}>

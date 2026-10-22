@@ -1,0 +1,67 @@
+name: Verify Development Deployment
+
+# Observation is a separate manual operation. Publishing images never queues a
+# runner or assumes an existing Kubernetes installation can be reached from CI.
+on:
+  workflow_dispatch:
+    inputs:
+      promoted_revision:
+        description: Full desired-state promotion commit SHA printed by the release workflow
+        type: string
+        required: true
+      runner_ready:
+        description: I verified the dedicated runner is online with the configured read-only context
+        type: boolean
+        required: true
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  configuration:
+    name: Check observation configuration
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      runner: ${{ steps.configuration.outputs.runner }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - name: Refuse missing runner/context or unconfirmed dispatch
+        id: configuration
+        env:
+          RUNNER_READY: ${{ inputs.runner_ready }}
+          DEV_VERIFY_RUNNER: ${{ vars.DEV_VERIFY_RUNNER }}
+          DEV_VERIFY_CONTEXT: ${{ vars.DEV_VERIFY_CONTEXT }}
+          PROMOTED_REVISION: ${{ inputs.promoted_revision }}
+        run: python scripts/deployment-verification-config.py
+
+  observe:
+    name: Verify exact revision, rollout and PostSync smoke
+    needs: configuration
+    runs-on: ${{ fromJSON(needs.configuration.outputs.runner) }}
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+          path: verification
+          persist-credentials: false
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.promoted_revision }}
+          path: selected-release
+          persist-credentials: false
+      - name: Observe the configured cluster (read-only)
+        env:
+          DEV_VERIFY_CONTEXT: ${{ vars.DEV_VERIFY_CONTEXT }}
+          PROMOTED_REVISION: ${{ inputs.promoted_revision }}
+          DEV_VERIFY_SELECTION: selected-release/k8s/gitops/overlays/dev/release-selection.json
+        run: python verification/scripts/verify-dev-deployment.py --timeout 240

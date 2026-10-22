@@ -1,6 +1,7 @@
 import {KeyboardEvent, useEffect, useState} from 'react';
 import type {Bracket, RunDetail} from '../types';
 import {AppHeader} from '../components';
+import {ShowdownAssetsWarning} from '../ShowdownAssetsWarning';
 import {BackToRuns} from './shared';
 import {Summary, Verification} from './summary';
 import {Standings} from './standings';
@@ -60,6 +61,7 @@ export default function ReportView({run, bracket, goHome}: {
     </header>
     <SectionNavigation hasPods={hasPods} />
     <main id="main-content" tabIndex={-1}>
+      <ShowdownAssetsWarning />
       <Summary run={run} />
       <Verification run={run} />
       <Standings runId={run.runId} />

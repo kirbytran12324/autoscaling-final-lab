@@ -24,15 +24,30 @@ test('artifact paths reject traversal and symlinked run directories', async t =>
       error instanceof ArtifactStoreError && error.code === 'INVALID_RUN_ID'
     );
   }
-  await symlink(join(root, 'runs', FIXTURE_RUN_ID), join(root, 'runs', 'linked-run'));
+  await symlink(join(root, 'runs', FIXTURE_RUN_ID), join(root, 'runs', 'linked-run'),
+    process.platform === 'win32' ? 'junction' : 'dir');
   await assert.rejects(
     store.getRun('linked-run'),
     error => error instanceof ArtifactStoreError && error.code === 'RUN_NOT_FOUND'
   );
+});
 
+test('artifact files reject symlinks to external files', async t => {
+  const root = await createFixtureRoot();
+  t.after(() => removeFixtureRoot(root));
+  const store = new FilesystemArtifactStore({stateRoot: root});
+  const externalPath = join(root, 'external-standings.json');
   const standingsPath = join(root, 'runs', FIXTURE_RUN_ID, 'standings.json');
+  await writeFile(externalPath, await readFile(standingsPath));
   await unlink(standingsPath);
-  await symlink('/etc/passwd', standingsPath);
+  try {
+    await symlink(externalPath, standingsPath, 'file');
+  } catch (error) {
+    if (process.platform === 'win32' && ['EPERM', 'EACCES'].includes(error.code)) {
+      return t.skip('Windows file symlink privileges are unavailable; Linux must run this security check.');
+    }
+    throw error;
+  }
   await assert.rejects(
     store.getRun(FIXTURE_RUN_ID),
     error => error instanceof ArtifactStoreError && error.code === 'INVALID_RUN'

@@ -17,11 +17,14 @@ concurrency:
 
 jobs:
   node-tests:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 5
+    env:
+      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
     strategy:
       fail-fast: false
       matrix:
+        os: [ubuntu-latest, windows-latest]
         package: [simulator, explorer-api, explorer-web, control-api]
     steps:
       - uses: actions/checkout@v6
@@ -47,18 +50,37 @@ jobs:
         if: matrix.package == 'explorer-web'
         working-directory: explorer-web
         run: npm run build
-      - name: Install browser for controls validation
-        if: matrix.package == 'explorer-web'
-        working-directory: explorer-web
-        run: npx playwright install --with-deps chromium
+      - name: Verify runner Chrome without installing a browser
+        if: matrix.package == 'explorer-web' && matrix.os == 'ubuntu-latest'
+        timeout-minutes: 1
+        run: |
+          command -v google-chrome >/dev/null || {
+            echo '::error::The hosted runner must provide Google Chrome; CI will not install a browser.'
+            exit 1
+          }
+          google-chrome --version
+      - name: Install control verifier for signed browser fixtures
+        if: matrix.package == 'explorer-web' && matrix.os == 'ubuntu-latest'
+        run: npm ci --prefix control-api --ignore-scripts
       - name: Check browser controls with isolated Kubernetes fixtures
-        if: matrix.package == 'explorer-web'
+        if: matrix.package == 'explorer-web' && matrix.os == 'ubuntu-latest'
+        timeout-minutes: 1
         working-directory: explorer-web
+        env:
+          CONTROL_CHECK_BROWSER: chrome
+        run: npm run check:controls
+      - name: Check managed controls with signed ALB fixtures
+        if: matrix.package == 'explorer-web' && matrix.os == 'ubuntu-latest'
+        timeout-minutes: 1
+        working-directory: explorer-web
+        env:
+          CONTROL_CHECK_BROWSER: chrome
+          CONTROL_CHECK_AUTH_MODE: alb
         run: npm run check:controls
 
   load-test:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-python@v6
@@ -71,7 +93,7 @@ jobs:
 
   manifests:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v6
       - uses: azure/setup-kubectl@v4
@@ -85,12 +107,38 @@ jobs:
           node-version: '24.20.0'
       - run: pip install -r scripts/requirements-validation.txt
       - run: python scripts/test-dev-promotion.py
-      - run: python scripts/validate-manifests.py
+      - run: python scripts/install-kubeconform.py
+      - run: python -m unittest discover -s scripts/test -p 'test_delivery*.py'
+      - run: python scripts/validate-manifests.py --schema
+
+  terraform:
+    name: Offline Terraform and lifecycle guards
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      CHECKPOINT_DISABLE: '1'
+      AWS_EC2_METADATA_DISABLED: 'true'
+    steps:
+      - uses: actions/checkout@v6
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: '1.16.5'
+          terraform_wrapper: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24.20.0'
+      - run: terraform -chdir=infra/aws/lab fmt -check -recursive
+      - name: Install the locked provider without a backend
+        run: terraform -chdir=infra/aws/lab init -backend=false -lockfile=readonly -input=false
+      - run: terraform -chdir=infra/aws/lab validate -no-color
+      - name: Run mocked plans only (no AWS credentials)
+        run: terraform -chdir=infra/aws/lab test -no-color
+      - run: node --test infra/aws/tools/foundation-guards.test.mjs
 
   images:
-    needs: [node-tests, load-test, manifests, operations]
+    needs: [node-tests, load-test, manifests, operations, terraform]
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 5
     permissions:
       contents: read
       packages: write
@@ -172,7 +220,9 @@ jobs:
         if: matrix.name == 'explorer-web'
         env:
           IMAGE_REF: ghcr.io/${{ steps.registry.outputs.owner }}/metronome-${{ matrix.name }}:${{ github.sha }}
-        run: node scripts/check-web-image.mjs "$IMAGE_REF"
+        run: |
+          npm ci --prefix control-api --ignore-scripts
+          node scripts/check-web-image.mjs "$IMAGE_REF"
       - name: Test packaged load generator without sending traffic
         if: matrix.name == 'load-test'
         env:
@@ -224,7 +274,7 @@ jobs:
           retention-days: 30
 
   operations:
-    timeout-minutes: 10
+    timeout-minutes: 5
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
