@@ -9,7 +9,7 @@ const {
   writeFile,
 } = require('node:fs/promises');
 const {tmpdir} = require('node:os');
-const {join} = require('node:path');
+const {basename, join} = require('node:path');
 const test = require('node:test');
 const {
   buildGroupStageRecoveryPlan,
@@ -73,7 +73,7 @@ test('sample finalization writes standings, r16 bracket, then checkpoint', async
     now: () => INITIAL_TIME,
   });
 
-  assert.deepEqual(writes.map(write => write.path.split('/').at(-1)), [
+  assert.deepEqual(writes.map(write => basename(write.path)), [
     'standings.json',
     'bracket.json',
     'checkpoint.json',
@@ -184,7 +184,7 @@ test('final artifact failures never advance the knockout checkpoint', async t =>
       await assert.rejects(
         executeGroupStagePlan(plan, {
           async atomicWriteJson(path) {
-            const fileName = path.split('/').at(-1);
+            const fileName = basename(path);
             writes.push(fileName);
             if (fileName === failedArtifact) throw storageError;
           },

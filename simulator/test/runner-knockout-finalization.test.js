@@ -9,7 +9,7 @@ const {
   writeFile,
 } = require('node:fs/promises');
 const {tmpdir} = require('node:os');
-const {join} = require('node:path');
+const {basename, join} = require('node:path');
 const test = require('node:test');
 const {
   buildKnockoutRecoveryPlan,
@@ -68,7 +68,7 @@ test('completed round writes enriched bracket before the next checkpoint', async
     },
     async appendJsonLine() {},
     async atomicWriteJson(path, value) {
-      writes.push({name: path.split('/').at(-1), value: structuredClone(value)});
+      writes.push({name: basename(path), value: structuredClone(value)});
     },
     now: () => INITIAL_TIME,
   });
@@ -163,7 +163,7 @@ test('final completion writes bracket, checkpoint, then metadata', async t => {
     },
     async appendJsonLine() {},
     async atomicWriteJson(path, value) {
-      writes.push({name: path.split('/').at(-1), value: structuredClone(value)});
+      writes.push({name: basename(path), value: structuredClone(value)});
     },
     now: () => INITIAL_TIME,
   });

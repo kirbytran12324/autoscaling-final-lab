@@ -9,7 +9,7 @@ const {
   writeFile,
 } = require('node:fs/promises');
 const {tmpdir} = require('node:os');
-const {join} = require('node:path');
+const {basename, join} = require('node:path');
 const test = require('node:test');
 const {
   buildKnockoutRecoveryPlan,
@@ -79,7 +79,7 @@ test('request failure drains already-started knockout successes', async t => {
       await appendStateJsonLine(path, value);
     },
     async atomicWriteJson(path, value) {
-      events.push(`${path.split('/').at(-1)}:${value.status || value.stage}`);
+      events.push(`${basename(path)}:${value.status || value.stage}`);
     },
     now: () => INITIAL_TIME,
   });
@@ -155,7 +155,7 @@ test('knockout storage failures do not mark metadata failed', async t => {
         events.push('append');
       },
       async atomicWriteJson(path) {
-        events.push(path.split('/').at(-1));
+        events.push(basename(path));
         throw storageError;
       },
     }), error => error === storageError);
@@ -190,7 +190,7 @@ test('knockout storage failures do not mark metadata failed', async t => {
       },
       async appendJsonLine() {},
       async atomicWriteJson(path) {
-        writes.push(path.split('/').at(-1));
+        writes.push(basename(path));
         if (path.endsWith('bracket.json')) throw storageError;
       },
       now: () => INITIAL_TIME,
