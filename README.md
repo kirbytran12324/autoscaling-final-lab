@@ -639,7 +639,10 @@ documented in the
 
 Repository CI runs the simulator, explorer API, frontend and control API native
 test suites on Linux and Windows, builds the frontend, and tests Locust on
-Linux. Browser controls and container checks run on Linux. Every Kustomization
+Linux. Browser controls use Chrome already installed on the Linux runner,
+without browser/system-dependency installation. Each authentication-mode browser
+check has a one-minute limit, and every workflow job has a five-minute limit.
+Container checks run on Linux. Every Kustomization
 is rendered and its core resources checked with a checksum-pinned strict schema
 validator; controller-specific CRD exceptions are reported explicitly. Terraform
 formatting, locked-provider initialization without a backend, validation, mocked

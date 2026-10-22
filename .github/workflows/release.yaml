@@ -39,7 +39,7 @@ jobs:
       github.repository == 'kirbytran12324/autoscaling-final-lab' &&
       github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 5
     permissions:
       contents: write
       actions: read

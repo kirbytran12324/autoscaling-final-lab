@@ -47,7 +47,7 @@ jobs:
     name: Verify exact revision, rollout and PostSync smoke
     needs: configuration
     runs-on: ${{ fromJSON(needs.configuration.outputs.runner) }}
-    timeout-minutes: 8
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v6
         with:
@@ -64,4 +64,4 @@ jobs:
           DEV_VERIFY_CONTEXT: ${{ vars.DEV_VERIFY_CONTEXT }}
           PROMOTED_REVISION: ${{ inputs.promoted_revision }}
           DEV_VERIFY_SELECTION: selected-release/k8s/gitops/overlays/dev/release-selection.json
-        run: python verification/scripts/verify-dev-deployment.py
+        run: python verification/scripts/verify-dev-deployment.py --timeout 240

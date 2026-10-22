@@ -8,7 +8,19 @@ checks below migrates the application to AWS or provisions infrastructure.
 
 The reusable CI workflow tests all four Node packages on Ubuntu and Windows.
 Frontend builds run on both; browser controls and packaged container checks run
-on Linux. Each of the five production images is built once, tested, and then
+on Linux. Every workflow job has a five-minute execution limit; jobs running in
+parallel and later image jobs have separate budgets, not one shared workflow
+deadline. Browser controls use the hosted Ubuntu runner's installed Google
+Chrome, log its version, and have a one-minute limit per authentication mode.
+CI does not download a browser or install its system dependencies. A missing
+Chrome installation fails explicitly, with no installation fallback.
+`PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1` also prevents browser downloads during
+dependency installation.
+Local validation can opt into an already installed browser with
+`CONTROL_CHECK_BROWSER=chrome` or `msedge`; the default local Playwright browser
+setup remains a separate manual choice.
+
+Each of the five production images is built once, tested, and then
 pushed unchanged when publication is enabled. `verified-release-<attempt>`
 records their digests, source commit, workflow URL and attempt. Promote the
 recorded digest rather than rebuilding or relying on a reusable tag.
@@ -142,8 +154,10 @@ that revision, and its successful `PostSync` hook result. It checks observed
 Deployment generation, updated/available/ready replicas and the selected image
 digest. The completed smoke Job must fall within that operation's timestamps;
 an old successful Job cannot satisfy a newer release. Argo status is read again
-before reporting success to detect a concurrent sync. Polling is bounded to
-five minutes by default. Failed checks do not mutate or roll back anything.
+before reporting success to detect a concurrent sync. Local polling is bounded
+to five minutes by default; the workflow selects four minutes to leave setup
+and cleanup time inside its five-minute job budget. Failed checks do not mutate
+or roll back anything.
 
 For local observation, use the selection file from the promoted checkout:
 
