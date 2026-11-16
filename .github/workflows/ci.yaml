@@ -138,10 +138,12 @@ jobs:
   images:
     needs: [node-tests, load-test, manifests, operations, terraform]
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     permissions:
       contents: read
       packages: write
+    env:
+      OCI_HANDOFF: ${{ github.event_name == 'pull_request' && !inputs.publish && matrix.oci }}
     strategy:
       fail-fast: false
       matrix:
@@ -149,12 +151,15 @@ jobs:
           - name: simulator
             context: simulator
             file: simulator/Dockerfile
+            oci: true
           - name: explorer-api
             context: .
             file: explorer-api/Dockerfile
+            oci: true
           - name: explorer-web
             context: explorer-web
             file: explorer-web/Dockerfile
+            oci: true
           - name: load-test
             context: load-test
             file: load-test/Dockerfile
@@ -163,6 +168,11 @@ jobs:
             file: control-api/Dockerfile
     steps:
       - uses: actions/checkout@v6
+      - name: Enable Docker OCI image loading
+        if: env.OCI_HANDOFF == 'true'
+        uses: docker/setup-docker-action@v5
+        with:
+          daemon-config: '{"features":{"containerd-snapshotter":true}}'
       - uses: docker/setup-buildx-action@v3
       - name: Normalize registry owner
         id: registry
@@ -176,11 +186,16 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Build image for testing
+        id: build
         uses: docker/build-push-action@v6
         with:
           context: ${{ matrix.context }}
           file: ${{ matrix.file }}
-          load: true
+          load: ${{ env.OCI_HANDOFF != 'true' }}
+          outputs: ${{ env.OCI_HANDOFF == 'true' && format('type=oci,dest={0}/{1}.oci.tar', runner.temp, matrix.name) || '' }}
+          platforms: ${{ env.OCI_HANDOFF == 'true' && 'linux/amd64' || '' }}
+          provenance: ${{ env.OCI_HANDOFF == 'true' && 'false' || '' }}
+          sbom: ${{ env.OCI_HANDOFF == 'true' && 'false' || '' }}
           push: false
           tags: ghcr.io/${{ steps.registry.outputs.owner }}/metronome-${{ matrix.name }}:${{ github.sha }}
           cache-from: type=gha,scope=${{ matrix.name }}
@@ -188,6 +203,17 @@ jobs:
           labels: |
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
+      - name: Load OCI archive for packaged tests
+        if: env.OCI_HANDOFF == 'true'
+        env:
+          IMAGE_NAME: ${{ matrix.name }}
+          IMAGE_REF: ghcr.io/${{ steps.registry.outputs.owner }}/metronome-${{ matrix.name }}:${{ github.sha }}
+          BUILD_DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          [[ "$BUILD_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]
+          docker load --input "$RUNNER_TEMP/$IMAGE_NAME.oci.tar"
+          loaded_digest="$(docker image inspect "$IMAGE_REF" --format '{{.Descriptor.Digest}}')"
+          [[ "$loaded_digest" == "$BUILD_DIGEST" ]]
       - name: Test packaged control API
         if: matrix.name == 'control-api'
         env:
@@ -233,6 +259,27 @@ jobs:
             --mount "type=bind,source=$GITHUB_WORKSPACE/load-test/test_locustfile.py,target=/home/locust/test_locustfile.py,readonly" \
             --workdir /home/locust --entrypoint python \
             "$IMAGE_REF" -m unittest discover -s /home/locust -p 'test_*.py'
+      - name: Record tested OCI archive
+        if: env.OCI_HANDOFF == 'true'
+        env:
+          IMAGE_NAME: ${{ matrix.name }}
+          BUILD_DIGEST: ${{ steps.build.outputs.digest }}
+        working-directory: ${{ runner.temp }}
+        run: |
+          sha256sum "$IMAGE_NAME.oci.tar" > "$IMAGE_NAME.oci.tar.sha256"
+          printf '%s\n' "$BUILD_DIGEST" > "$IMAGE_NAME.manifest-digest"
+      - name: Upload tested OCI archive
+        if: env.OCI_HANDOFF == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: oci-handoff-${{ matrix.name }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/${{ matrix.name }}.oci.tar
+            ${{ runner.temp }}/${{ matrix.name }}.oci.tar.sha256
+            ${{ runner.temp }}/${{ matrix.name }}.manifest-digest
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
       - name: Publish tested image
         if: inputs.publish == true
         env:
@@ -292,6 +339,48 @@ jobs:
           shellcheck -x -P SCRIPTDIR scripts/*.sh
           python3 -m unittest discover -s scripts/test -p 'test_*.py'
 
+  oci-handoff:
+    name: Verify OCI handoff (dry run)
+    if: github.event_name == 'pull_request' && !inputs.publish
+    needs: images
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - name: Download tested OCI archives
+        uses: actions/download-artifact@v4
+        with:
+          pattern: oci-handoff-*-${{ github.run_attempt }}
+          path: oci-handoff
+      - name: Verify archive checksums and manifest digests
+        shell: bash
+        run: |
+          {
+            echo '### OCI handoff dry run'
+            echo '| Image | Archive bytes | Verified manifest digest |'
+            echo '| --- | ---: | --- |'
+            for image in simulator explorer-api explorer-web; do
+              (
+                cd "oci-handoff/oci-handoff-$image-$GITHUB_RUN_ATTEMPT"
+                archive="$image.oci.tar"
+                expected_checksum="$(cut -d ' ' -f 1 "$archive.sha256")"
+                actual_checksum="$(sha256sum "$archive" | cut -d ' ' -f 1)"
+                [[ "$actual_checksum" == "$expected_checksum" ]]
+
+                expected_digest="$(cat "$image.manifest-digest")"
+                [[ "$expected_digest" =~ ^sha256:[0-9a-f]{64}$ ]]
+                index_digest="$(tar -xOf "$archive" index.json | jq -er '
+                  .manifests | select(length == 1) | .[0]
+                  | select(.mediaType == "application/vnd.oci.image.manifest.v1+json")
+                  | .digest')"
+                [[ "$index_digest" == "$expected_digest" ]]
+                manifest_hash="$(tar -xOf "$archive" "blobs/sha256/${expected_digest#sha256:}" | sha256sum | cut -d ' ' -f 1)"
+                [[ "sha256:$manifest_hash" == "$expected_digest" ]]
+                printf '| %s | %s | %s |\n' "$image" "$(stat -c %s "$archive")" "$expected_digest"
+              )
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
+
   release-ready:
     name: Assemble verified release
     needs: images
@@ -344,3 +433,4 @@ jobs:
           path: release.json
           if-no-files-found: error
           retention-days: 30
+
